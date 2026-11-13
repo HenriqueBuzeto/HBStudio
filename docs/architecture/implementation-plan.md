@@ -1,8 +1,8 @@
 # Implementation Plan — ERP Enterprise de Tecnologia Multinegócios
 
 **Data:** 13/11/2026  
-**Status:** DRAFT / INICIANDO FASE 0  
-**Stack de Referência:** Next.js App Router (TSX) + Tailwind / shadcn/ui + ASP.NET Core .NET 10 LTS (C#) + EF Core / Npgsql + PostgreSQL (Neon)
+**Status:** FASE 0 HOMOLOGADA (`READY_VERIFIED`) — INICIANDO FASE 1 (MOD-01, MOD-02, MOD-03)  
+**Stack de Referência:** Next.js App Router (TSX) + Tailwind / shadcn/ui + ASP.NET Core .NET 10 LTS (C#) + EF Core / Npgsql + PostgreSQL 18 / Neon
 
 ---
 

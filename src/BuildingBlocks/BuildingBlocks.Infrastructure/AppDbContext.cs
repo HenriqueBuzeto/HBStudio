@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using BuildingBlocks.Domain;
 using BuildingBlocks.Application;
+using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
 using IdentityAccess.Domain;
 
 namespace BuildingBlocks.Infrastructure;
@@ -46,6 +47,12 @@ public class AppDbContext : DbContext
             b.Property(br => br.Code).HasMaxLength(50).IsRequired();
             b.HasIndex(br => new { br.TenantId, br.Code }).IsUnique();
             b.Property(br => br.Version).IsRowVersion();
+
+            // FK composta com Tenant
+            b.HasOne<Tenant>()
+             .WithMany(t => t.Branches)
+             .HasForeignKey(br => br.TenantId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<User>(b =>
@@ -56,6 +63,16 @@ public class AppDbContext : DbContext
             b.Property(u => u.Email).HasMaxLength(250).IsRequired();
             b.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
             b.Property(u => u.Version).IsRowVersion();
+
+            b.HasOne<Tenant>()
+             .WithMany()
+             .HasForeignKey(u => u.TenantId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Branch>()
+             .WithMany()
+             .HasForeignKey(u => u.DefaultBranchId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Role>(b =>
@@ -65,12 +82,32 @@ public class AppDbContext : DbContext
             b.Property(r => r.Name).HasMaxLength(100).IsRequired();
             b.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
             b.Property(r => r.Version).IsRowVersion();
+
+            b.HasOne<Tenant>()
+             .WithMany()
+             .HasForeignKey(r => r.TenantId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<UserRole>(b =>
         {
             b.ToTable("user_roles");
             b.HasKey(ur => new { ur.TenantId, ur.UserId, ur.RoleId });
+
+            b.HasOne<Tenant>()
+             .WithMany()
+             .HasForeignKey(ur => ur.TenantId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<User>()
+             .WithMany(u => u.UserRoles)
+             .HasForeignKey(ur => ur.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne<Role>()
+             .WithMany()
+             .HasForeignKey(ur => ur.RoleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<RolePermission>(b =>
@@ -78,6 +115,16 @@ public class AppDbContext : DbContext
             b.ToTable("role_permissions");
             b.HasKey(rp => new { rp.TenantId, rp.RoleId, rp.PermissionKey });
             b.Property(rp => rp.PermissionKey).HasMaxLength(100).IsRequired();
+
+            b.HasOne<Tenant>()
+             .WithMany()
+             .HasForeignKey(rp => rp.TenantId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Role>()
+             .WithMany(r => r.Permissions)
+             .HasForeignKey(rp => rp.RoleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditEvent>(b =>
@@ -89,6 +136,10 @@ public class AppDbContext : DbContext
             b.Property(a => a.Action).HasMaxLength(50).IsRequired();
             b.Property(a => a.ActorEmail).HasMaxLength(250).IsRequired();
             b.Property(a => a.CorrelationId).HasMaxLength(100);
+            b.Property(a => a.BeforeStateJson).HasColumnType("jsonb");
+            b.Property(a => a.AfterStateJson).HasColumnType("jsonb");
+
+            b.HasIndex(a => new { a.TenantId, a.CreatedAtUtc });
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos
@@ -105,31 +156,83 @@ public class AppDbContext : DbContext
         }
     }
 
+    public Guid CurrentTenantId => _executionContext?.TenantId ?? Guid.Empty;
+    public bool IsContextAuthenticated => _executionContext?.IsAuthenticated ?? false;
+
     private void ConfigureTenantFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, ITenantScoped
     {
-        modelBuilder.Entity<TEntity>().HasQueryFilter(e => _executionContext == null || e.TenantId == _executionContext.TenantId);
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e => !IsContextAuthenticated || e.TenantId == CurrentTenantId);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        var entries = ChangeTracker.Entries<ITenantScoped>()
-            .Where(e => e.State == EntityState.Added)
+        // 1. Validar e Forçar Isolamento de Tenant
+        var tenantEntries = ChangeTracker.Entries<ITenantScoped>()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)
             .ToList();
 
         if (_executionContext != null && _executionContext.IsAuthenticated && _executionContext.TenantId != Guid.Empty)
         {
-            foreach (var entry in entries)
+            foreach (var entry in tenantEntries)
             {
-                if (entry.Entity.TenantId == Guid.Empty)
+                if (entry.State == EntityState.Added)
                 {
-                    // Fail-safe: herda do contexto se não explicitado na entidade
-                    entry.Property(nameof(ITenantScoped.TenantId)).CurrentValue = _executionContext.TenantId;
+                    if (entry.Entity.TenantId == Guid.Empty)
+                    {
+                        entry.Property(nameof(ITenantScoped.TenantId)).CurrentValue = _executionContext.TenantId;
+                    }
+                    else if (entry.Entity.TenantId != _executionContext.TenantId)
+                    {
+                        throw new InvalidOperationException("Tentativa de gravação com TenantId diferente do contexto autenticado.");
+                    }
                 }
-                else if (entry.Entity.TenantId != _executionContext.TenantId)
+                else if (entry.State == EntityState.Modified)
                 {
-                    throw new InvalidOperationException("Tentativa de gravação com TenantId diferente do contexto autenticado.");
+                    var originalTenantId = entry.OriginalValues.GetValue<Guid>(nameof(ITenantScoped.TenantId));
+                    if (originalTenantId != _executionContext.TenantId || entry.Entity.TenantId != _executionContext.TenantId)
+                    {
+                        throw new InvalidOperationException("Violação de segurança: Não é permitido alterar ou transferir TenantId.");
+                    }
                 }
             }
+        }
+
+        // 2. Gravar Eventos de Auditoria Sanitizada Automaticamente
+        var auditedEntries = ChangeTracker.Entries<BaseEntity>()
+            .Where(e => e.Entity is not AuditEvent && 
+                       (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
+            .ToList();
+
+        var auditList = new List<AuditEvent>();
+        foreach (var entry in auditedEntries)
+        {
+            var action = entry.State switch
+            {
+                EntityState.Added => "INSERT",
+                EntityState.Modified => "UPDATE",
+                EntityState.Deleted => "DELETE",
+                _ => "UNKNOWN"
+            };
+
+            Guid? tenantId = (entry.Entity as ITenantScoped)?.TenantId ?? _executionContext?.TenantId;
+            Guid? branchId = (entry.Entity as IBranchScoped)?.BranchId ?? _executionContext?.BranchId;
+
+            var audit = new AuditEvent(
+                tenantId,
+                branchId,
+                entry.Entity.GetType().Name,
+                entry.Property("Id").CurrentValue?.ToString() ?? Guid.Empty.ToString(),
+                action,
+                _executionContext?.UserId,
+                _executionContext?.UserEmail ?? "system",
+                _executionContext is AppExecutionContext ec ? ec.CorrelationId : null
+            );
+            auditList.Add(audit);
+        }
+
+        if (auditList.Count > 0)
+        {
+            AuditEvents.AddRange(auditList);
         }
 
         return await base.SaveChangesAsync(cancellationToken);

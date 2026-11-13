@@ -3,7 +3,7 @@ namespace BuildingBlocks.Domain;
 public interface IEntity
 {
     Guid Id { get; }
-    byte[] Version { get; }
+    uint Version { get; }
 }
 
 public interface ITenantScoped
@@ -21,7 +21,7 @@ public abstract class BaseEntity : IEntity
     public Guid Id { get; protected set; } = Guid.NewGuid();
     public DateTime CreatedAtUtc { get; protected set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; protected set; }
-    public byte[] Version { get; set; } = [];
+    public uint Version { get; set; }
 }
 
 public abstract class TenantEntity : BaseEntity, ITenantScoped
