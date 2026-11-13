@@ -15,6 +15,11 @@
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Domain/IdentityAccess.Domain.csproj" />
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Infrastructure/IdentityAccess.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Parties/">
+    <Project Path="src/Modules/Parties/Parties.Application/Parties.Application.csproj" />
+    <Project Path="src/Modules/Parties/Parties.Domain/Parties.Domain.csproj" />
+    <Project Path="src/Modules/Parties/Parties.Infrastructure/Parties.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj" />
   </Folder>

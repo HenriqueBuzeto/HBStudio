@@ -4,6 +4,8 @@
     <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.Security\BuildingBlocks.Security.csproj" />
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\IdentityAccess.Infrastructure\IdentityAccess.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Parties\Parties.Application\Parties.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Parties\Parties.Infrastructure\Parties.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

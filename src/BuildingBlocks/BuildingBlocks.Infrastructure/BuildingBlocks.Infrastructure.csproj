@@ -4,6 +4,7 @@
     <ProjectReference Include="..\BuildingBlocks.Domain\BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\BuildingBlocks.Application\BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\Modules\IdentityAccess\IdentityAccess.Domain\IdentityAccess.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Parties\Parties.Domain\Parties.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

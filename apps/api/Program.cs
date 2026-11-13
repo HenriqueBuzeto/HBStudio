@@ -22,6 +22,9 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
     options.UseNpgsql(connectionString);
 });
 
+// Modulo Parties
+builder.Services.AddScoped<Parties.Application.IPartiesService, Parties.Application.PartiesService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -74,6 +77,63 @@ app.UseAuthorization();
 
 // Health Check Endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
+
+// Endpoints do Módulo Parties
+var partiesGroup = app.MapGroup("/api/parties").RequireAuthorization();
+
+partiesGroup.MapGet("/", async (
+    string? search, 
+    bool? onlyCustomers, 
+    bool? onlySuppliers, 
+    int? page, 
+    int? pageSize, 
+    Parties.Application.IPartiesService service, 
+    CancellationToken ct) =>
+{
+    var result = await service.ListAsync(search, onlyCustomers, onlySuppliers, page ?? 1, pageSize ?? 20, ct);
+    return Results.Ok(result);
+}).RequireAuthorization(PermissionCatalog.CustomersView);
+
+partiesGroup.MapGet("/{id:guid}", async (Guid id, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var party = await service.GetByIdAsync(id, ct);
+    return party == null ? Results.NotFound() : Results.Ok(party);
+}).RequireAuthorization(PermissionCatalog.CustomersView);
+
+partiesGroup.MapPost("/", async (Parties.Application.CreatePartyRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var created = await service.CreateAsync(req, ct);
+    return Results.Created($"/api/parties/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CustomersCreate);
+
+partiesGroup.MapPut("/{id:guid}", async (Guid id, Parties.Application.UpdatePartyRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    try
+    {
+        var updated = await service.UpdateAsync(id, req, ct);
+        return Results.Ok(updated);
+    }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+    {
+        return Results.Conflict(new { error = "Conflito de concorrência detectado: o registro foi alterado simultaneamente por outro usuário." });
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
+
+partiesGroup.MapPost("/{id:guid}/equipments", async (Guid id, Parties.Application.AddEquipmentRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var eq = await service.AddEquipmentAsync(id, req, ct);
+    return Results.Created($"/api/parties/{id}/equipments/{eq.Id}", eq);
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
+
+partiesGroup.MapPost("/{id:guid}/consents", async (Guid id, Parties.Application.RecordConsentRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var consent = await service.RecordConsentAsync(id, req, ct);
+    return Results.Created($"/api/parties/{id}/consents/{consent.Id}", consent);
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

@@ -17,8 +17,8 @@
 
 | ID | Módulo | Bounded Context | Domínio | Persistência / Migrations | API REST | Frontend UI | Testes Automatizados | Status Homologado |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **MOD-00** | **Fundação & Segurança** | `IdentityAccess` & `BuildingBlocks` | Implementado | Implementado | Implementado | Implementado | 5/5 xUnit Aprovados | `READY_VERIFIED` |
-| **MOD-01** | **Pessoas & Contatos** | `Parties` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
+| **MOD-00** | **Fundação & Segurança** | `IdentityAccess` & `BuildingBlocks` | Implementado | Implementado | Implementado | Implementado | 11/11 xUnit Aprovados | `READY_VERIFIED` |
+| **MOD-01** | **Pessoas & Contatos** | `Parties` | Implementado | Implementado | Implementado | Implementado | 6/6 xUnit Aprovados (17 total) | `READY_VERIFIED` |
 | **MOD-02** | **Catálogo & Serialização (IMEI)** | `Catalog` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-03** | **Estoque & Kardex Imutável** | `Inventory` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-04** | **Compras & Recebimento** | `Procurement` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |

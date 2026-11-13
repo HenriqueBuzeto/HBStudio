@@ -29,6 +29,8 @@
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\IdentityAccess.Domain\IdentityAccess.Domain.csproj" />
     <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
     <ProjectReference Include="..\..\apps\api\api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Parties\Parties.Domain\Parties.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Parties\Parties.Application\Parties.Application.csproj" />
   </ItemGroup>
 
 </Project>
