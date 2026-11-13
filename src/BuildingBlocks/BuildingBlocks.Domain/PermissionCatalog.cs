@@ -1,0 +1,108 @@
+namespace BuildingBlocks.Domain;
+
+public static class PermissionCatalog
+{
+    // Clientes
+    public const string CustomersView = "customers.view";
+    public const string CustomersCreate = "customers.create";
+    public const string CustomersEdit = "customers.edit";
+    public const string CustomersExport = "customers.export";
+    public const string CustomersSensitiveView = "customers.sensitive.view";
+
+    // Catálogo
+    public const string CatalogProductsView = "catalog.products.view";
+    public const string CatalogProductsManage = "catalog.products.manage";
+    public const string CatalogCostView = "catalog.cost.view";
+
+    // Estoque
+    public const string InventoryView = "inventory.view";
+    public const string InventoryMove = "inventory.move";
+    public const string InventoryAdjust = "inventory.adjust";
+    public const string InventoryCostView = "inventory.cost.view";
+    public const string InventorySerialsView = "inventory.serials.view";
+
+    // Compras
+    public const string PurchasesView = "purchases.view";
+    public const string PurchasesCreate = "purchases.create";
+    public const string PurchasesApprove = "purchases.approve";
+    public const string PurchasesReceive = "purchases.receive";
+    public const string PurchasesCostView = "purchases.cost.view";
+
+    // PDV / Vendas
+    public const string SalesPosUse = "sales.pos.use";
+    public const string SalesCreate = "sales.create";
+    public const string SalesDiscountOverride = "sales.discount.override";
+    public const string SalesCancel = "sales.cancel";
+    public const string SalesCostView = "sales.cost.view";
+
+    // Caixa
+    public const string CashOpen = "cash.open";
+    public const string CashSupply = "cash.supply";
+    public const string CashWithdraw = "cash.withdraw";
+    public const string CashClose = "cash.close";
+    public const string CashReconcile = "cash.reconcile";
+    public const string CashApproveDifference = "cash.approve_difference";
+
+    // Assistência Técnica
+    public const string RepairsView = "repairs.view";
+    public const string RepairsCreate = "repairs.create";
+    public const string RepairsDiagnose = "repairs.diagnose";
+    public const string RepairsQuote = "repairs.quote";
+    public const string RepairsApprove = "repairs.approve";
+    public const string RepairsExecute = "repairs.execute";
+    public const string RepairsDeliver = "repairs.deliver";
+    public const string RepairsWarranty = "repairs.warranty";
+
+    // CRM
+    public const string CrmView = "crm.view";
+    public const string CrmManage = "crm.manage";
+    public const string CrmInterestManage = "crm.interest.manage";
+    public const string CrmCampaignSend = "crm.campaign.send";
+    public const string CrmMessageView = "crm.message.view";
+
+    // Financeiro
+    public const string FinancePayablesView = "finance.payables.view";
+    public const string FinancePay = "finance.pay";
+    public const string FinanceReceivablesView = "finance.receivables.view";
+    public const string FinanceSettle = "finance.settle";
+    public const string FinanceReconcile = "finance.reconcile";
+    public const string FinanceReportsView = "finance.reports.view";
+
+    // Societário & Investimentos
+    public const string PartnersView = "partners.view";
+    public const string PartnersCapitalManage = "partners.capital.manage";
+    public const string PartnersLoanManage = "partners.loan.manage";
+    public const string PartnersDistributionPropose = "partners.distribution.propose";
+    public const string PartnersDistributionApprove = "partners.distribution.approve";
+    public const string PartnersDistributionPay = "partners.distribution.pay";
+
+    // Fábrica 3D
+    public const string ManufacturingView = "manufacturing.view";
+    public const string ManufacturingQuote = "manufacturing.quote";
+    public const string ManufacturingSchedule = "manufacturing.schedule";
+    public const string ManufacturingExecute = "manufacturing.execute";
+    public const string ManufacturingCostView = "manufacturing.cost.view";
+
+    // Projetos Digitais
+    public const string ProjectsView = "projects.view";
+    public const string ProjectsManage = "projects.manage";
+    public const string ProjectsCostView = "projects.cost.view";
+    public const string ProjectsBillingManage = "projects.billing.manage";
+
+    // Fiscal
+    public const string FiscalDocumentsView = "fiscal.documents.view";
+    public const string FiscalIssue = "fiscal.issue";
+    public const string FiscalCancel = "fiscal.cancel";
+    public const string FiscalSettingsManage = "fiscal.settings.manage";
+
+    // Administração & Auditoria
+    public const string AccessManage = "access.manage";
+    public const string AuditView = "audit.view";
+    public const string AutomationManage = "automation.manage";
+
+    public static readonly IReadOnlyCollection<string> All = typeof(PermissionCatalog)
+        .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+        .Where(f => f.IsLiteral && !f.IsInitOnly && f.FieldType == typeof(string))
+        .Select(f => (string)f.GetValue(null)!)
+        .ToList();
+}

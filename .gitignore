@@ -1,0 +1,29 @@
+## Build and Tooling
+bin/
+obj/
+node_modules/
+.next/
+out/
+dist/
+build/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Environment and Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pfx
+*.pem
+*.key
+
+## IDE and OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
