@@ -6,6 +6,7 @@
     <ProjectReference Include="..\..\Modules\IdentityAccess\IdentityAccess.Domain\IdentityAccess.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Parties\Parties.Domain\Parties.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\Catalog.Domain\Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Inventory\Inventory.Domain\Inventory.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

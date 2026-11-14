@@ -203,6 +203,44 @@ public enum UnitOperationalStatus
     Sold = 5                       // Faturado no PDV / Venda
 }
 
+public enum IdentifierType
+{
+    Imei = 1,
+    SerialNumber = 2
+}
+
+public class InventoryUnitIdentifier : TenantEntity
+{
+    public Guid InventoryUnitId { get; private set; }
+    public InventoryUnit? InventoryUnit { get; private set; }
+    public IdentifierType IdentifierType { get; private set; }
+    public string NormalizedValue { get; private set; }
+    public bool IsPrimary { get; private set; }
+
+    private InventoryUnitIdentifier() { NormalizedValue = string.Empty; }
+
+    public InventoryUnitIdentifier(
+        Guid tenantId,
+        Guid inventoryUnitId,
+        IdentifierType identifierType,
+        string rawValue,
+        bool isPrimary = true) : base(tenantId)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            throw new ArgumentException("O valor do identificador não pode ser vazio.", nameof(rawValue));
+
+        InventoryUnitId = inventoryUnitId;
+        IdentifierType = identifierType;
+        NormalizedValue = Normalize(rawValue);
+        IsPrimary = isPrimary;
+    }
+
+    public static string Normalize(string rawValue)
+    {
+        return rawValue.Trim().Replace(" ", "").Replace("-", "").ToUpperInvariant();
+    }
+}
+
 public class InventoryUnit : TenantEntity
 {
     public Guid ProductSkuId { get; private set; }
@@ -218,6 +256,9 @@ public class InventoryUnit : TenantEntity
     public UnitOperationalStatus OperationalStatus { get; private set; }
     public string? InspectionNotes { get; private set; }
     public DateTime AcquisitionDateUtc { get; private set; }
+
+    private readonly List<InventoryUnitIdentifier> _identifiers = [];
+    public IReadOnlyCollection<InventoryUnitIdentifier> Identifiers => _identifiers.AsReadOnly();
 
     private InventoryUnit() { }
 
@@ -249,6 +290,21 @@ public class InventoryUnit : TenantEntity
         InspectionNotes = inspectionNotes?.Trim();
         OperationalStatus = UnitOperationalStatus.AcquiredPendingInspection;
         AcquisitionDateUtc = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(Imei1))
+        {
+            _identifiers.Add(new InventoryUnitIdentifier(tenantId, Id, IdentifierType.Imei, Imei1, isPrimary: true));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Imei2))
+        {
+            _identifiers.Add(new InventoryUnitIdentifier(tenantId, Id, IdentifierType.Imei, Imei2, isPrimary: false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(SerialNumber))
+        {
+            _identifiers.Add(new InventoryUnitIdentifier(tenantId, Id, IdentifierType.SerialNumber, SerialNumber, isPrimary: true));
+        }
     }
 
     public void ApproveForSale(string? approvalNotes = null)

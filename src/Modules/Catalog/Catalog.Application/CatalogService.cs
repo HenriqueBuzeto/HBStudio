@@ -258,21 +258,34 @@ public class CatalogService : ICatalogService
             }
         }
 
-        // Validação de IMEI duplicado por tenant
+        // Validação de identificador duplicado (IMEI ou Serial) global por tenant (impedindo colisão IMEI1 vs IMEI2)
+        var identifiersToCheck = new List<(IdentifierType Type, string Value)>();
         if (!string.IsNullOrWhiteSpace(request.Imei1))
+            identifiersToCheck.Add((IdentifierType.Imei, InventoryUnitIdentifier.Normalize(request.Imei1)));
+        if (!string.IsNullOrWhiteSpace(request.Imei2))
+            identifiersToCheck.Add((IdentifierType.Imei, InventoryUnitIdentifier.Normalize(request.Imei2)));
+        if (!string.IsNullOrWhiteSpace(request.SerialNumber))
+            identifiersToCheck.Add((IdentifierType.SerialNumber, InventoryUnitIdentifier.Normalize(request.SerialNumber)));
+
+        // Verificar colisão interna na mesma requisição (ex: IMEI1 igual ao IMEI2)
+        var duplicateInRequest = identifiersToCheck
+            .GroupBy(x => new { x.Type, x.Value })
+            .FirstOrDefault(g => g.Count() > 1);
+        if (duplicateInRequest != null)
         {
-            var existsImei1 = await _dbContext.InventoryUnits
-                .AnyAsync(u => u.Imei1 == request.Imei1.Trim(), ct);
-            if (existsImei1)
-                throw new InvalidOperationException($"Já existe uma unidade física cadastrada com o IMEI 1 '{request.Imei1}'.");
+            throw new ArgumentException($"O mesmo identificador ({duplicateInRequest.Key.Type} '{duplicateInRequest.Key.Value}') não pode ser informado mais de uma vez na mesma unidade física.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Imei2))
+        // Verificar existência no banco de identificadores normalizados
+        foreach (var item in identifiersToCheck)
         {
-            var existsImei2 = await _dbContext.InventoryUnits
-                .AnyAsync(u => u.Imei2 == request.Imei2.Trim(), ct);
-            if (existsImei2)
-                throw new InvalidOperationException($"Já existe uma unidade física cadastrada com o IMEI 2 '{request.Imei2}'.");
+            var exists = await _dbContext.InventoryUnitIdentifiers
+                .AnyAsync(i => i.IdentifierType == item.Type && i.NormalizedValue == item.Value, ct);
+
+            if (exists)
+            {
+                throw new InvalidOperationException($"Já existe uma unidade física cadastrada com o {item.Type} '{item.Value}' neste tenant.");
+            }
         }
 
         var unit = new InventoryUnit(

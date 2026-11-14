@@ -27,6 +27,7 @@ builder.Services.AddScoped<Parties.Application.IPartiesService, Parties.Applicat
 
 // Modulo Catalog & Inventory
 builder.Services.AddScoped<Catalog.Application.ICatalogService, Catalog.Application.CatalogService>();
+builder.Services.AddScoped<Inventory.Application.InventoryService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -290,6 +291,173 @@ catalogGroup.MapPut("/units/{id:guid}/approve", async (
         return Results.NotFound();
     }
 }).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+// Endpoints do Módulo Inventory & Kardex
+var inventoryGroup = app.MapGroup("/api/inventory").RequireAuthorization();
+
+// Almoxarifados e Localizações
+inventoryGroup.MapGet("/warehouses", async (
+    Guid? branchId,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListWarehousesAsync(branchId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.InventoryView);
+
+inventoryGroup.MapPost("/warehouses", async (
+    Inventory.Application.CreateWarehouseRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateWarehouseAsync(req, ct);
+    return Results.Created($"/api/inventory/warehouses/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+inventoryGroup.MapGet("/warehouses/{id:guid}/locations", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListLocationsAsync(id, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.InventoryView);
+
+inventoryGroup.MapPost("/warehouses/{id:guid}/locations", async (
+    Guid id,
+    Inventory.Application.CreateWarehouseLocationRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var created = await service.AddLocationAsync(id, req, ct);
+    return Results.Created($"/api/inventory/warehouses/{id}/locations/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+// Saldos e Posições de Estoque
+inventoryGroup.MapGet("/balances", async (
+    Guid? branchId,
+    Guid? warehouseId,
+    Guid? skuId,
+    System.Security.Claims.ClaimsPrincipal user,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.InventoryCostView);
+    var balances = await service.ListBalancesAsync(branchId, warehouseId, skuId, canViewCost, ct);
+    return Results.Ok(balances);
+}).RequireAuthorization(PermissionCatalog.InventoryView);
+
+// Kardex Imutável
+inventoryGroup.MapGet("/kardex", async (
+    Guid? branchId,
+    Guid? warehouseId,
+    Guid? skuId,
+    Guid? inventoryUnitId,
+    System.Security.Claims.ClaimsPrincipal user,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.InventoryCostView);
+    var history = await service.GetKardexAsync(branchId, warehouseId, skuId, inventoryUnitId, canViewCost, ct);
+    return Results.Ok(history);
+}).RequireAuthorization(PermissionCatalog.InventoryView);
+
+// Entrada Inicial / Recebimento de Estoque com Kardex
+inventoryGroup.MapPost("/initial-receipt", async (
+    Inventory.Application.InitialStockReceiptRequest req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.InventoryCostView);
+    var movement = await service.RegisterInitialReceiptAsync(req, canViewCost, ct);
+    return Results.Created($"/api/inventory/kardex/{movement.Id}", movement);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+// Reservas de Estoque
+inventoryGroup.MapPost("/reservations", async (
+    Inventory.Application.CreateReservationRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var reservation = await service.CreateReservationAsync(req, ct);
+    return Results.Created($"/api/inventory/reservations/{reservation.Id}", reservation);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+inventoryGroup.MapPost("/reservations/{id:guid}/release", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var released = await service.ReleaseReservationAsync(id, ct);
+    return Results.Ok(released);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+inventoryGroup.MapPost("/reservations/{id:guid}/consume", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var consumed = await service.ConsumeReservationAsync(id, ct);
+    return Results.Ok(consumed);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+// Transferências Entre Depósitos / Filiais
+inventoryGroup.MapPost("/transfers", async (
+    Inventory.Application.CreateTransferRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var transfer = await service.CreateTransferAsync(req, ct);
+    return Results.Created($"/api/inventory/transfers/{transfer.Id}", transfer);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+inventoryGroup.MapPost("/transfers/{id:guid}/dispatch", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var dispatched = await service.DispatchTransferAsync(id, ct);
+    return Results.Ok(dispatched);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+inventoryGroup.MapPost("/transfers/{id:guid}/receive", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var received = await service.ReceiveTransferAsync(id, ct);
+    return Results.Ok(received);
+}).RequireAuthorization(PermissionCatalog.InventoryMove);
+
+// Inventário Físico (Contagem e Reconciliação)
+inventoryGroup.MapPost("/counts", async (
+    Inventory.Application.CreateInventoryCountRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var count = await service.CreateCountAsync(req, ct);
+    return Results.Created($"/api/inventory/counts/{count.Id}", count);
+}).RequireAuthorization(PermissionCatalog.InventoryAdjust);
+
+inventoryGroup.MapPost("/counts/{id:guid}/records", async (
+    Guid id,
+    Inventory.Application.RecordCountItemRequest req,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.RecordCountItemAsync(id, req, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.InventoryAdjust);
+
+inventoryGroup.MapPost("/counts/{id:guid}/approve-post", async (
+    Guid id,
+    Inventory.Application.InventoryService service,
+    CancellationToken ct) =>
+{
+    var posted = await service.ApproveAndPostCountAsync(id, ct);
+    return Results.Ok(posted);
+}).RequireAuthorization(PermissionCatalog.InventoryAdjust);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

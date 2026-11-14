@@ -5,6 +5,7 @@ using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
 using IdentityAccess.Domain;
 using Parties.Domain;
 using Catalog.Domain;
+using Inventory.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -29,12 +30,26 @@ public class AppDbContext : DbContext
     public DbSet<CustomerEquipment> CustomerEquipments => Set<CustomerEquipment>();
     public DbSet<PartyConsentRecord> PartyConsentRecords => Set<PartyConsentRecord>();
 
-    // Modulo Catalog & Inventory
+    // Modulo Catalog
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<ProductBrand> ProductBrands => Set<ProductBrand>();
     public DbSet<ProductModel> ProductModels => Set<ProductModel>();
     public DbSet<ProductSku> ProductSkus => Set<ProductSku>();
     public DbSet<InventoryUnit> InventoryUnits => Set<InventoryUnit>();
+    public DbSet<InventoryUnitIdentifier> InventoryUnitIdentifiers => Set<InventoryUnitIdentifier>();
+
+    // Modulo Inventory & Kardex
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<SerialStockPosition> SerialStockPositions => Set<SerialStockPosition>();
+    public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+    public DbSet<StockReservationItem> StockReservationItems => Set<StockReservationItem>();
+    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
+    public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
+    public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
+    public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -369,6 +384,238 @@ public class AppDbContext : DbContext
              .WithMany()
              .HasForeignKey(u => u.SupplierPartyId)
              .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<InventoryUnitIdentifier>(b =>
+        {
+            b.ToTable("inventory_unit_identifiers");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.NormalizedValue).HasMaxLength(100).IsRequired();
+            b.Property(i => i.Version).IsRowVersion();
+
+            // Restrição crítica: Unicidade global de qualquer identificador (IMEI ou Serial) por tenant
+            b.HasIndex(i => new { i.TenantId, i.IdentifierType, i.NormalizedValue }).IsUnique();
+
+            b.HasOne(i => i.InventoryUnit)
+             .WithMany(u => u.Identifiers)
+             .HasForeignKey(i => i.InventoryUnitId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuração do Módulo Inventory & Kardex
+        modelBuilder.Entity<Warehouse>(b =>
+        {
+            b.ToTable("warehouses");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.Code).HasMaxLength(50).IsRequired();
+            b.Property(w => w.Name).HasMaxLength(150).IsRequired();
+            b.Property(w => w.Description).HasMaxLength(500);
+            b.Property(w => w.Version).IsRowVersion();
+
+            b.HasIndex(w => new { w.TenantId, w.BranchId, w.Code }).IsUnique();
+
+            b.HasOne<Branch>()
+             .WithMany()
+             .HasForeignKey(w => w.BranchId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WarehouseLocation>(b =>
+        {
+            b.ToTable("warehouse_locations");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Code).HasMaxLength(50).IsRequired();
+            b.Property(l => l.Aisle).HasMaxLength(20).IsRequired();
+            b.Property(l => l.Shelf).HasMaxLength(20).IsRequired();
+            b.Property(l => l.Bin).HasMaxLength(20).IsRequired();
+            b.Property(l => l.Description).HasMaxLength(200);
+            b.Property(l => l.Version).IsRowVersion();
+
+            b.HasIndex(l => new { l.TenantId, l.WarehouseId, l.Code }).IsUnique();
+
+            b.HasOne(l => l.Warehouse)
+             .WithMany(w => w.Locations)
+             .HasForeignKey(l => l.WarehouseId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StockMovement>(b =>
+        {
+            b.ToTable("stock_movements");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Quantity).HasPrecision(18, 4); // Permite gramas de filamento 3D
+            b.Property(m => m.UnitCost).HasPrecision(18, 4);
+            b.Property(m => m.TotalCost).HasPrecision(18, 2);
+            b.Property(m => m.BalanceAfterQuantity).HasPrecision(18, 4);
+            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
+            b.Property(m => m.Reason).HasMaxLength(250);
+            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
+            b.Property(m => m.Version).IsRowVersion();
+
+            // Kardex imutável: Sem updates, indexado por tenant, data, SKU e serial
+            b.HasIndex(m => new { m.TenantId, m.BranchId, m.CreatedAtUtc });
+            b.HasIndex(m => new { m.TenantId, m.ProductSkuId, m.CreatedAtUtc });
+            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId, m.CreatedAtUtc });
+            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey })
+             .IsUnique()
+             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+            b.HasOne(m => m.Warehouse)
+             .WithMany()
+             .HasForeignKey(m => m.WarehouseId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(m => m.WarehouseLocation)
+             .WithMany()
+             .HasForeignKey(m => m.WarehouseLocationId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(m => m.ProductSku)
+             .WithMany()
+             .HasForeignKey(m => m.ProductSkuId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(m => m.InventoryUnit)
+             .WithMany()
+             .HasForeignKey(m => m.InventoryUnitId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StockBalance>(b =>
+        {
+            b.ToTable("stock_balances");
+            b.HasKey(b => b.Id);
+            b.Property(b => b.OnHandQuantity).HasPrecision(18, 4);
+            b.Property(b => b.ReservedQuantity).HasPrecision(18, 4);
+            b.Property(b => b.BlockedQuantity).HasPrecision(18, 4);
+            b.Property(b => b.AverageCost).HasPrecision(18, 4);
+            b.Property(b => b.Version).IsRowVersion();
+
+            b.HasIndex(b => new { b.TenantId, b.BranchId, b.WarehouseId, b.WarehouseLocationId, b.ProductSkuId }).IsUnique();
+
+            b.HasOne(b => b.Warehouse)
+             .WithMany()
+             .HasForeignKey(b => b.WarehouseId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(b => b.WarehouseLocation)
+             .WithMany()
+             .HasForeignKey(b => b.WarehouseLocationId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(b => b.ProductSku)
+             .WithMany()
+             .HasForeignKey(b => b.ProductSkuId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SerialStockPosition>(b =>
+        {
+            b.ToTable("serial_stock_positions");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();
+
+            // Unidade física serializada só pode ter uma posição no estoque
+            b.HasIndex(p => new { p.TenantId, p.InventoryUnitId }).IsUnique();
+
+            b.HasOne(p => p.InventoryUnit)
+             .WithMany()
+             .HasForeignKey(p => p.InventoryUnitId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(p => p.Warehouse)
+             .WithMany()
+             .HasForeignKey(p => p.WarehouseId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(p => p.WarehouseLocation)
+             .WithMany()
+             .HasForeignKey(p => p.WarehouseLocationId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StockReservation>(b =>
+        {
+            b.ToTable("stock_reservations");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.ReservationNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.Reason).HasMaxLength(250).IsRequired();
+            b.Property(r => r.DocumentReference).HasMaxLength(100);
+            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.ReservationNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey })
+             .IsUnique()
+             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<StockReservationItem>(b =>
+        {
+            b.ToTable("stock_reservation_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<StockReservation>()
+             .WithMany(r => r.Items)
+             .HasForeignKey(i => i.StockReservationId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<StockTransfer>(b =>
+        {
+            b.ToTable("stock_transfers");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.TransferNumber).HasMaxLength(50).IsRequired();
+            b.Property(t => t.Notes).HasMaxLength(500);
+            b.Property(t => t.Version).IsRowVersion();
+
+            b.HasIndex(t => new { t.TenantId, t.TransferNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<StockTransferItem>(b =>
+        {
+            b.ToTable("stock_transfer_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<StockTransfer>()
+             .WithMany(t => t.Items)
+             .HasForeignKey(i => i.StockTransferId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InventoryCount>(b =>
+        {
+            b.ToTable("inventory_counts");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.CountNumber).HasMaxLength(50).IsRequired();
+            b.Property(c => c.Description).HasMaxLength(250).IsRequired();
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasIndex(c => new { c.TenantId, c.CountNumber }).IsUnique();
+
+            b.HasOne(c => c.Warehouse)
+             .WithMany()
+             .HasForeignKey(c => c.WarehouseId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryCountItem>(b =>
+        {
+            b.ToTable("inventory_count_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.SystemSnapshotQuantity).HasPrecision(18, 4);
+            b.Property(i => i.CountedQuantity).HasPrecision(18, 4);
+            b.Property(i => i.Notes).HasMaxLength(250);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<InventoryCount>()
+             .WithMany(c => c.Items)
+             .HasForeignKey(i => i.InventoryCountId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos

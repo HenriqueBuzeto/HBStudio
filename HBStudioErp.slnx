@@ -20,6 +20,11 @@
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Domain/IdentityAccess.Domain.csproj" />
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Infrastructure/IdentityAccess.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Inventory/">
+    <Project Path="src/Modules/Inventory/Inventory.Application/Inventory.Application.csproj" />
+    <Project Path="src/Modules/Inventory/Inventory.Domain/Inventory.Domain.csproj" />
+    <Project Path="src/Modules/Inventory/Inventory.Infrastructure/Inventory.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Parties/">
     <Project Path="src/Modules/Parties/Parties.Application/Parties.Application.csproj" />
     <Project Path="src/Modules/Parties/Parties.Domain/Parties.Domain.csproj" />
