@@ -40,6 +40,11 @@
     <Project Path="src/Modules/Parties/Parties.Domain/Parties.Domain.csproj" />
     <Project Path="src/Modules/Parties/Parties.Infrastructure/Parties.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/PartnersCapital/">
+    <Project Path="src/Modules/PartnersCapital/PartnersCapital.Application/PartnersCapital.Application.csproj" />
+    <Project Path="src/Modules/PartnersCapital/PartnersCapital.Domain/PartnersCapital.Domain.csproj" />
+    <Project Path="src/Modules/PartnersCapital/PartnersCapital.Infrastructure/PartnersCapital.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Procurement/">
     <Project Path="src/Modules/Procurement/Procurement.Application/Procurement.Application.csproj" />
     <Project Path="src/Modules/Procurement/Procurement.Domain/Procurement.Domain.csproj" />

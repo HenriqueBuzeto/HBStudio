@@ -18,6 +18,8 @@
     <ProjectReference Include="..\..\src\Modules\CashManagement\CashManagement.Infrastructure\CashManagement.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Financial\Financial.Application\Financial.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Financial\Financial.Infrastructure\Financial.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PartnersCapital\PartnersCapital.Application\PartnersCapital.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\PartnersCapital\PartnersCapital.Infrastructure\PartnersCapital.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,6 +10,7 @@ using Procurement.Domain;
 using Sales.Domain;
 using CashManagement.Domain;
 using Financial.Domain;
+using PartnersCapital.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -94,6 +95,15 @@ public class AppDbContext : DbContext
     public DbSet<AccountReceivable> AccountsReceivable => Set<AccountReceivable>();
     public DbSet<FinancialSettlement> FinancialSettlements => Set<FinancialSettlement>();
     public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
+
+    // Modulo PartnersCapital (MOD-13) - Gestão Societária, Cap Table, Aportes, Mútuos e Distribuição de Resultados
+    public DbSet<Partner> Partners => Set<Partner>();
+    public DbSet<EquityParticipation> EquityParticipations => Set<EquityParticipation>();
+    public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
+    public DbSet<PartnerLoan> PartnerLoans => Set<PartnerLoan>();
+    public DbSet<PartnerCompensation> PartnerCompensations => Set<PartnerCompensation>();
+    public DbSet<ProfitDistributionProposal> ProfitDistributionProposals => Set<ProfitDistributionProposal>();
+    public DbSet<ProfitDistributionItem> ProfitDistributionItems => Set<ProfitDistributionItem>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1162,6 +1172,106 @@ public class AppDbContext : DbContext
 
             b.HasIndex(t => new { t.TenantId, t.BankAccountId, t.FitId }).IsUnique();
             b.HasIndex(t => new { t.TenantId, t.Status });
+        });
+
+        // Modulo PartnersCapital (MOD-13)
+        modelBuilder.Entity<Partner>(b =>
+        {
+            b.ToTable("partners");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            b.Property(p => p.DocumentNumber).HasMaxLength(20).IsRequired();
+            b.Property(p => p.Email).HasMaxLength(255).IsRequired();
+            b.Property(p => p.MonthlyCompensationCap).HasPrecision(18, 2);
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasIndex(p => new { p.TenantId, p.PartyId }).IsUnique();
+            b.HasIndex(p => new { p.TenantId, p.DocumentNumber });
+        });
+
+        modelBuilder.Entity<EquityParticipation>(b =>
+        {
+            b.ToTable("equity_participations");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Quotas).HasPrecision(18, 4);
+            b.Property(e => e.Percentage).HasPrecision(7, 4);
+            b.Property(e => e.NominalValuePerQuota).HasPrecision(18, 4);
+            b.Property(e => e.LegalDocumentReference).HasMaxLength(150).IsRequired();
+            b.Property(e => e.Version).IsRowVersion();
+
+            b.HasIndex(e => new { e.TenantId, e.PartnerId, e.IsCurrent });
+        });
+
+        modelBuilder.Entity<CapitalContribution>(b =>
+        {
+            b.ToTable("capital_contributions");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Amount).HasPrecision(18, 2);
+            b.Property(c => c.Description).HasMaxLength(500).IsRequired();
+            b.Property(c => c.FormalInstrumentReference).HasMaxLength(150).IsRequired();
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasIndex(c => new { c.TenantId, c.PartnerId });
+            b.HasIndex(c => new { c.TenantId, c.Status });
+        });
+
+        modelBuilder.Entity<PartnerLoan>(b =>
+        {
+            b.ToTable("partner_loans");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.PrincipalAmount).HasPrecision(18, 2);
+            b.Property(l => l.AmortizedAmount).HasPrecision(18, 2);
+            b.Property(l => l.AnnualInterestRate).HasPrecision(7, 4);
+            b.Property(l => l.ContractNumber).HasMaxLength(100).IsRequired();
+            b.Property(l => l.Version).IsRowVersion();
+
+            b.HasIndex(l => new { l.TenantId, l.PartnerId });
+            b.HasIndex(l => new { l.TenantId, l.ContractNumber });
+        });
+
+        modelBuilder.Entity<PartnerCompensation>(b =>
+        {
+            b.ToTable("partner_compensations");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.GrossAmount).HasPrecision(18, 2);
+            b.Property(c => c.InssWithholding).HasPrecision(18, 2);
+            b.Property(c => c.IrrfWithholding).HasPrecision(18, 2);
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasIndex(c => new { c.TenantId, c.PartnerId, c.ReferenceYear, c.ReferenceMonth });
+        });
+
+        modelBuilder.Entity<ProfitDistributionProposal>(b =>
+        {
+            b.ToTable("profit_distribution_proposals");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.ProtocolNumber).HasMaxLength(100).IsRequired();
+            b.Property(p => p.BaseNetProfit).HasPrecision(18, 2);
+            b.Property(p => p.LegalReserveRetention).HasPrecision(18, 2);
+            b.Property(p => p.WorkingCapitalRetention).HasPrecision(18, 2);
+            b.Property(p => p.TotalDistributedAmount).HasPrecision(18, 2);
+            b.Property(p => p.MeetingMinutesReference).HasMaxLength(200).IsRequired();
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasMany(p => p.Items)
+                .WithOne()
+                .HasForeignKey(i => i.ProposalId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(p => new { p.TenantId, p.ProtocolNumber }).IsUnique();
+            b.HasIndex(p => new { p.TenantId, p.FiscalYear });
+        });
+
+        modelBuilder.Entity<ProfitDistributionItem>(b =>
+        {
+            b.ToTable("profit_distribution_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.PartnerPercentage).HasPrecision(7, 4);
+            b.Property(i => i.GrossAmount).HasPrecision(18, 2);
+            b.Property(i => i.TaxWithheld).HasPrecision(18, 2);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasIndex(i => new { i.TenantId, i.ProposalId, i.PartnerId });
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos

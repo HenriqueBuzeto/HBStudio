@@ -88,11 +88,14 @@ public static class PermissionCatalog
 
     // Societário & Investimentos
     public const string PartnersView = "partners.view";
+    public const string PartnersManage = "partners.manage";
     public const string PartnersCapitalManage = "partners.capital.manage";
     public const string PartnersLoanManage = "partners.loan.manage";
+    public const string PartnersCompensationManage = "partners.compensation.manage";
     public const string PartnersDistributionPropose = "partners.distribution.propose";
     public const string PartnersDistributionApprove = "partners.distribution.approve";
     public const string PartnersDistributionPay = "partners.distribution.pay";
+    public const string PartnersDistributionSettle = "partners.distribution.settle";
 
     // Fábrica 3D
     public const string ManufacturingView = "manufacturing.view";

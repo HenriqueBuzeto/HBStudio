@@ -33,6 +33,8 @@ builder.Services.AddScoped<Procurement.Application.ProcurementService>();
 builder.Services.AddScoped<Sales.Application.SalesService>();
 builder.Services.AddScoped<CashManagement.Application.CashManagementService>();
 builder.Services.AddScoped<Financial.Application.FinancialService>();
+builder.Services.AddScoped<PartnersCapital.Domain.Repositories.IPartnersCapitalRepository, PartnersCapital.Infrastructure.Repositories.PartnersCapitalRepository>();
+builder.Services.AddScoped<PartnersCapital.Application.Services.PartnersCapitalService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -1317,7 +1319,9 @@ financialGroup.MapGet("/reports/dre", async (
     Financial.Application.FinancialService service,
     CancellationToken ct) =>
 {
-    var report = await service.GetDreReportAsync(startDate, endDate, branchId, ct);
+    var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+    var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+    var report = await service.GetDreReportAsync(startUtc, endUtc, branchId, ct);
     return Results.Ok(report);
 }).RequireAuthorization(PermissionCatalog.FinanceReportsView);
 
@@ -1329,6 +1333,199 @@ financialGroup.MapGet("/reports/cash-flow-forecast", async (
     var forecast = await service.GetCashFlowForecastAsync(branchId, ct);
     return Results.Ok(forecast);
 }).RequireAuthorization(PermissionCatalog.FinanceReportsView);
+
+// ==========================================
+// MOD-13 — PartnersCapital (Gestão Societária, Cap Table, Aportes, Mútuos e Resultados)
+// ==========================================
+var partnersGroup = app.MapGroup("/api/partners");
+
+partnersGroup.MapGet("/", async (
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var summaries = await service.ListPartnerSummariesAsync(executionContext.TenantId, ct);
+    return Results.Ok(summaries);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.View);
+
+partnersGroup.MapPost("/", async (
+    PartnersCapital.Application.DTOs.CreatePartnerRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var p = await service.CreatePartnerAsync(executionContext.TenantId, request, ct);
+    var response = new PartnersCapital.Application.DTOs.PartnerResponse(
+        p.Id, p.TenantId, p.PartyId, p.Name, p.DocumentNumber, p.Email, p.Type, p.Status,
+        p.AdmissionDate, p.ExitDate, p.MonthlyCompensationCap, p.Notes
+    );
+    return Results.Created($"/api/partners/{p.Id}", response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.Manage);
+
+partnersGroup.MapGet("/cap-table", async (
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var capTable = await service.GetCurrentCapTableSummaryAsync(executionContext.TenantId, ct);
+    return Results.Ok(capTable);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.View);
+
+partnersGroup.MapPost("/cap-table", async (
+    PartnersCapital.Application.DTOs.UpdateCapTableRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var result = await service.UpdateCapTableAsync(executionContext.TenantId, request, ct);
+    return Results.Ok(result);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.CapitalManage);
+
+partnersGroup.MapPost("/contributions", async (
+    PartnersCapital.Application.DTOs.RegisterContributionRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var c = await service.RegisterContributionAsync(executionContext.TenantId, request, ct);
+    var response = new PartnersCapital.Application.DTOs.CapitalContributionResponse(
+        c.Id, c.TenantId, c.PartnerId, c.Type, c.Status, c.Amount, c.SubscriptionDate,
+        c.PaidInDate, c.BankAccountId, c.FinancialJournalEntryId, c.Description, c.FormalInstrumentReference
+    );
+    return Results.Created($"/api/partners/contributions/{c.Id}", response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.CapitalManage);
+
+partnersGroup.MapPost("/contributions/{id:guid}/pay-in", async (
+    Guid id,
+    PartnersCapital.Application.DTOs.PayInContributionRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var c = await service.PayInContributionAsync(executionContext.TenantId, id, request, ct);
+    var response = new PartnersCapital.Application.DTOs.CapitalContributionResponse(
+        c.Id, c.TenantId, c.PartnerId, c.Type, c.Status, c.Amount, c.SubscriptionDate,
+        c.PaidInDate, c.BankAccountId, c.FinancialJournalEntryId, c.Description, c.FormalInstrumentReference
+    );
+    return Results.Ok(response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.CapitalManage);
+
+partnersGroup.MapPost("/loans", async (
+    PartnersCapital.Application.DTOs.RegisterLoanRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var l = await service.RegisterLoanAsync(executionContext.TenantId, request, ct);
+    var response = new PartnersCapital.Application.DTOs.PartnerLoanResponse(
+        l.Id, l.TenantId, l.PartnerId, l.Direction, l.Status, l.PrincipalAmount, l.AmortizedAmount,
+        l.OutstandingBalance, l.AnnualInterestRate, l.IssueDate, l.DueDate, l.ContractNumber, l.Notes,
+        l.BankAccountId, l.DisbursementJournalEntryId
+    );
+    return Results.Created($"/api/partners/loans/{l.Id}", response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.LoanManage);
+
+partnersGroup.MapPost("/loans/{id:guid}/amortize", async (
+    Guid id,
+    PartnersCapital.Application.DTOs.AmortizeLoanRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var l = await service.AmortizeLoanAsync(executionContext.TenantId, id, request, ct);
+    var response = new PartnersCapital.Application.DTOs.PartnerLoanResponse(
+        l.Id, l.TenantId, l.PartnerId, l.Direction, l.Status, l.PrincipalAmount, l.AmortizedAmount,
+        l.OutstandingBalance, l.AnnualInterestRate, l.IssueDate, l.DueDate, l.ContractNumber, l.Notes,
+        l.BankAccountId, l.DisbursementJournalEntryId
+    );
+    return Results.Ok(response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.LoanManage);
+
+partnersGroup.MapPost("/compensations", async (
+    PartnersCapital.Application.DTOs.ScheduleCompensationRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var c = await service.ScheduleCompensationAsync(executionContext.TenantId, request, ct);
+    var response = new PartnersCapital.Application.DTOs.PartnerCompensationResponse(
+        c.Id, c.TenantId, c.PartnerId, c.ReferenceYear, c.ReferenceMonth, c.GrossAmount,
+        c.InssWithholding, c.IrrfWithholding, c.NetAmount, c.Status, c.ScheduledPaymentDate,
+        c.PaidDate, c.AccountPayableId, c.BankAccountId, c.Notes
+    );
+    return Results.Created($"/api/partners/compensations/{c.Id}", response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.CompensationManage);
+
+partnersGroup.MapPost("/distribution/proposals", async (
+    PartnersCapital.Application.DTOs.CreateDistributionProposalRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var p = await service.CreateDistributionProposalAsync(executionContext.TenantId, request, ct);
+    var items = p.Items.Select(i => new PartnersCapital.Application.DTOs.ProfitDistributionItemResponse(
+        i.Id, i.ProposalId, i.TenantId, i.PartnerId, i.PartnerPercentage, i.GrossAmount,
+        i.TaxWithheld, i.NetAmount, i.IsPaid, i.PaidDate, i.BankAccountId, i.JournalEntryId
+    )).ToList();
+    var response = new PartnersCapital.Application.DTOs.ProfitDistributionProposalResponse(
+        p.Id, p.TenantId, p.ProtocolNumber, p.FiscalYear, p.FiscalQuarter, p.BaseNetProfit,
+        p.LegalReserveRetention, p.WorkingCapitalRetention, p.DistributableAmount,
+        p.TotalDistributedAmount, p.Status, p.DeliberationDate, p.MeetingMinutesReference, p.Notes, items
+    );
+    return Results.Created($"/api/partners/distribution/proposals/{p.Id}", response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.DistributionPropose);
+
+partnersGroup.MapPost("/distribution/proposals/{id:guid}/approve", async (
+    Guid id,
+    string meetingMinutes,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var p = await service.ApproveProposalAsync(executionContext.TenantId, id, meetingMinutes, ct);
+    var items = p.Items.Select(i => new PartnersCapital.Application.DTOs.ProfitDistributionItemResponse(
+        i.Id, i.ProposalId, i.TenantId, i.PartnerId, i.PartnerPercentage, i.GrossAmount,
+        i.TaxWithheld, i.NetAmount, i.IsPaid, i.PaidDate, i.BankAccountId, i.JournalEntryId
+    )).ToList();
+    var response = new PartnersCapital.Application.DTOs.ProfitDistributionProposalResponse(
+        p.Id, p.TenantId, p.ProtocolNumber, p.FiscalYear, p.FiscalQuarter, p.BaseNetProfit,
+        p.LegalReserveRetention, p.WorkingCapitalRetention, p.DistributableAmount,
+        p.TotalDistributedAmount, p.Status, p.DeliberationDate, p.MeetingMinutesReference, p.Notes, items
+    );
+    return Results.Ok(response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.DistributionApprove);
+
+partnersGroup.MapPost("/distribution/proposals/{id:guid}/settle/{partnerId:guid}", async (
+    Guid id,
+    Guid partnerId,
+    PartnersCapital.Application.DTOs.SettleDistributionItemRequest request,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var p = await service.SettleProposalItemAsync(executionContext.TenantId, id, partnerId, request, ct);
+    var items = p.Items.Select(i => new PartnersCapital.Application.DTOs.ProfitDistributionItemResponse(
+        i.Id, i.ProposalId, i.TenantId, i.PartnerId, i.PartnerPercentage, i.GrossAmount,
+        i.TaxWithheld, i.NetAmount, i.IsPaid, i.PaidDate, i.BankAccountId, i.JournalEntryId
+    )).ToList();
+    var response = new PartnersCapital.Application.DTOs.ProfitDistributionProposalResponse(
+        p.Id, p.TenantId, p.ProtocolNumber, p.FiscalYear, p.FiscalQuarter, p.BaseNetProfit,
+        p.LegalReserveRetention, p.WorkingCapitalRetention, p.DistributableAmount,
+        p.TotalDistributedAmount, p.Status, p.DeliberationDate, p.MeetingMinutesReference, p.Notes, items
+    );
+    return Results.Ok(response);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.DistributionSettle);
+
+partnersGroup.MapGet("/simulation/liquidity", async (
+    decimal proposedAmount,
+    decimal? reserve,
+    PartnersCapital.Application.Services.PartnersCapitalService service,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var simulation = await service.SimulateLiquidityAsync(executionContext.TenantId, proposedAmount, reserve ?? 20000m, ct);
+    return Results.Ok(simulation);
+}).RequireAuthorization(PartnersCapitalPermissionKeys.View);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

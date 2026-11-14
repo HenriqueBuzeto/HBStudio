@@ -1,7 +1,7 @@
 # Matriz de Cobertura e Homologação de Módulos (Module Coverage)
 
 **Data de Atualização:** 14/11/2026  
-**Status do Projeto:** Fase Financeira Concluída (MOD-00 a MOD-06 e MOD-12 Homologados)  
+**Status do Projeto:** Fase Financeira & Societária Concluída (MOD-00 a MOD-06, MOD-12 e MOD-13 Homologados)  
 
 > **Legenda de Status:**
 > - `NOT_STARTED`: Módulo planejado, sem implementação física.
@@ -30,7 +30,7 @@
 | **MOD-10** | **Fábrica 3D & Custos Reais** | `Manufacturing3D` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-11** | **Projetos Digitais & Horas** | `DigitalProjects` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-12** | **Financeiro & DRE** | `Financial` | Implementado | Implementado | Implementado | Implementado | 6/6 xUnit Aprovados (51 total) | `READY_VERIFIED` |
-| **MOD-13** | **Sócios & Aportes / Liquidez** | `PartnersCapital` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
+| **MOD-13** | **Sócios & Aportes / Liquidez** | `PartnersCapital` | Implementado | Implementado | Implementado | Implementado | 6/6 xUnit Aprovados (57 total) | `READY_VERIFIED` |
 | **MOD-14** | **Fiscal (NFC-e / NF-e / NFS-e)** | `Fiscal` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-15** | **Relatórios & Auditoria Geral** | `Reporting` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 
