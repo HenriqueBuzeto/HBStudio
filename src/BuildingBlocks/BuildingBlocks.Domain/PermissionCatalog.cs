@@ -40,13 +40,22 @@ public static class PermissionCatalog
     public const string SalesCancel = "sales.cancel";
     public const string SalesCostView = "sales.cost.view";
 
-    // Caixa
+    // Caixa & Turnos (CashManagement)
     public const string CashOpen = "cash.open";
     public const string CashSupply = "cash.supply";
     public const string CashWithdraw = "cash.withdraw";
     public const string CashClose = "cash.close";
     public const string CashReconcile = "cash.reconcile";
     public const string CashApproveDifference = "cash.approve_difference";
+    public const string CashRegisterView = "cash.register.view";
+    public const string CashRegisterManage = "cash.register.manage";
+    public const string CashShiftView = "cash.shift.view";
+    public const string CashShiftCount = "cash.shift.count";
+    public const string CashShiftApprove = "cash.shift.approve";
+    public const string CashMovementView = "cash.movement.view";
+    public const string CashDiscrepancyView = "cash.discrepancy.view";
+    public const string CashDiscrepancyResolve = "cash.discrepancy.resolve";
+    public const string CashAuditView = "cash.audit.view";
 
     // Assistência Técnica
     public const string RepairsView = "repairs.view";

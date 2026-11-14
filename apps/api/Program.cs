@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -30,6 +31,7 @@ builder.Services.AddScoped<Catalog.Application.ICatalogService, Catalog.Applicat
 builder.Services.AddScoped<Inventory.Application.InventoryService>();
 builder.Services.AddScoped<Procurement.Application.ProcurementService>();
 builder.Services.AddScoped<Sales.Application.SalesService>();
+builder.Services.AddScoped<CashManagement.Application.CashManagementService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -958,6 +960,186 @@ salesGroup.MapPost("/returns/{id:guid}/restock", async (
     var restocked = await service.InspectAndRestockReturnAsync(id, warehouseId, inspectionNotes, ct);
     return Results.Ok(restocked);
 }).RequireAuthorization(PermissionCatalog.SalesCancel);
+
+// ==================== CASH MANAGEMENT (MOD-06) ====================
+var cashGroup = app.MapGroup("/api/cash").RequireAuthorization();
+
+// Terminais de Caixa
+cashGroup.MapGet("/registers", async (
+    Guid? branchId,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListRegistersAsync(branchId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.CashRegisterView);
+
+cashGroup.MapPost("/registers", async (
+    CashManagement.Application.CreateCashRegisterDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateRegisterAsync(req, ct);
+    return Results.Created($"/api/cash/registers/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CashRegisterManage);
+
+cashGroup.MapPut("/registers/{id:guid}", async (
+    Guid id,
+    CashManagement.Application.UpdateCashRegisterDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.UpdateRegisterAsync(id, req, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.CashRegisterManage);
+
+// Turnos de Caixa
+cashGroup.MapGet("/registers/{registerId:guid}/active-shift", async (
+    Guid registerId,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var shift = await service.GetActiveShiftForRegisterAsync(registerId, ct);
+    return shift != null ? Results.Ok(shift) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.CashShiftView);
+
+cashGroup.MapGet("/shifts", async (
+    Guid? branchId,
+    CashManagement.Domain.CashShiftStatus? status,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListShiftsAsync(branchId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.CashShiftView);
+
+cashGroup.MapGet("/shifts/{id:guid}", async (
+    Guid id,
+    ClaimsPrincipal user,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var canViewExpected = user.HasClaim("permission", PermissionCatalog.CashReconcile) || user.HasClaim("permission", PermissionCatalog.CashShiftApprove);
+        var shift = await service.GetShiftDetailsAsync(id, canViewExpected, ct);
+        return Results.Ok(shift);
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+}).RequireAuthorization(PermissionCatalog.CashShiftView);
+
+cashGroup.MapPost("/shifts/open", async (
+    CashManagement.Application.OpenCashShiftDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var shift = await service.OpenShiftAsync(req, ct);
+    return Results.Created($"/api/cash/shifts/{shift.Id}", shift);
+}).RequireAuthorization(PermissionCatalog.CashOpen);
+
+cashGroup.MapPost("/shifts/{id:guid}/withdrawal", async (
+    Guid id,
+    CashManagement.Application.CreateCashWithdrawalDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var mov = await service.RecordWithdrawalAsync(id, req, ct);
+    return Results.Ok(mov);
+}).RequireAuthorization(PermissionCatalog.CashWithdraw);
+
+cashGroup.MapPost("/shifts/{id:guid}/supply", async (
+    Guid id,
+    CashManagement.Application.CreateCashSupplyDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var mov = await service.RecordSupplyAsync(id, req, ct);
+    return Results.Ok(mov);
+}).RequireAuthorization(PermissionCatalog.CashSupply);
+
+cashGroup.MapPost("/shifts/{id:guid}/sale-receipt", async (
+    Guid id,
+    CashManagement.Application.RecordCashSaleReceiptDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var mov = await service.RecordCashSaleReceiptAsync(id, req, ct);
+    return Results.Ok(mov);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+cashGroup.MapPost("/shifts/{id:guid}/start-closing", async (
+    Guid id,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    await service.StartShiftClosingAsync(id, ct);
+    return Results.NoContent();
+}).RequireAuthorization(PermissionCatalog.CashClose);
+
+cashGroup.MapPost("/shifts/{id:guid}/submit-count", async (
+    Guid id,
+    CashManagement.Application.SubmitBlindCountDto req,
+    ClaimsPrincipal user,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var canViewExpected = user.HasClaim("permission", PermissionCatalog.CashReconcile) || user.HasClaim("permission", PermissionCatalog.CashShiftApprove);
+    var shift = await service.SubmitBlindCountAsync(id, req, canViewExpected, ct);
+    return Results.Ok(shift);
+}).RequireAuthorization(PermissionCatalog.CashShiftCount);
+
+cashGroup.MapPost("/shifts/{id:guid}/approve-closing", async (
+    Guid id,
+    CashManagement.Application.ApproveCashClosingDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var shift = await service.ApproveClosingAsync(id, req, ct);
+    return Results.Ok(shift);
+}).RequireAuthorization(PermissionCatalog.CashShiftApprove);
+
+cashGroup.MapPost("/shifts/{id:guid}/close", async (
+    Guid id,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var shift = await service.CloseShiftAsync(id, ct);
+    return Results.Ok(shift);
+}).RequireAuthorization(PermissionCatalog.CashClose);
+
+// Divergências de Caixa
+cashGroup.MapGet("/discrepancies", async (
+    Guid? branchId,
+    CashManagement.Domain.CashDiscrepancyStatus? status,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListDiscrepanciesAsync(branchId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.CashDiscrepancyView);
+
+cashGroup.MapPost("/discrepancies/{id:guid}/justify", async (
+    Guid id,
+    CashManagement.Application.JustifyCashDiscrepancyDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var res = await service.JustifyDiscrepancyAsync(id, req, ct);
+    return Results.Ok(res);
+}).RequireAuthorization(PermissionCatalog.CashShiftCount);
+
+cashGroup.MapPost("/discrepancies/{id:guid}/resolve", async (
+    Guid id,
+    CashManagement.Application.ResolveCashDiscrepancyDto req,
+    CashManagement.Application.CashManagementService service,
+    CancellationToken ct) =>
+{
+    var res = await service.ResolveDiscrepancyAsync(id, req, ct);
+    return Results.Ok(res);
+}).RequireAuthorization(PermissionCatalog.CashDiscrepancyResolve);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

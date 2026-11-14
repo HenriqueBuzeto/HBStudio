@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\Modules\Inventory\Inventory.Domain\Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Procurement\Procurement.Domain\Procurement.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Sales\Sales.Domain\Sales.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\CashManagement\CashManagement.Domain\CashManagement.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

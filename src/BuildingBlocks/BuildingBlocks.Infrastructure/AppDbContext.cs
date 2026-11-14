@@ -8,6 +8,7 @@ using Catalog.Domain;
 using Inventory.Domain;
 using Procurement.Domain;
 using Sales.Domain;
+using CashManagement.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -74,6 +75,13 @@ public class AppDbContext : DbContext
     public DbSet<SalePaymentIntent> SalePaymentIntents => Set<SalePaymentIntent>();
     public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
     public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
+
+    // Modulo CashManagement (MOD-06) - Caixa, Turnos, Sangrias, Suprimentos e Fechamento
+    public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
+    public DbSet<CashShift> CashShifts => Set<CashShift>();
+    public DbSet<CashMovement> CashMovements => Set<CashMovement>();
+    public DbSet<CashCountDenomination> CashCountDenominations => Set<CashCountDenomination>();
+    public DbSet<CashDiscrepancy> CashDiscrepancies => Set<CashDiscrepancy>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -933,6 +941,89 @@ public class AppDbContext : DbContext
              .WithMany(r => r.Items)
              .HasForeignKey(i => i.SaleReturnId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ==================== CASH MANAGEMENT (MOD-06) ====================
+        modelBuilder.Entity<CashRegister>(b =>
+        {
+            b.ToTable("cash_registers");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.Code).HasMaxLength(50).IsRequired();
+            b.Property(r => r.Name).HasMaxLength(150).IsRequired();
+            b.Property(r => r.Notes).HasMaxLength(500);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<CashShift>(b =>
+        {
+            b.ToTable("cash_shifts");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.OpeningFloat).HasPrecision(18, 2);
+            b.Property(s => s.CurrentBalance).HasPrecision(18, 2);
+            b.Property(s => s.TotalCashIn).HasPrecision(18, 2);
+            b.Property(s => s.TotalCashOut).HasPrecision(18, 2);
+            b.Property(s => s.ExpectedCashBalance).HasPrecision(18, 2);
+            b.Property(s => s.CountedCashBalance).HasPrecision(18, 2);
+            b.Property(s => s.DiscrepancyAmount).HasPrecision(18, 2);
+            b.Property(s => s.OpeningSource).HasMaxLength(150);
+            b.Property(s => s.OpeningNotes).HasMaxLength(500);
+            b.Property(s => s.ClosingNotes).HasMaxLength(500);
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.HasIndex(s => new { s.TenantId, s.BranchId, s.CashRegisterId, s.Status });
+        });
+
+        modelBuilder.Entity<CashMovement>(b =>
+        {
+            b.ToTable("cash_movements");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Amount).HasPrecision(18, 2);
+            b.Property(m => m.SourceType).HasMaxLength(50).IsRequired();
+            b.Property(m => m.SourceId).HasMaxLength(100).IsRequired();
+            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
+            b.Property(m => m.Reason).HasMaxLength(500);
+            b.Property(m => m.CorrelationId).HasMaxLength(100);
+            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
+            b.Property(m => m.Version).IsRowVersion();
+
+            b.HasOne<CashShift>()
+             .WithMany(s => s.Movements)
+             .HasForeignKey(m => m.CashShiftId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(m => new { m.TenantId, m.CashShiftId });
+            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey });
+            b.HasIndex(m => new { m.TenantId, m.MovementType, m.SourceId });
+        });
+
+        modelBuilder.Entity<CashCountDenomination>(b =>
+        {
+            b.ToTable("cash_count_denominations");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Denomination).HasPrecision(18, 2);
+            b.Property(d => d.Version).IsRowVersion();
+
+            b.HasOne<CashShift>()
+             .WithMany(s => s.Denominations)
+             .HasForeignKey(d => d.CashShiftId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(d => new { d.TenantId, d.CashShiftId });
+        });
+
+        modelBuilder.Entity<CashDiscrepancy>(b =>
+        {
+            b.ToTable("cash_discrepancies");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Amount).HasPrecision(18, 2);
+            b.Property(d => d.OperatorJustification).HasMaxLength(1000);
+            b.Property(d => d.ResolutionNotes).HasMaxLength(1000);
+            b.Property(d => d.Version).IsRowVersion();
+
+            b.HasIndex(d => new { d.TenantId, d.BranchId, d.CashShiftId });
+            b.HasIndex(d => new { d.TenantId, d.Status });
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos

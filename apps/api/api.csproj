@@ -14,6 +14,8 @@
     <ProjectReference Include="..\..\src\Modules\Procurement\Procurement.Infrastructure\Procurement.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Sales\Sales.Application\Sales.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Sales\Sales.Infrastructure\Sales.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CashManagement\CashManagement.Application\CashManagement.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CashManagement\CashManagement.Infrastructure\CashManagement.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
