@@ -40,6 +40,8 @@
     <ProjectReference Include="..\..\src\Modules\Sales\Sales.Application\Sales.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\CashManagement\CashManagement.Application\CashManagement.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\CashManagement\CashManagement.Domain\CashManagement.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Financial\Financial.Application\Financial.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Financial\Financial.Domain\Financial.Domain.csproj" />
   </ItemGroup>
 
 </Project>

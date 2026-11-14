@@ -9,6 +9,7 @@ using Inventory.Domain;
 using Procurement.Domain;
 using Sales.Domain;
 using CashManagement.Domain;
+using Financial.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -82,6 +83,17 @@ public class AppDbContext : DbContext
     public DbSet<CashMovement> CashMovements => Set<CashMovement>();
     public DbSet<CashCountDenomination> CashCountDenominations => Set<CashCountDenomination>();
     public DbSet<CashDiscrepancy> CashDiscrepancies => Set<CashDiscrepancy>();
+
+    // Modulo Financial (MOD-12) - Financeiro, Razão Contábil, Contas a Pagar/Receber, Bancos e DRE
+    public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
+    public DbSet<FinancialCostCenter> FinancialCostCenters => Set<FinancialCostCenter>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<FinancialJournalEntry> FinancialJournalEntries => Set<FinancialJournalEntry>();
+    public DbSet<FinancialJournalLine> FinancialJournalLines => Set<FinancialJournalLine>();
+    public DbSet<AccountPayable> AccountsPayable => Set<AccountPayable>();
+    public DbSet<AccountReceivable> AccountsReceivable => Set<AccountReceivable>();
+    public DbSet<FinancialSettlement> FinancialSettlements => Set<FinancialSettlement>();
+    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1024,6 +1036,132 @@ public class AppDbContext : DbContext
 
             b.HasIndex(d => new { d.TenantId, d.BranchId, d.CashShiftId });
             b.HasIndex(d => new { d.TenantId, d.Status });
+        });
+
+        // ==================== FINANCIAL (MOD-12) ====================
+        modelBuilder.Entity<FinancialAccount>(b =>
+        {
+            b.ToTable("financial_accounts");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Code).HasMaxLength(50).IsRequired();
+            b.Property(a => a.Name).HasMaxLength(150).IsRequired();
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.HasIndex(a => new { a.TenantId, a.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<FinancialCostCenter>(b =>
+        {
+            b.ToTable("financial_cost_centers");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
+            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
+            b.Property(c => c.Description).HasMaxLength(500);
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasIndex(c => new { c.TenantId, c.Code }).IsUnique();
+        });
+
+        modelBuilder.Entity<BankAccount>(b =>
+        {
+            b.ToTable("bank_accounts");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.BankName).HasMaxLength(150).IsRequired();
+            b.Property(a => a.AgencyNumber).HasMaxLength(50);
+            b.Property(a => a.AccountNumber).HasMaxLength(50).IsRequired();
+            b.Property(a => a.CurrentBalance).HasPrecision(18, 2);
+            b.Property(a => a.ReconciledBalance).HasPrecision(18, 2);
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.HasIndex(a => new { a.TenantId, a.BranchId, a.AccountNumber });
+        });
+
+        modelBuilder.Entity<FinancialJournalEntry>(b =>
+        {
+            b.ToTable("financial_journal_entries");
+            b.HasKey(j => j.Id);
+            b.Property(j => j.DocumentNumber).HasMaxLength(100).IsRequired();
+            b.Property(j => j.SourceType).HasMaxLength(50).IsRequired();
+            b.Property(j => j.SourceId).HasMaxLength(100).IsRequired();
+            b.Property(j => j.Description).HasMaxLength(500).IsRequired();
+            b.Property(j => j.TotalAmount).HasPrecision(18, 2);
+            b.Property(j => j.CorrelationId).HasMaxLength(100);
+            b.Property(j => j.IdempotencyKey).HasMaxLength(100);
+            b.Property(j => j.Version).IsRowVersion();
+
+            b.HasIndex(j => new { j.TenantId, j.BranchId, j.CompetenceDateUtc });
+            b.HasIndex(j => new { j.TenantId, j.IdempotencyKey });
+        });
+
+        modelBuilder.Entity<FinancialJournalLine>(b =>
+        {
+            b.ToTable("financial_journal_lines");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Amount).HasPrecision(18, 2);
+            b.Property(l => l.Memo).HasMaxLength(500);
+            b.Property(l => l.Version).IsRowVersion();
+
+            b.HasOne<FinancialJournalEntry>()
+             .WithMany(j => j.Lines)
+             .HasForeignKey(l => l.FinancialJournalEntryId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(l => new { l.TenantId, l.FinancialJournalEntryId });
+            b.HasIndex(l => new { l.TenantId, l.FinancialAccountId });
+        });
+
+        modelBuilder.Entity<AccountPayable>(b =>
+        {
+            b.ToTable("accounts_payable");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.TitleNumber).HasMaxLength(100).IsRequired();
+            b.Property(p => p.Description).HasMaxLength(500).IsRequired();
+            b.Property(p => p.OriginalAmount).HasPrecision(18, 2);
+            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
+            b.Property(p => p.DocumentReference).HasMaxLength(100);
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasIndex(p => new { p.TenantId, p.BranchId, p.TitleNumber }).IsUnique();
+            b.HasIndex(p => new { p.TenantId, p.Status, p.DueDateUtc });
+        });
+
+        modelBuilder.Entity<AccountReceivable>(b =>
+        {
+            b.ToTable("accounts_receivable");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.TitleNumber).HasMaxLength(100).IsRequired();
+            b.Property(r => r.Description).HasMaxLength(500).IsRequired();
+            b.Property(r => r.OriginalAmount).HasPrecision(18, 2);
+            b.Property(r => r.ReceivedAmount).HasPrecision(18, 2);
+            b.Property(r => r.DocumentReference).HasMaxLength(100);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.TitleNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.Status, r.DueDateUtc });
+        });
+
+        modelBuilder.Entity<FinancialSettlement>(b =>
+        {
+            b.ToTable("financial_settlements");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Amount).HasPrecision(18, 2);
+            b.Property(s => s.ReferenceNumber).HasMaxLength(100).IsRequired();
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.HasIndex(s => new { s.TenantId, s.TitleId });
+        });
+
+        modelBuilder.Entity<BankTransaction>(b =>
+        {
+            b.ToTable("bank_transactions");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.Amount).HasPrecision(18, 2);
+            b.Property(t => t.FitId).HasMaxLength(100).IsRequired();
+            b.Property(t => t.Memo).HasMaxLength(500).IsRequired();
+            b.Property(t => t.Version).IsRowVersion();
+
+            b.HasIndex(t => new { t.TenantId, t.BankAccountId, t.FitId }).IsUnique();
+            b.HasIndex(t => new { t.TenantId, t.Status });
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos

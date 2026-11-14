@@ -32,6 +32,7 @@ builder.Services.AddScoped<Inventory.Application.InventoryService>();
 builder.Services.AddScoped<Procurement.Application.ProcurementService>();
 builder.Services.AddScoped<Sales.Application.SalesService>();
 builder.Services.AddScoped<CashManagement.Application.CashManagementService>();
+builder.Services.AddScoped<Financial.Application.FinancialService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -1140,6 +1141,194 @@ cashGroup.MapPost("/discrepancies/{id:guid}/resolve", async (
     var res = await service.ResolveDiscrepancyAsync(id, req, ct);
     return Results.Ok(res);
 }).RequireAuthorization(PermissionCatalog.CashDiscrepancyResolve);
+
+// ==================== FINANCIAL (MOD-12) ====================
+var financialGroup = app.MapGroup("/api/financial").RequireAuthorization();
+
+// Plano de Contas & Centros de Custo
+financialGroup.MapGet("/accounts", async (
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListAccountsAsync(ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceReportsView);
+
+financialGroup.MapPost("/accounts", async (
+    Financial.Application.CreateFinancialAccountDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateAccountAsync(req, ct);
+    return Results.Created($"/api/financial/accounts/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinanceJournalView);
+
+financialGroup.MapGet("/cost-centers", async (
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListCostCentersAsync(ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceReportsView);
+
+financialGroup.MapPost("/cost-centers", async (
+    Financial.Application.CreateCostCenterDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateCostCenterAsync(req, ct);
+    return Results.Created($"/api/financial/cost-centers/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinanceCostCentersManage);
+
+// Contas Bancárias
+financialGroup.MapGet("/bank-accounts", async (
+    Guid? branchId,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListBankAccountsAsync(branchId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceReportsView);
+
+financialGroup.MapPost("/bank-accounts", async (
+    Financial.Application.CreateBankAccountDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateBankAccountAsync(req, ct);
+    return Results.Created($"/api/financial/bank-accounts/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinanceBanksManage);
+
+// Contas a Pagar
+financialGroup.MapGet("/payables", async (
+    Guid? branchId,
+    Financial.Domain.PayableStatus? status,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListAccountsPayableAsync(branchId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinancePayablesView);
+
+financialGroup.MapPost("/payables", async (
+    Financial.Application.CreateAccountPayableDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateAccountPayableAsync(req, ct);
+    return Results.Created($"/api/financial/payables/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinancePay);
+
+financialGroup.MapPost("/payables/{id:guid}/pay", async (
+    Guid id,
+    Financial.Application.PayTitleDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var res = await service.PayTitleAsync(id, req, ct);
+    return Results.Ok(res);
+}).RequireAuthorization(PermissionCatalog.FinancePay);
+
+// Contas a Receber
+financialGroup.MapGet("/receivables", async (
+    Guid? branchId,
+    Financial.Domain.ReceivableStatus? status,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListAccountsReceivableAsync(branchId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceReceivablesView);
+
+financialGroup.MapPost("/receivables", async (
+    Financial.Application.CreateAccountReceivableDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateAccountReceivableAsync(req, ct);
+    return Results.Created($"/api/financial/receivables/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinanceSettle);
+
+financialGroup.MapPost("/receivables/{id:guid}/receive", async (
+    Guid id,
+    Financial.Application.ReceiveTitleDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var res = await service.ReceiveTitleAsync(id, req, ct);
+    return Results.Ok(res);
+}).RequireAuthorization(PermissionCatalog.FinanceSettle);
+
+// Razão Contábil / Journal Entry (Partidas Dobradas)
+financialGroup.MapGet("/journal-entries", async (
+    Guid? branchId,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListJournalEntriesAsync(branchId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceJournalView);
+
+financialGroup.MapPost("/journal-entries", async (
+    Financial.Application.CreateJournalEntryDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateJournalEntryAsync(req, ct);
+    return Results.Created($"/api/financial/journal-entries/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.FinanceJournalView);
+
+// Extratos e Conciliação Bancária
+financialGroup.MapGet("/bank-accounts/{bankAccountId:guid}/transactions", async (
+    Guid bankAccountId,
+    Financial.Domain.ReconciliationStatus? status,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListTransactionsAsync(bankAccountId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.FinanceReconcile);
+
+financialGroup.MapPost("/bank-accounts/{bankAccountId:guid}/import-statement", async (
+    Guid bankAccountId,
+    Financial.Application.ImportBankStatementDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var imported = await service.ImportStatementAsync(req, ct);
+    return Results.Ok(imported);
+}).RequireAuthorization(PermissionCatalog.FinanceReconcile);
+
+financialGroup.MapPost("/transactions/{transactionId:guid}/reconcile", async (
+    Guid transactionId,
+    Financial.Application.ReconcileTransactionDto req,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var reconciled = await service.ReconcileTransactionAsync(transactionId, req, ct);
+    return Results.Ok(reconciled);
+}).RequireAuthorization(PermissionCatalog.FinanceReconcile);
+
+// DRE Gerencial & Fluxo de Caixa Projetado
+financialGroup.MapGet("/reports/dre", async (
+    DateTime startDate,
+    DateTime endDate,
+    Guid? branchId,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var report = await service.GetDreReportAsync(startDate, endDate, branchId, ct);
+    return Results.Ok(report);
+}).RequireAuthorization(PermissionCatalog.FinanceReportsView);
+
+financialGroup.MapGet("/reports/cash-flow-forecast", async (
+    Guid? branchId,
+    Financial.Application.FinancialService service,
+    CancellationToken ct) =>
+{
+    var forecast = await service.GetCashFlowForecastAsync(branchId, ct);
+    return Results.Ok(forecast);
+}).RequireAuthorization(PermissionCatalog.FinanceReportsView);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

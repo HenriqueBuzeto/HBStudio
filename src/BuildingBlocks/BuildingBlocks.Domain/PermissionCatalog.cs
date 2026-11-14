@@ -74,13 +74,17 @@ public static class PermissionCatalog
     public const string CrmCampaignSend = "crm.campaign.send";
     public const string CrmMessageView = "crm.message.view";
 
-    // Financeiro
+    // Financeiro (MOD-12 Financial)
     public const string FinancePayablesView = "finance.payables.view";
     public const string FinancePay = "finance.pay";
     public const string FinanceReceivablesView = "finance.receivables.view";
     public const string FinanceSettle = "finance.settle";
     public const string FinanceReconcile = "finance.reconcile";
     public const string FinanceReportsView = "finance.reports.view";
+    public const string FinanceBanksManage = "finance.banks.manage";
+    public const string FinanceJournalView = "finance.journal.view";
+    public const string FinanceCostCentersManage = "finance.costcenters.manage";
+    public const string FinancePeriodClose = "finance.period.close";
 
     // Societário & Investimentos
     public const string PartnersView = "partners.view";
