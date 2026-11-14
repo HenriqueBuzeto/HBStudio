@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\src\Modules\Inventory\Inventory.Infrastructure\Inventory.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Procurement.Application\Procurement.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Procurement.Infrastructure\Procurement.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sales\Sales.Application\Sales.Application.csproj" />
   </ItemGroup>
 
 </Project>

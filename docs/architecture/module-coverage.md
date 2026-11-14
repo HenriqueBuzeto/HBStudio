@@ -1,7 +1,7 @@
 # Matriz de Cobertura e Homologação de Módulos (Module Coverage)
 
 **Data de Atualização:** 14/11/2026  
-**Status do Projeto:** Fase 4 Concluída (MOD-00 a MOD-04 Homologados)  
+**Status do Projeto:** Fase 5 Concluída (MOD-00 a MOD-05 Homologados)  
 
 > **Legenda de Status:**
 > - `NOT_STARTED`: Módulo planejado, sem implementação física.
@@ -22,7 +22,7 @@
 | **MOD-02** | **Catálogo & Serialização (IMEI)** | `Catalog` | Implementado | Implementado | Implementado | Implementado | 5/5 xUnit Aprovados (22 total) | `READY_VERIFIED` |
 | **MOD-03** | **Estoque & Kardex Imutável** | `Inventory` | Implementado | Implementado | Implementado | Implementado | 5/5 xUnit Aprovados (27 total) | `READY_VERIFIED` |
 | **MOD-04** | **Compras & Recebimento** | `Procurement` | Implementado | Implementado | Implementado | Implementado | 6/6 xUnit Aprovados (33 total) | `READY_VERIFIED` |
-| **MOD-05** | **Vendas & PDV** | `Sales` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
+| **MOD-05** | **Vendas & PDV** | `Sales` | Implementado | Implementado | Implementado | Implementado | 6/6 xUnit Aprovados (39 total) | `READY_VERIFIED` |
 | **MOD-06** | **Caixa & Turnos Físicos** | `CashManagement` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-07** | **Assistência Técnica & OS** | `RepairService` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |
 | **MOD-08** | **CRM & Intenção de Compra** | `CRM` | Não iniciado | Não iniciado | Não iniciado | Não iniciado | Não iniciado | `NOT_STARTED` |

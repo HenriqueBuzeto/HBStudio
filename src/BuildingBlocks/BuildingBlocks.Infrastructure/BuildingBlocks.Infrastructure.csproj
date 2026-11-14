@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\Modules\Catalog\Catalog.Domain\Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Inventory\Inventory.Domain\Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Procurement\Procurement.Domain\Procurement.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Sales\Sales.Domain\Sales.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

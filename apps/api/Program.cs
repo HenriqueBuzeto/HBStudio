@@ -29,6 +29,7 @@ builder.Services.AddScoped<Parties.Application.IPartiesService, Parties.Applicat
 builder.Services.AddScoped<Catalog.Application.ICatalogService, Catalog.Application.CatalogService>();
 builder.Services.AddScoped<Inventory.Application.InventoryService>();
 builder.Services.AddScoped<Procurement.Application.ProcurementService>();
+builder.Services.AddScoped<Sales.Application.SalesService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -771,6 +772,192 @@ procurementGroup.MapPost("/returns", async (
     var returned = await service.CreateAndDispatchSupplierReturnAsync(req, canViewCost, ct);
     return Results.Created($"/api/procurement/returns/{returned.Id}", returned);
 }).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+// ==========================================
+// Modulo Sales (MOD-05) - Orçamentos, PDV e Vendas
+// ==========================================
+var salesGroup = app.MapGroup("/api/sales");
+
+// Orçamentos
+salesGroup.MapGet("/quotes", async (
+    Guid? branchId,
+    Sales.Domain.SalesQuoteStatus? status,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListQuotesAsync(branchId, status, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+salesGroup.MapGet("/quotes/{id:guid}", async (
+    Guid id,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var item = await service.GetQuoteByIdAsync(id, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+salesGroup.MapPost("/quotes", async (
+    Sales.Application.CreateSalesQuoteDto req,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateQuoteAsync(req, ct);
+    return Results.Created($"/api/sales/quotes/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+salesGroup.MapPost("/quotes/{id:guid}/send", async (
+    Guid id,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var sent = await service.SendQuoteAsync(id, ct);
+    return Results.Ok(sent);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+salesGroup.MapPost("/quotes/{id:guid}/accept", async (
+    Guid id,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var accepted = await service.AcceptQuoteAsync(id, ct);
+    return Results.Ok(accepted);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+salesGroup.MapPost("/quotes/{id:guid}/convert", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var sale = await service.ConvertQuoteToSaleAsync(id, canViewCost, ct);
+    return Results.Ok(sale);
+}).RequireAuthorization(PermissionCatalog.SalesCreate);
+
+// Vendas & PDV
+salesGroup.MapGet("/sales", async (
+    Guid? branchId,
+    Sales.Domain.SaleStatus? status,
+    Sales.Domain.SalePaymentStatus? paymentStatus,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var list = await service.ListSalesAsync(branchId, status, paymentStatus, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapGet("/sales/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var item = await service.GetSaleByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales", async (
+    Sales.Application.CreateSaleDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var created = await service.CreateSaleAsync(req, canViewCost, ct);
+    return Results.Created($"/api/sales/sales/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales/{id:guid}/reserve", async (
+    Guid id,
+    Guid warehouseId,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var reserved = await service.ReserveStockForSaleAsync(id, warehouseId, canViewCost, ct);
+    return Results.Ok(reserved);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales/{id:guid}/payments", async (
+    Guid id,
+    Sales.Application.AddPaymentIntentRequest req,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var payment = await service.RegisterPaymentIntentAsync(id, req, ct);
+    return Results.Created($"/api/sales/sales/{id}/payments/{payment.Id}", payment);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales/{id:guid}/payments/{paymentId:guid}/confirm", async (
+    Guid id,
+    Guid paymentId,
+    Sales.Application.ConfirmPaymentIntentRequest req,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var confirmed = await service.ConfirmPaymentIntentAsync(id, paymentId, req, ct);
+    return Results.Ok(confirmed);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales/{id:guid}/complete-fulfill", async (
+    Guid id,
+    Guid warehouseId,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var completed = await service.CompleteSaleAndFulfillAsync(id, warehouseId, canViewCost, ct);
+    return Results.Ok(completed);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/sales/{id:guid}/cancel", async (
+    Guid id,
+    string reason,
+    System.Security.Claims.ClaimsPrincipal user,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.SalesCostView);
+    var cancelled = await service.CancelSaleAsync(id, reason, canViewCost, ct);
+    return Results.Ok(cancelled);
+}).RequireAuthorization(PermissionCatalog.SalesCancel);
+
+// Devoluções de Venda
+salesGroup.MapGet("/returns", async (
+    Guid? branchId,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListSaleReturnsAsync(branchId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.SalesPosUse);
+
+salesGroup.MapPost("/returns", async (
+    Sales.Application.CreateSaleReturnDto req,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateSaleReturnAsync(req, ct);
+    return Results.Created($"/api/sales/returns/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.SalesCancel);
+
+salesGroup.MapPost("/returns/{id:guid}/restock", async (
+    Guid id,
+    Guid warehouseId,
+    string inspectionNotes,
+    Sales.Application.SalesService service,
+    CancellationToken ct) =>
+{
+    var restocked = await service.InspectAndRestockReturnAsync(id, warehouseId, inspectionNotes, ct);
+    return Results.Ok(restocked);
+}).RequireAuthorization(PermissionCatalog.SalesCancel);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

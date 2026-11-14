@@ -7,6 +7,7 @@ using Parties.Domain;
 using Catalog.Domain;
 using Inventory.Domain;
 using Procurement.Domain;
+using Sales.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -64,6 +65,15 @@ public class AppDbContext : DbContext
     public DbSet<UsedDeviceAcquisition> UsedDeviceAcquisitions => Set<UsedDeviceAcquisition>();
     public DbSet<SupplierReturn> SupplierReturns => Set<SupplierReturn>();
     public DbSet<SupplierReturnItem> SupplierReturnItems => Set<SupplierReturnItem>();
+
+    // Modulo Sales (MOD-05) - Orçamentos, PDV, Vendas e Pagamentos
+    public DbSet<SalesQuote> SalesQuotes => Set<SalesQuote>();
+    public DbSet<SalesQuoteItem> SalesQuoteItems => Set<SalesQuoteItem>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<SalePaymentIntent> SalePaymentIntents => Set<SalePaymentIntent>();
+    public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
+    public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -805,6 +815,123 @@ public class AppDbContext : DbContext
             b.HasOne<SupplierReturn>()
              .WithMany(r => r.Items)
              .HasForeignKey(i => i.SupplierReturnId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ==========================================
+        // Modulo Sales (MOD-05) - Orçamentos e PDV
+        // ==========================================
+        modelBuilder.Entity<SalesQuote>(b =>
+        {
+            b.ToTable("sales_quotes");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.QuoteNumber).HasMaxLength(50).IsRequired();
+            b.Property(q => q.PaymentTermsExpected).HasMaxLength(150);
+            b.Property(q => q.ShippingTotal).HasPrecision(18, 2);
+            b.Property(q => q.DiscountTotal).HasPrecision(18, 2);
+            b.Property(q => q.Notes).HasMaxLength(1000);
+            b.Property(q => q.Version).IsRowVersion();
+
+            b.HasIndex(q => new { q.TenantId, q.QuoteNumber }).IsUnique();
+            b.HasIndex(q => new { q.TenantId, q.BranchId, q.Status });
+            b.HasIndex(q => new { q.TenantId, q.CustomerPartyId });
+        });
+
+        modelBuilder.Entity<SalesQuoteItem>(b =>
+        {
+            b.ToTable("sales_quote_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<SalesQuote>()
+             .WithMany(q => q.Items)
+             .HasForeignKey(i => i.SalesQuoteId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Sale>(b =>
+        {
+            b.ToTable("sales");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.SaleNumber).HasMaxLength(50).IsRequired();
+            b.Property(s => s.ChargesTotal).HasPrecision(18, 2);
+            b.Property(s => s.DiscountTotal).HasPrecision(18, 2);
+            b.Property(s => s.Observations).HasMaxLength(1000);
+            b.Property(s => s.IdempotencyKey).HasMaxLength(100);
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.HasIndex(s => new { s.TenantId, s.SaleNumber }).IsUnique();
+            b.HasIndex(s => new { s.TenantId, s.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            b.HasIndex(s => new { s.TenantId, s.BranchId, s.Status });
+            b.HasIndex(s => new { s.TenantId, s.CustomerPartyId });
+            b.HasIndex(s => new { s.TenantId, s.SellerUserId });
+        });
+
+        modelBuilder.Entity<SaleItem>(b =>
+        {
+            b.ToTable("sale_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+            b.Property(i => i.HistoricalUnitCost).HasPrecision(18, 2);
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<Sale>()
+             .WithMany(s => s.Items)
+             .HasForeignKey(i => i.SaleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalePaymentIntent>(b =>
+        {
+            b.ToTable("sale_payment_intents");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Amount).HasPrecision(18, 2);
+            b.Property(p => p.AuthorizationCode).HasMaxLength(100);
+            b.Property(p => p.TransactionReference).HasMaxLength(200);
+            b.Property(p => p.Notes).HasMaxLength(500);
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasOne<Sale>()
+             .WithMany(s => s.Payments)
+             .HasForeignKey(p => p.SaleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SaleReturn>(b =>
+        {
+            b.ToTable("sale_returns");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
+            b.Property(r => r.InspectionNotes).HasMaxLength(500);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.SaleId });
+        });
+
+        modelBuilder.Entity<SaleReturnItem>(b =>
+        {
+            b.ToTable("sale_return_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.RefundAmount).HasPrecision(18, 2);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<SaleReturn>()
+             .WithMany(r => r.Items)
+             .HasForeignKey(i => i.SaleReturnId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 
