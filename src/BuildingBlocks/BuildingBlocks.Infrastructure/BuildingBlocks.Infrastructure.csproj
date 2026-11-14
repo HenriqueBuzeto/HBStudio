@@ -5,6 +5,7 @@
     <ProjectReference Include="..\BuildingBlocks.Application\BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\..\Modules\IdentityAccess\IdentityAccess.Domain\IdentityAccess.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Parties\Parties.Domain\Parties.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Catalog.Domain\Catalog.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

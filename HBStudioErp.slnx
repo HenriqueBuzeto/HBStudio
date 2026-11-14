@@ -10,6 +10,11 @@
     <Project Path="src/BuildingBlocks/BuildingBlocks.Security/BuildingBlocks.Security.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/Catalog.Application/Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/Catalog.Domain/Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/Catalog.Infrastructure/Catalog.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/IdentityAccess/">
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Application/IdentityAccess.Application.csproj" />
     <Project Path="src/Modules/IdentityAccess/IdentityAccess.Domain/IdentityAccess.Domain.csproj" />

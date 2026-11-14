@@ -4,6 +4,7 @@ using BuildingBlocks.Application;
 using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
 using IdentityAccess.Domain;
 using Parties.Domain;
+using Catalog.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -27,6 +28,13 @@ public class AppDbContext : DbContext
     public DbSet<PartyAddress> PartyAddresses => Set<PartyAddress>();
     public DbSet<CustomerEquipment> CustomerEquipments => Set<CustomerEquipment>();
     public DbSet<PartyConsentRecord> PartyConsentRecords => Set<PartyConsentRecord>();
+
+    // Modulo Catalog & Inventory
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<ProductBrand> ProductBrands => Set<ProductBrand>();
+    public DbSet<ProductModel> ProductModels => Set<ProductModel>();
+    public DbSet<ProductSku> ProductSkus => Set<ProductSku>();
+    public DbSet<InventoryUnit> InventoryUnits => Set<InventoryUnit>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -263,6 +271,104 @@ public class AppDbContext : DbContext
              .WithMany(p => p.Consents)
              .HasForeignKey(c => c.PartyId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuração do Módulo Catalog & InventoryUnit
+        modelBuilder.Entity<ProductCategory>(b =>
+        {
+            b.ToTable("product_categories");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
+            b.Property(c => c.Slug).HasMaxLength(150).IsRequired();
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasIndex(c => new { c.TenantId, c.Slug }).IsUnique();
+
+            b.HasOne(c => c.ParentCategory)
+             .WithMany(p => p.SubCategories)
+             .HasForeignKey(c => c.ParentCategoryId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductBrand>(b =>
+        {
+            b.ToTable("product_brands");
+            b.HasKey(brand => brand.Id);
+            b.Property(brand => brand.Name).HasMaxLength(150).IsRequired();
+            b.Property(brand => brand.Description).HasMaxLength(500);
+            b.Property(brand => brand.Version).IsRowVersion();
+
+            b.HasIndex(brand => new { brand.TenantId, brand.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductModel>(b =>
+        {
+            b.ToTable("product_models");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Name).HasMaxLength(200).IsRequired();
+            b.Property(m => m.Description).HasMaxLength(1000);
+            b.Property(m => m.Version).IsRowVersion();
+
+            b.HasOne(m => m.Brand)
+             .WithMany()
+             .HasForeignKey(m => m.BrandId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne(m => m.Category)
+             .WithMany()
+             .HasForeignKey(m => m.CategoryId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductSku>(b =>
+        {
+            b.ToTable("product_skus");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.SkuCode).HasMaxLength(100).IsRequired();
+            b.Property(s => s.VariantName).HasMaxLength(150).IsRequired();
+            b.Property(s => s.BarcodeEan).HasMaxLength(50);
+            b.Property(s => s.DefaultPrice).HasPrecision(18, 2);
+            b.Property(s => s.TechnicalSpecsJson).HasColumnType("jsonb");
+            b.Property(s => s.Version).IsRowVersion();
+
+            // SKU deve ser estritamente único por tenant
+            b.HasIndex(s => new { s.TenantId, s.SkuCode }).IsUnique();
+
+            b.HasOne(s => s.ProductModel)
+             .WithMany(m => m.Skus)
+             .HasForeignKey(s => s.ProductModelId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InventoryUnit>(b =>
+        {
+            b.ToTable("inventory_units");
+            b.HasKey(u => u.Id);
+            b.Property(u => u.SerialNumber).HasMaxLength(100);
+            b.Property(u => u.Imei1).HasMaxLength(20);
+            b.Property(u => u.Imei2).HasMaxLength(20);
+            b.Property(u => u.AcquisitionCost).HasPrecision(18, 2);
+            b.Property(u => u.InspectionNotes).HasMaxLength(1000);
+            b.Property(u => u.Version).IsRowVersion();
+
+            // Índices parciais únicos por tenant para IMEI1 e IMEI2 (quando não nulos)
+            b.HasIndex(u => new { u.TenantId, u.Imei1 })
+             .IsUnique()
+             .HasFilter("\"Imei1\" IS NOT NULL");
+
+            b.HasIndex(u => new { u.TenantId, u.Imei2 })
+             .IsUnique()
+             .HasFilter("\"Imei2\" IS NOT NULL");
+
+            b.HasOne(u => u.ProductSku)
+             .WithMany(s => s.InventoryUnits)
+             .HasForeignKey(u => u.ProductSkuId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasOne<Party>()
+             .WithMany()
+             .HasForeignKey(u => u.SupplierPartyId)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos

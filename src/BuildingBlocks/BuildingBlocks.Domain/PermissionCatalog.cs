@@ -9,6 +9,11 @@ public static class PermissionCatalog
     public const string CustomersExport = "customers.export";
     public const string CustomersSensitiveView = "customers.sensitive.view";
 
+    // Fornecedores
+    public const string SuppliersView = "suppliers.view";
+    public const string SuppliersCreate = "suppliers.create";
+    public const string SuppliersEdit = "suppliers.edit";
+
     // Catálogo
     public const string CatalogProductsView = "catalog.products.view";
     public const string CatalogProductsManage = "catalog.products.manage";

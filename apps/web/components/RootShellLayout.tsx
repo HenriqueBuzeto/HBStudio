@@ -30,6 +30,7 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
   { name: "Dashboard Executivo", href: "/dashboard", icon: Building2 },
   { name: "Clientes & Fornecedores", href: "/parties", icon: Users },
+  { name: "Catálogo & Produtos", href: "/catalog", icon: Boxes },
   { name: "PDV & Vendas", href: "/sales", icon: ShoppingCart },
   { name: "Assistência Técnica (OS)", href: "/repairs", icon: Wrench },
   { name: "Estoque & Kardex", href: "/inventory", icon: Boxes },

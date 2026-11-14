@@ -25,6 +25,9 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 // Modulo Parties
 builder.Services.AddScoped<Parties.Application.IPartiesService, Parties.Application.PartiesService>();
 
+// Modulo Catalog & Inventory
+builder.Services.AddScoped<Catalog.Application.ICatalogService, Catalog.Application.CatalogService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -134,6 +137,159 @@ partiesGroup.MapPost("/{id:guid}/consents", async (Guid id, Parties.Application.
     var consent = await service.RecordConsentAsync(id, req, ct);
     return Results.Created($"/api/parties/{id}/consents/{consent.Id}", consent);
 }).RequireAuthorization(PermissionCatalog.CustomersEdit);
+
+// Endpoints do Módulo Catalog & InventoryUnit
+var catalogGroup = app.MapGroup("/api/catalog").RequireAuthorization();
+
+// Categorias
+catalogGroup.MapGet("/categories", async (Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var categories = await service.ListCategoriesAsync(ct);
+    return Results.Ok(categories);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapPost("/categories", async (Catalog.Application.CreateCategoryRequest req, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var created = await service.CreateCategoryAsync(req, ct);
+    return Results.Created($"/api/catalog/categories/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+// Marcas
+catalogGroup.MapGet("/brands", async (Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var brands = await service.ListBrandsAsync(ct);
+    return Results.Ok(brands);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapPost("/brands", async (Catalog.Application.CreateBrandRequest req, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var created = await service.CreateBrandAsync(req, ct);
+    return Results.Created($"/api/catalog/brands/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+// Modelos de Produtos
+catalogGroup.MapGet("/models", async (string? search, Guid? categoryId, Guid? brandId, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var models = await service.ListModelsAsync(search, categoryId, brandId, ct);
+    return Results.Ok(models);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapGet("/models/{id:guid}", async (Guid id, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var model = await service.GetModelByIdAsync(id, ct);
+    return model == null ? Results.NotFound() : Results.Ok(model);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapPost("/models", async (Catalog.Application.CreateProductModelRequest req, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    var created = await service.CreateModelAsync(req, ct);
+    return Results.Created($"/api/catalog/models/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+// SKUs
+catalogGroup.MapPost("/models/{id:guid}/skus", async (Guid id, Catalog.Application.CreateProductSkuRequest req, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    try
+    {
+        var created = await service.AddSkuAsync(id, req, ct);
+        return Results.Created($"/api/catalog/skus/{created.Id}", created);
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+catalogGroup.MapPut("/skus/{id:guid}/price", async (Guid id, Catalog.Application.UpdateSkuPriceRequest req, Catalog.Application.ICatalogService service, CancellationToken ct) =>
+{
+    try
+    {
+        var updated = await service.UpdateSkuPriceAsync(id, req, ct);
+        return Results.Ok(updated);
+    }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+    {
+        return Results.Conflict(new { error = "Conflito de concorrência detectado: o SKU foi alterado simultaneamente por outro usuário." });
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+// Unidades Físicas / Serializadas / Usados
+catalogGroup.MapGet("/units", async (
+    Guid? skuId,
+    string? search,
+    Catalog.Domain.UnitOperationalStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Catalog.Application.ICatalogService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.CatalogCostView);
+    var units = await service.ListUnitsAsync(skuId, search, status, canViewCost, ct);
+    return Results.Ok(units);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapGet("/units/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Catalog.Application.ICatalogService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.CatalogCostView);
+    var unit = await service.GetUnitByIdAsync(id, canViewCost, ct);
+    return unit == null ? Results.NotFound() : Results.Ok(unit);
+}).RequireAuthorization(PermissionCatalog.CatalogProductsView);
+
+catalogGroup.MapPost("/units", async (
+    Catalog.Application.RegisterInventoryUnitRequest req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Catalog.Application.ICatalogService service,
+    CancellationToken ct) =>
+{
+    try
+    {
+        bool canViewCost = user.HasClaim("permission", PermissionCatalog.CatalogCostView);
+        var created = await service.RegisterUnitAsync(req, canViewCost, ct);
+        return Results.Created($"/api/catalog/units/{created.Id}", created);
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
+
+catalogGroup.MapPut("/units/{id:guid}/approve", async (
+    Guid id,
+    Catalog.Application.ApproveUnitForSaleRequest req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Catalog.Application.ICatalogService service,
+    CancellationToken ct) =>
+{
+    try
+    {
+        bool canViewCost = user.HasClaim("permission", PermissionCatalog.CatalogCostView);
+        var approved = await service.ApproveUnitForSaleAsync(id, req, canViewCost, ct);
+        return Results.Ok(approved);
+    }
+    catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+    {
+        return Results.Conflict(new { error = "Conflito de concorrência detectado na unidade física." });
+    }
+    catch (KeyNotFoundException)
+    {
+        return Results.NotFound();
+    }
+}).RequireAuthorization(PermissionCatalog.CatalogProductsManage);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

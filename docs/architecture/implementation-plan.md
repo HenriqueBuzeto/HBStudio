@@ -46,6 +46,13 @@
 - **Decisão:** Valores monetários armazenados exclusivamente como `numeric(18,2)`. Quantidades fracionárias (e.g. gramas de filamento 3D, horas) com precisão decimal dedicada (`numeric(18,4)` ou similar). **Proibido o uso de `float` ou `double` para dinheiro**.
 - **Datas:** Todas as datas registradas em `UTC` com fuso horário da filial/operação respeitado na apresentação.
 
+### ADR-07: Segregação Estrita entre Modelo Comercial, SKU e Unidade Serializada
+- **Decisão:** O catálogo separa:
+  - `ProductModel`: Entidade abstrata/família comercial (e.g. "iPhone 14 Pro Max", "Filamento PLA").
+  - `ProductSku`: Variante vendável precificada com SKU estritamente único por tenant (e.g. "IPH14PM-128-PURPLE").
+  - `InventoryUnit`: Unidade física individual com IMEI 1, IMEI 2 (SIM 2), Serial Apple/Fabricante, Grau Estético (A, B, C), Condição (Novo, Usado, Recondicionado), Saúde de Bateria %, Laudo de Inspeção e Custo de Aquisição Individual.
+- **Racional:** Eletrônicos novos e usados compartilham o mesmo SKU comercial, porém unidades usadas possuem custos de recompra distintos, laudos técnicos individuais e números de IMEI exclusivos. Unidades físicas possuem índices parciais únicos no PostgreSQL para evitar duplicações ou aparelhos clonados. O custo individual de aquisição é estritamente sigiloso e só é retornado com a permissão `catalog.cost.view`.
+
 ---
 
 ## 3. Bounded Contexts e Domínios do Sistema

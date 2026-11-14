@@ -31,6 +31,8 @@
     <ProjectReference Include="..\..\apps\api\api.csproj" />
     <ProjectReference Include="..\..\src\Modules\Parties\Parties.Domain\Parties.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Parties\Parties.Application\Parties.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.Domain\Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.Application\Catalog.Application.csproj" />
   </ItemGroup>
 
 </Project>

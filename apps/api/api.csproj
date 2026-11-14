@@ -6,6 +6,8 @@
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\IdentityAccess.Infrastructure\IdentityAccess.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Parties\Parties.Application\Parties.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Parties\Parties.Infrastructure\Parties.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.Application\Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\Catalog.Infrastructure\Catalog.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
