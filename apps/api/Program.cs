@@ -28,6 +28,7 @@ builder.Services.AddScoped<Parties.Application.IPartiesService, Parties.Applicat
 // Modulo Catalog & Inventory
 builder.Services.AddScoped<Catalog.Application.ICatalogService, Catalog.Application.CatalogService>();
 builder.Services.AddScoped<Inventory.Application.InventoryService>();
+builder.Services.AddScoped<Procurement.Application.ProcurementService>();
 
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
@@ -458,6 +459,318 @@ inventoryGroup.MapPost("/counts/{id:guid}/approve-post", async (
     var posted = await service.ApproveAndPostCountAsync(id, ct);
     return Results.Ok(posted);
 }).RequireAuthorization(PermissionCatalog.InventoryAdjust);
+
+// ==========================================
+// Modulo Procurement (MOD-04) - Compras e Usados
+// ==========================================
+var procurementGroup = app.MapGroup("/api/procurement");
+
+// Requisições de Compra
+procurementGroup.MapGet("/requests", async (
+    Guid? branchId,
+    Procurement.Domain.PurchaseRequestStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListPurchaseRequestsAsync(branchId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/requests/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetPurchaseRequestByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/requests", async (
+    Procurement.Application.CreatePurchaseRequestDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var created = await service.CreatePurchaseRequestAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/requests/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/requests/{id:guid}/submit", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var submitted = await service.SubmitPurchaseRequestAsync(id, canViewCost, ct);
+    return Results.Ok(submitted);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/requests/{id:guid}/approve", async (
+    Guid id,
+    string? notes,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var approved = await service.ApprovePurchaseRequestAsync(id, notes, canViewCost, ct);
+    return Results.Ok(approved);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+procurementGroup.MapPost("/requests/{id:guid}/reject", async (
+    Guid id,
+    string notes,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var rejected = await service.RejectPurchaseRequestAsync(id, notes, canViewCost, ct);
+    return Results.Ok(rejected);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+// Cotações
+procurementGroup.MapGet("/quotations", async (
+    Guid? branchId,
+    Guid? supplierPartyId,
+    Procurement.Domain.QuotationStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListSupplierQuotationsAsync(branchId, supplierPartyId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/quotations/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetSupplierQuotationByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/quotations", async (
+    Procurement.Application.CreateSupplierQuotationDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var created = await service.CreateSupplierQuotationAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/quotations/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/quotations/{id:guid}/accept", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var accepted = await service.AcceptSupplierQuotationAsync(id, canViewCost, ct);
+    return Results.Ok(accepted);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+// Pedidos de Compra
+procurementGroup.MapGet("/orders", async (
+    Guid? branchId,
+    Guid? supplierPartyId,
+    Procurement.Domain.PurchaseOrderStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListPurchaseOrdersAsync(branchId, supplierPartyId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/orders/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetPurchaseOrderByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/orders", async (
+    Procurement.Application.CreatePurchaseOrderDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var created = await service.CreatePurchaseOrderAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/orders/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/orders/{id:guid}/submit", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var submitted = await service.SubmitPurchaseOrderAsync(id, canViewCost, ct);
+    return Results.Ok(submitted);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/orders/{id:guid}/approve", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var approved = await service.ApprovePurchaseOrderAsync(id, canViewCost, ct);
+    return Results.Ok(approved);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+procurementGroup.MapPost("/orders/{id:guid}/cancel", async (
+    Guid id,
+    string reason,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var cancelled = await service.CancelPurchaseOrderAsync(id, reason, canViewCost, ct);
+    return Results.Ok(cancelled);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+// Recebimento de Mercadorias (Conferência e Kardex)
+procurementGroup.MapGet("/receipts", async (
+    Guid? branchId,
+    Guid? warehouseId,
+    Procurement.Domain.GoodsReceiptStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListGoodsReceiptsAsync(branchId, warehouseId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/receipts/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetGoodsReceiptByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/receipts", async (
+    Procurement.Application.CreateGoodsReceiptDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var received = await service.CreateAndPostGoodsReceiptAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/receipts/{received.Id}", received);
+}).RequireAuthorization(PermissionCatalog.PurchasesReceive);
+
+// Aquisição de Usados no Balcão
+procurementGroup.MapGet("/used-devices", async (
+    Guid? branchId,
+    Procurement.Domain.UsedDeviceStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListUsedDeviceAcquisitionsAsync(branchId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/used-devices/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetUsedDeviceAcquisitionByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/used-devices", async (
+    Procurement.Application.RegisterUsedDeviceAcquisitionDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var registered = await service.RegisterUsedDeviceAcquisitionAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/used-devices/{registered.Id}", registered);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
+
+procurementGroup.MapPost("/used-devices/{id:guid}/approve-receive", async (
+    Guid id,
+    Guid warehouseId,
+    Guid? warehouseLocationId,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var received = await service.ApproveAndReceiveUsedDeviceInStockAsync(id, warehouseId, warehouseLocationId, canViewCost, ct);
+    return Results.Ok(received);
+}).RequireAuthorization(PermissionCatalog.PurchasesApprove);
+
+// Devoluções a Fornecedores
+procurementGroup.MapGet("/returns", async (
+    Guid? branchId,
+    Guid? supplierPartyId,
+    Procurement.Domain.SupplierReturnStatus? status,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var list = await service.ListSupplierReturnsAsync(branchId, supplierPartyId, status, canViewCost, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapGet("/returns/{id:guid}", async (
+    Guid id,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var item = await service.GetSupplierReturnByIdAsync(id, canViewCost, ct);
+    return Results.Ok(item);
+}).RequireAuthorization(PermissionCatalog.PurchasesView);
+
+procurementGroup.MapPost("/returns", async (
+    Procurement.Application.CreateSupplierReturnDto req,
+    System.Security.Claims.ClaimsPrincipal user,
+    Procurement.Application.ProcurementService service,
+    CancellationToken ct) =>
+{
+    bool canViewCost = user.HasClaim("permission", PermissionCatalog.PurchasesCostView);
+    var returned = await service.CreateAndDispatchSupplierReturnAsync(req, canViewCost, ct);
+    return Results.Created($"/api/procurement/returns/{returned.Id}", returned);
+}).RequireAuthorization(PermissionCatalog.PurchasesCreate);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

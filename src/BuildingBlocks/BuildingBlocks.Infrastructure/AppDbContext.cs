@@ -6,6 +6,7 @@ using IdentityAccess.Domain;
 using Parties.Domain;
 using Catalog.Domain;
 using Inventory.Domain;
+using Procurement.Domain;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -50,6 +51,19 @@ public class AppDbContext : DbContext
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
     public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
     public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
+
+    // Modulo Procurement (Compras, Recebimento e Aquisição de Usados)
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+    public DbSet<PurchaseRequestItem> PurchaseRequestItems => Set<PurchaseRequestItem>();
+    public DbSet<SupplierQuotation> SupplierQuotations => Set<SupplierQuotation>();
+    public DbSet<SupplierQuotationItem> SupplierQuotationItems => Set<SupplierQuotationItem>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+    public DbSet<GoodsReceiptItem> GoodsReceiptItems => Set<GoodsReceiptItem>();
+    public DbSet<UsedDeviceAcquisition> UsedDeviceAcquisitions => Set<UsedDeviceAcquisition>();
+    public DbSet<SupplierReturn> SupplierReturns => Set<SupplierReturn>();
+    public DbSet<SupplierReturnItem> SupplierReturnItems => Set<SupplierReturnItem>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -615,6 +629,182 @@ public class AppDbContext : DbContext
             b.HasOne<InventoryCount>()
              .WithMany(c => c.Items)
              .HasForeignKey(i => i.InventoryCountId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ==========================================
+        // Modulo Procurement (MOD-04)
+        // ==========================================
+        modelBuilder.Entity<PurchaseRequest>(b =>
+        {
+            b.ToTable("purchase_requests");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.RequestNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.Justification).HasMaxLength(500).IsRequired();
+            b.Property(r => r.DecisionNotes).HasMaxLength(500);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.RequestNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
+        });
+
+        modelBuilder.Entity<PurchaseRequestItem>(b =>
+        {
+            b.ToTable("purchase_request_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.EstimatedUnitCost).HasPrecision(18, 2);
+            b.Property(i => i.Notes).HasMaxLength(250);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<PurchaseRequest>()
+             .WithMany(r => r.Items)
+             .HasForeignKey(i => i.PurchaseRequestId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SupplierQuotation>(b =>
+        {
+            b.ToTable("supplier_quotations");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.QuotationNumber).HasMaxLength(50).IsRequired();
+            b.Property(q => q.ShippingFee).HasPrecision(18, 2);
+            b.Property(q => q.PaymentTerms).HasMaxLength(150);
+            b.Property(q => q.Notes).HasMaxLength(500);
+            b.Property(q => q.Version).IsRowVersion();
+
+            b.HasIndex(q => new { q.TenantId, q.QuotationNumber }).IsUnique();
+            b.HasIndex(q => new { q.TenantId, q.SupplierPartyId, q.Status });
+        });
+
+        modelBuilder.Entity<SupplierQuotationItem>(b =>
+        {
+            b.ToTable("supplier_quotation_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+            b.Property(i => i.DiscountAmount).HasPrecision(18, 2);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<SupplierQuotation>()
+             .WithMany(q => q.Items)
+             .HasForeignKey(i => i.SupplierQuotationId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PurchaseOrder>(b =>
+        {
+            b.ToTable("purchase_orders");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.OrderNumber).HasMaxLength(50).IsRequired();
+            b.Property(o => o.PaymentTerms).HasMaxLength(150);
+            b.Property(o => o.ShippingCost).HasPrecision(18, 2);
+            b.Property(o => o.OtherExpenses).HasPrecision(18, 2);
+            b.Property(o => o.TotalDiscount).HasPrecision(18, 2);
+            b.Property(o => o.Notes).HasMaxLength(1000);
+            b.Property(o => o.Version).IsRowVersion();
+
+            b.HasIndex(o => new { o.TenantId, o.OrderNumber }).IsUnique();
+            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
+            b.HasIndex(o => new { o.TenantId, o.SupplierPartyId });
+        });
+
+        modelBuilder.Entity<PurchaseOrderItem>(b =>
+        {
+            b.ToTable("purchase_order_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+            b.Property(i => i.QuantityOrdered).HasPrecision(18, 4);
+            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
+            b.Property(i => i.UnitCost).HasPrecision(18, 2);
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<PurchaseOrder>()
+             .WithMany(o => o.Items)
+             .HasForeignKey(i => i.PurchaseOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GoodsReceipt>(b =>
+        {
+            b.ToTable("goods_receipts");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.ReceiptNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.InvoiceOrDocumentNumber).HasMaxLength(100).IsRequired();
+            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
+            b.Property(r => r.Notes).HasMaxLength(1000);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.ReceiptNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            b.HasIndex(r => new { r.TenantId, r.PurchaseOrderId });
+            b.HasIndex(r => new { r.TenantId, r.WarehouseId });
+        });
+
+        modelBuilder.Entity<GoodsReceiptItem>(b =>
+        {
+            b.ToTable("goods_receipt_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
+            b.Property(i => i.RealUnitCost).HasPrecision(18, 2);
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+            b.Property(i => i.Notes).HasMaxLength(300);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<GoodsReceipt>()
+             .WithMany(r => r.Items)
+             .HasForeignKey(i => i.GoodsReceiptId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UsedDeviceAcquisition>(b =>
+        {
+            b.ToTable("used_device_acquisitions");
+            b.HasKey(u => u.Id);
+            b.Property(u => u.AcquisitionNumber).HasMaxLength(50).IsRequired();
+            b.Property(u => u.SerialNumber).HasMaxLength(100).IsRequired();
+            b.Property(u => u.Imei1).HasMaxLength(20);
+            b.Property(u => u.Imei2).HasMaxLength(20);
+            b.Property(u => u.NegotiatedPrice).HasPrecision(18, 2);
+            b.Property(u => u.AttributableExpenses).HasPrecision(18, 2);
+            b.Property(u => u.ChecklistInspectionJson).HasColumnType("jsonb").IsRequired();
+            b.Property(u => u.Notes).HasMaxLength(1000);
+            b.Property(u => u.Version).IsRowVersion();
+
+            b.HasIndex(u => new { u.TenantId, u.AcquisitionNumber }).IsUnique();
+            b.HasIndex(u => new { u.TenantId, u.BranchId, u.Status });
+            b.HasIndex(u => new { u.TenantId, u.SellerPartyId });
+            b.HasIndex(u => new { u.TenantId, u.SerialNumber });
+            b.HasIndex(u => new { u.TenantId, u.Imei1 });
+        });
+
+        modelBuilder.Entity<SupplierReturn>(b =>
+        {
+            b.ToTable("supplier_returns");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
+            b.Property(r => r.ReturnInvoiceNumber).HasMaxLength(100);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.SupplierPartyId });
+            b.HasIndex(r => new { r.TenantId, r.GoodsReceiptId });
+        });
+
+        modelBuilder.Entity<SupplierReturnItem>(b =>
+        {
+            b.ToTable("supplier_return_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitCost).HasPrecision(18, 2);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasOne<SupplierReturn>()
+             .WithMany(r => r.Items)
+             .HasForeignKey(i => i.SupplierReturnId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 
