@@ -11,6 +11,7 @@ using Sales.Domain;
 using CashManagement.Domain;
 using Financial.Domain;
 using PartnersCapital.Domain.Entities;
+using RepairService.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -104,6 +105,15 @@ public class AppDbContext : DbContext
     public DbSet<PartnerCompensation> PartnerCompensations => Set<PartnerCompensation>();
     public DbSet<ProfitDistributionProposal> ProfitDistributionProposals => Set<ProfitDistributionProposal>();
     public DbSet<ProfitDistributionItem> ProfitDistributionItems => Set<ProfitDistributionItem>();
+
+    // Modulo RepairService (MOD-07) - Assistência Técnica, OS, Laboratório e Garantias
+    public DbSet<RepairOrder> RepairOrders => Set<RepairOrder>();
+    public DbSet<RepairChecklistItem> RepairChecklistItems => Set<RepairChecklistItem>();
+    public DbSet<RepairEstimateItem> RepairEstimateItems => Set<RepairEstimateItem>();
+    public DbSet<RepairPartUsage> RepairPartUsages => Set<RepairPartUsage>();
+    public DbSet<RepairStatusHistoryEntry> RepairStatusHistoryEntries => Set<RepairStatusHistoryEntry>();
+    public DbSet<RepairEvidenceAttachment> RepairEvidenceAttachments => Set<RepairEvidenceAttachment>();
+    public DbSet<RepairWarrantyClaim> RepairWarrantyClaims => Set<RepairWarrantyClaim>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1274,6 +1284,138 @@ public class AppDbContext : DbContext
             b.HasIndex(i => new { i.TenantId, i.ProposalId, i.PartnerId });
         });
 
+        // Modulo RepairService (MOD-07)
+        modelBuilder.Entity<RepairOrder>(b =>
+        {
+            b.ToTable("repair_orders");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.OrderNumber).HasMaxLength(50).IsRequired();
+            b.Property(r => r.ReportedDefect).HasMaxLength(1000).IsRequired();
+            b.Property(r => r.PhysicalConditionNotes).HasMaxLength(2000);
+            b.Property(r => r.AccessoriesIncluded).HasMaxLength(1000);
+            b.Property(r => r.DiagnosticNotes).HasMaxLength(4000);
+            b.Property(r => r.ResolutionNotes).HasMaxLength(4000);
+            b.Property(r => r.DeliveredToPersonName).HasMaxLength(200);
+            b.Property(r => r.DeliveredToDocumentNumber).HasMaxLength(50);
+            b.Property(r => r.DeliveryNotes).HasMaxLength(2000);
+
+            b.Property(r => r.TotalLaborPrice).HasPrecision(18, 2);
+            b.Property(r => r.TotalPartsPrice).HasPrecision(18, 2);
+            b.Property(r => r.TotalDiscount).HasPrecision(18, 2);
+            b.Property(r => r.FinalPrice).HasPrecision(18, 2);
+            b.Property(r => r.TotalPartsCost).HasPrecision(18, 2);
+            b.Property(r => r.TotalLaborCost).HasPrecision(18, 2);
+            b.Property(r => r.Version).IsRowVersion();
+
+            b.HasIndex(r => new { r.TenantId, r.OrderNumber }).IsUnique();
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
+            b.HasIndex(r => new { r.TenantId, r.CustomerId });
+            b.HasIndex(r => new { r.TenantId, r.CustomerEquipmentId });
+            b.HasIndex(r => new { r.TenantId, r.OriginalRepairOrderId });
+        });
+
+        modelBuilder.Entity<RepairChecklistItem>(b =>
+        {
+            b.ToTable("repair_checklist_items");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Category).HasMaxLength(100).IsRequired();
+            b.Property(c => c.ItemName).HasMaxLength(150).IsRequired();
+            b.Property(c => c.Notes).HasMaxLength(500);
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.ChecklistItems)
+             .HasForeignKey(c => c.RepairOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(c => new { c.TenantId, c.RepairOrderId, c.ItemName, c.IsOutputCheck });
+        });
+
+        modelBuilder.Entity<RepairEstimateItem>(b =>
+        {
+            b.ToTable("repair_estimate_items");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Description).HasMaxLength(250).IsRequired();
+            b.Property(e => e.Quantity).HasPrecision(18, 4);
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            b.Property(e => e.UnitCost).HasPrecision(18, 2);
+            b.Property(e => e.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.EstimateItems)
+             .HasForeignKey(e => e.RepairOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(e => new { e.TenantId, e.RepairOrderId });
+        });
+
+        modelBuilder.Entity<RepairPartUsage>(b =>
+        {
+            b.ToTable("repair_part_usages");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.PartDescription).HasMaxLength(250).IsRequired();
+            b.Property(p => p.Quantity).HasPrecision(18, 4);
+            b.Property(p => p.ActualUnitCost).HasPrecision(18, 2);
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.PartUsages)
+             .HasForeignKey(p => p.RepairOrderId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            b.HasIndex(p => new { p.TenantId, p.RepairOrderId, p.ProductSkuId });
+        });
+
+        modelBuilder.Entity<RepairStatusHistoryEntry>(b =>
+        {
+            b.ToTable("repair_status_history");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Description).HasMaxLength(500).IsRequired();
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.StatusHistory)
+             .HasForeignKey(s => s.RepairOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(s => new { s.TenantId, s.RepairOrderId, s.TimestampUtc });
+        });
+
+        modelBuilder.Entity<RepairEvidenceAttachment>(b =>
+        {
+            b.ToTable("repair_evidence_attachments");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.FileName).HasMaxLength(250).IsRequired();
+            b.Property(a => a.StorageUrl).HasMaxLength(1000).IsRequired();
+            b.Property(a => a.FileType).HasMaxLength(100).IsRequired();
+            b.Property(a => a.Category).HasMaxLength(100).IsRequired();
+            b.Property(a => a.Description).HasMaxLength(500);
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.Attachments)
+             .HasForeignKey(a => a.RepairOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(a => new { a.TenantId, a.RepairOrderId });
+        });
+
+        modelBuilder.Entity<RepairWarrantyClaim>(b =>
+        {
+            b.ToTable("repair_warranty_claims");
+            b.HasKey(w => w.Id);
+            b.Property(w => w.DefectDescription).HasMaxLength(1000).IsRequired();
+            b.Property(w => w.DecisionRationale).HasMaxLength(1000);
+            b.Property(w => w.Version).IsRowVersion();
+
+            b.HasOne<RepairOrder>()
+             .WithMany(r => r.WarrantyClaims)
+             .HasForeignKey(w => w.RepairOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(w => new { w.TenantId, w.RepairOrderId });
+        });
+
         // Configurar Filtros Globais Multi-Tenant Automaticos
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -1298,6 +1440,19 @@ public class AppDbContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // 0. Corrigir entidades filhas recém-anexadas com Version == 0 marcadas erroneamente como Modified
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
+        {
+            if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim)
+            {
+                var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
+                if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))
+                {
+                    entry.State = EntityState.Added;
+                }
+            }
+        }
+
         // 1. Validar e Forçar Isolamento de Tenant
         var tenantEntries = ChangeTracker.Entries<ITenantScoped>()
             .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)

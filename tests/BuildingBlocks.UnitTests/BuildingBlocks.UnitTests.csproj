@@ -45,6 +45,9 @@
     <ProjectReference Include="..\..\src\Modules\PartnersCapital\PartnersCapital.Domain\PartnersCapital.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\PartnersCapital\PartnersCapital.Application\PartnersCapital.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\PartnersCapital\PartnersCapital.Infrastructure\PartnersCapital.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Domain\RepairService.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Application\RepairService.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Infrastructure\RepairService.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

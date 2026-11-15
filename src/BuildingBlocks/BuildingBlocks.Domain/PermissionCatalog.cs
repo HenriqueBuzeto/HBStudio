@@ -63,9 +63,14 @@ public static class PermissionCatalog
     public const string RepairsDiagnose = "repairs.diagnose";
     public const string RepairsQuote = "repairs.quote";
     public const string RepairsApprove = "repairs.approve";
+    public const string RepairsAssign = "repairs.assign";
     public const string RepairsExecute = "repairs.execute";
+    public const string RepairsPartsReserve = "repairs.parts.reserve";
+    public const string RepairsPartsConsume = "repairs.parts.consume";
+    public const string RepairsQualityCheck = "repairs.quality";
     public const string RepairsDeliver = "repairs.deliver";
     public const string RepairsWarranty = "repairs.warranty";
+    public const string RepairsCostView = "repairs.cost.view";
 
     // CRM
     public const string CrmView = "crm.view";

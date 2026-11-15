@@ -50,6 +50,11 @@
     <Project Path="src/Modules/Procurement/Procurement.Domain/Procurement.Domain.csproj" />
     <Project Path="src/Modules/Procurement/Procurement.Infrastructure/Procurement.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/RepairService/">
+    <Project Path="src/Modules/RepairService/RepairService.Application/RepairService.Application.csproj" />
+    <Project Path="src/Modules/RepairService/RepairService.Domain/RepairService.Domain.csproj" />
+    <Project Path="src/Modules/RepairService/RepairService.Infrastructure/RepairService.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Sales/">
     <Project Path="src/Modules/Sales/Sales.Application/Sales.Application.csproj" />
     <Project Path="src/Modules/Sales/Sales.Domain/Sales.Domain.csproj" />

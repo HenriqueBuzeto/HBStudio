@@ -36,6 +36,10 @@ builder.Services.AddScoped<Financial.Application.FinancialService>();
 builder.Services.AddScoped<PartnersCapital.Domain.Repositories.IPartnersCapitalRepository, PartnersCapital.Infrastructure.Repositories.PartnersCapitalRepository>();
 builder.Services.AddScoped<PartnersCapital.Application.Services.PartnersCapitalService>();
 
+// Modulo RepairService (MOD-07)
+builder.Services.AddScoped<RepairService.Domain.Repositories.IRepairServiceRepository, RepairService.Infrastructure.Repositories.RepairServiceRepository>();
+builder.Services.AddScoped<RepairService.Application.Services.RepairServiceAppService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -1526,6 +1530,179 @@ partnersGroup.MapGet("/simulation/liquidity", async (
     var simulation = await service.SimulateLiquidityAsync(executionContext.TenantId, proposedAmount, reserve ?? 20000m, ct);
     return Results.Ok(simulation);
 }).RequireAuthorization(PartnersCapitalPermissionKeys.View);
+
+// Modulo RepairService (MOD-07) - Endpoints REST
+var repairsGroup = app.MapGroup("/api/repairs").RequireAuthorization();
+
+repairsGroup.MapPost("/orders", async (
+    RepairService.Application.DTOs.CreateRepairOrderRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var created = await service.CreateRepairOrderAsync(request, ct);
+    return Results.Created($"/api/repairs/orders/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.RepairsCreate);
+
+repairsGroup.MapGet("/orders", async (
+    Guid? branchId,
+    RepairService.Domain.Enums.RepairOrderStatus? status,
+    Guid? customerId,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var list = await service.ListAsync(branchId, status, customerId, ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.RepairsView);
+
+repairsGroup.MapGet("/orders/{id:guid}", async (
+    Guid id,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var order = await service.GetByIdAsync(id, ct);
+    return order != null ? Results.Ok(order) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.RepairsView);
+
+repairsGroup.MapPost("/orders/{id:guid}/checklist", async (
+    Guid id,
+    RepairService.Application.DTOs.AddChecklistItemRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.AddChecklistItemAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsCreate);
+
+repairsGroup.MapPost("/orders/{id:guid}/assign-technician", async (
+    Guid id,
+    Guid technicianId,
+    string? notes,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.AssignTechnicianAsync(id, technicianId, notes, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsAssign);
+
+repairsGroup.MapPost("/orders/{id:guid}/start-diagnosis", async (
+    Guid id,
+    Guid technicianId,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.StartDiagnosisAsync(id, technicianId, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsDiagnose);
+
+repairsGroup.MapPost("/orders/{id:guid}/complete-diagnosis", async (
+    Guid id,
+    RepairService.Application.DTOs.CompleteDiagnosisRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.CompleteDiagnosisAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsDiagnose);
+
+repairsGroup.MapPost("/orders/{id:guid}/estimate/items", async (
+    Guid id,
+    RepairService.Application.DTOs.AddEstimateItemRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.AddEstimateItemAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsQuote);
+
+repairsGroup.MapPost("/orders/{id:guid}/estimate/approve", async (
+    Guid id,
+    RepairService.Application.DTOs.ApproveEstimateRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.ApproveEstimateAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsApprove);
+
+repairsGroup.MapPost("/orders/{id:guid}/estimate/reject", async (
+    Guid id,
+    RepairService.Application.DTOs.RejectEstimateRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.RejectEstimateAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsQuote);
+
+repairsGroup.MapPost("/orders/{id:guid}/start-repair", async (
+    Guid id,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.StartRepairAsync(id, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsExecute);
+
+repairsGroup.MapPost("/orders/{id:guid}/parts/consume", async (
+    Guid id,
+    RepairService.Application.DTOs.ConsumePartRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.ConsumePartAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsPartsConsume);
+
+repairsGroup.MapPost("/orders/{id:guid}/complete-repair", async (
+    Guid id,
+    RepairService.Application.DTOs.CompleteRepairRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.CompleteRepairAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsExecute);
+
+repairsGroup.MapPost("/orders/{id:guid}/quality-check", async (
+    Guid id,
+    RepairService.Application.DTOs.PassQualityCheckRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.PassQualityCheckAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsQualityCheck);
+
+repairsGroup.MapPost("/orders/{id:guid}/deliver", async (
+    Guid id,
+    RepairService.Application.DTOs.DeliverRepairOrderRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.DeliverToCustomerAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsDeliver);
+
+repairsGroup.MapPost("/orders/{id:guid}/warranty/claims", async (
+    Guid id,
+    RepairService.Application.DTOs.CreateWarrantyClaimRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.CreateWarrantyClaimAsync(id, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsWarranty);
+
+repairsGroup.MapPost("/orders/{id:guid}/warranty/claims/{claimId:guid}/decide", async (
+    Guid id,
+    Guid claimId,
+    RepairService.Application.DTOs.DecideWarrantyClaimRequest request,
+    RepairService.Application.Services.RepairServiceAppService service,
+    CancellationToken ct) =>
+{
+    var updated = await service.DecideWarrantyClaimAsync(id, claimId, request, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.RepairsWarranty);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))
