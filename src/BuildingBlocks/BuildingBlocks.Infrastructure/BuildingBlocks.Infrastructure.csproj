@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\Modules\Messaging\Messaging.Domain\Messaging.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Manufacturing3D\Manufacturing3D.Domain\Manufacturing3D.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\DigitalProjects\DigitalProjects.Domain\DigitalProjects.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\IdentityAccess\IdentityAccess.Application\IdentityAccess.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

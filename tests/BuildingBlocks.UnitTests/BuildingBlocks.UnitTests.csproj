@@ -59,6 +59,7 @@
     <ProjectReference Include="..\..\src\Modules\DigitalProjects\DigitalProjects.Application\DigitalProjects.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\DigitalProjects\DigitalProjects.Domain\DigitalProjects.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\DigitalProjects\DigitalProjects.Infrastructure\DigitalProjects.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\IdentityAccess\IdentityAccess.Application\IdentityAccess.Application.csproj" />
   </ItemGroup>
 
 </Project>

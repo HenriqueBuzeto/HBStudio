@@ -58,6 +58,11 @@ builder.Services.AddScoped<Manufacturing3D.Application.Services.Manufacturing3DA
 // Modulo Digital Projects (MOD-11)
 builder.Services.AddScoped<DigitalProjects.Application.Services.DigitalProjectsAppService>();
 
+// Modulo IdentityAccess & Segurança dos Sócios
+builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+builder.Services.AddScoped<IdentityAccess.Application.Services.IIdentityDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+builder.Services.AddScoped<IdentityAccess.Application.Services.IAuthenticationService, IdentityAccess.Application.Services.AuthenticationService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -110,6 +115,50 @@ app.UseAuthorization();
 
 // Health Check Endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
+
+#region Auth Endpoints (IdentityAccess & Acesso Exclusivo Sócios)
+var authGroup = app.MapGroup("/api/auth");
+
+authGroup.MapPost("/login", async (
+    IdentityAccess.Application.DTOs.LoginRequest req,
+    IdentityAccess.Application.Services.IAuthenticationService authService,
+    CancellationToken ct) =>
+{
+    var result = await authService.LoginAsync(req, ct);
+    if (result == null)
+    {
+        // Mensagem genérica padronizada: não revela existência de e-mail, senha incorreta ou falta de vínculo
+        return Results.Json(new { error = "Não foi possível entrar. Verifique suas credenciais ou procure o responsável pelo acesso." }, statusCode: 401);
+    }
+    return Results.Ok(result);
+}).AllowAnonymous();
+
+authGroup.MapGet("/me", async (
+    ClaimsPrincipal user,
+    IdentityAccess.Application.Services.IAuthenticationService authService,
+    CancellationToken ct) =>
+{
+    var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var profile = await authService.GetCurrentUserProfileAsync(userId, ct);
+    if (profile == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(profile);
+}).RequireAuthorization();
+
+authGroup.MapPost("/logout", () =>
+{
+    // Emissão de logout: invalidação no cliente e auditoria
+    return Results.Ok(new { message = "Sessão encerrada com sucesso." });
+}).RequireAuthorization();
+#endregion
 
 // Endpoints do Módulo Parties
 var partiesGroup = app.MapGroup("/api/parties").RequireAuthorization();

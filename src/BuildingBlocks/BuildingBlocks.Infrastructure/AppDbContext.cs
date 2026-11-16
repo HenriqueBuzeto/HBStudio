@@ -3,6 +3,7 @@ using BuildingBlocks.Domain;
 using BuildingBlocks.Application;
 using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
 using IdentityAccess.Domain;
+using IdentityAccess.Application.Services;
 using Parties.Domain;
 using Catalog.Domain;
 using Inventory.Domain;
@@ -19,7 +20,7 @@ using DigitalProjects.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IIdentityDbContext
 {
     private readonly IExecutionContext? _executionContext;
 

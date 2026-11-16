@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
 import {
   LayoutDashboard,
   Users,
@@ -84,7 +85,27 @@ export default function RootShellLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, token, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // Redireciona para o login se não houver usuário ou token na sessão
+    if (!isLoading && !token) {
+      router.push("/login");
+    }
+  }, [isLoading, token, router]);
+
+  if (isLoading || !token) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#070b14] text-slate-400 font-medium text-xs">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-purple-600 border-t-transparent animate-spin" />
+          <span>Verificando sessão segura...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans">
@@ -188,16 +209,17 @@ export default function RootShellLayout({
         <div className="p-4 border-t border-[#161f33] bg-[#070b14] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 text-white font-extrabold flex items-center justify-center text-sm shadow-md">
-              H
+              {user?.fullName?.charAt(0)?.toUpperCase() ?? "S"}
             </div>
             <div className="truncate">
-              <p className="text-sm font-bold text-white truncate">Henrique Barreto</p>
-              <p className="text-xs text-slate-400 truncate">Operador Master • Admin</p>
+              <p className="text-sm font-bold text-white truncate">{user?.fullName ?? "Sócio Autorizado"}</p>
+              <p className="text-xs text-slate-400 truncate">{user?.partnerRole ?? "Sócio"} • HB Studio</p>
             </div>
           </div>
           <button
+            onClick={logout}
             title="Encerrar Sessão"
-            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#131c31] rounded-xl transition-colors"
+            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-[#131c31] rounded-xl transition-colors cursor-pointer"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -213,16 +235,11 @@ export default function RootShellLayout({
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-extrabold text-slate-900 tracking-tight">
-                  Boa tarde, Henrique
+                  Olá, {user?.fullName?.split(" ")[0] ?? "Sócio"}
                 </span>
                 <span className="text-slate-300">•</span>
                 <span className="text-xs font-medium text-slate-500">
-                  Sex, 16 de Nov
-                </span>
-                <span className="text-slate-300">•</span>
-                <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  22:00
+                  {new Date().toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
                 </span>
               </div>
               <span className="text-[11px] text-slate-400">
@@ -260,17 +277,17 @@ export default function RootShellLayout({
             <div className="flex items-center gap-3 pl-1">
               <div className="text-right leading-tight">
                 <span className="text-xs font-extrabold text-slate-900 block tracking-tight">
-                  Henrique Barreto
+                  {user?.fullName ?? "Sócio Autorizado"}
                 </span>
                 <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/80 inline-block mt-0.5">
-                  Operador PDV / Admin
+                  {user?.partnerRole ?? "Sócio"} • Executivo
                 </span>
               </div>
 
               {/* Avatar com Badge Numérico estilo HBVision */}
               <div className="relative">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-900 to-slate-800 text-white font-extrabold flex items-center justify-center text-xs shadow-md border-2 border-white ring-1 ring-slate-200">
-                  H
+                  {user?.fullName?.charAt(0)?.toUpperCase() ?? "S"}
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" title="Online"></span>
               </div>
