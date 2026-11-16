@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import RootShellLayout from "@/components/RootShellLayout";
 import {
   Users,
   Target,
@@ -22,7 +23,8 @@ import {
   Tag,
   Kanban,
   Check,
-  AlertCircle
+  AlertCircle,
+  Filter
 } from "lucide-react";
 
 interface LeadView {
@@ -85,7 +87,7 @@ interface PurchaseIntentView {
   desiredStorage?: string;
   minBatteryHealthPercentage?: number;
   maxBudget: number;
-  status: string; // Active, Fulfilled, Expired, Cancelled
+  status: string;
   notes?: string;
   createdAt: string;
 }
@@ -293,257 +295,263 @@ export default function CrmPage() {
   const totalEstimatedPipeline = mockOpportunities.reduce((acc, curr) => acc + curr.estimatedValue, 0);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-600/10 text-blue-600 dark:text-blue-400 rounded-xl">
-              <Users className="w-6 h-6" />
+    <RootShellLayout>
+      <div className="space-y-6">
+        {/* Top Header HBVisionX Style */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
+                Módulo 08 • CRM & Inteligência Comercial
+              </span>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">CRM & Inteligência Comercial</h1>
-              <p className="text-sm text-muted-foreground">
-                Funil de vendas, intenções de compra, matching automatizado com estoque serializado real e follow-ups.
-              </p>
-            </div>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
+              Funil de Vendas & Intenções de Compra
+            </h1>
+            <p className="text-xs text-slate-500">
+              Matching algorítmico automatizado com aparelhos serializados reais (IMEI) e follow-ups comerciais.
+            </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-2 px-3.5 py-2 border rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors">
-            <Search className="w-4 h-4" />
-            Pesquisar
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors">
-            <Plus className="w-4 h-4" />
-            Nova Oportunidade
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 border rounded-xl bg-card shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Pipeline em Aberto</span>
-            <DollarSign className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-2xl font-bold">
-            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalEstimatedPipeline)}
-          </div>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-            {mockOpportunities.length} oportunidades ativas
-          </p>
-        </div>
-
-        <div className="p-5 border rounded-xl bg-card shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Intenções / Fila de Espera</span>
-            <Target className="w-4 h-4 text-blue-500" />
-          </div>
-          <div className="text-2xl font-bold">{mockPurchaseIntents.length}</div>
-          <p className="text-xs text-muted-foreground">Clientes aguardando especificações exatas</p>
-        </div>
-
-        <div className="p-5 border rounded-xl bg-card shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Matches com Estoque Real</span>
-            <Sparkles className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="text-2xl font-bold">{mockMatches.length}</div>
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-            Aparelhos aprovados prontos para reserva
-          </p>
-        </div>
-
-        <div className="p-5 border rounded-xl bg-card shadow-sm space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Leads Qualificados</span>
-            <Flame className="w-4 h-4 text-orange-500" />
-          </div>
-          <div className="text-2xl font-bold">{mockLeads.length}</div>
-          <p className="text-xs text-muted-foreground">Com consentimento LGPD de contato</p>
-        </div>
-      </div>
-
-      {/* Reservation Notification */}
-      {reservationMessage && (
-        <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          <p className="text-sm font-medium">{reservationMessage}</p>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex border-b space-x-6">
-        <button
-          onClick={() => setActiveTab("kanban")}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === "kanban"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Kanban className="w-4 h-4" />
-          Funil Comercial (Kanban)
-        </button>
-        <button
-          onClick={() => setActiveTab("intents")}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === "intents"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          Intenções de Compra & Fila de Espera
-        </button>
-        <button
-          onClick={() => setActiveTab("matching")}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === "matching"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          Matching com Estoque Real
-        </button>
-        <button
-          onClick={() => setActiveTab("leads")}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === "leads"
-              ? "border-blue-600 text-blue-600 dark:text-blue-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Leads & Contatos
-        </button>
-      </div>
-
-      {/* Tab: Funil Kanban */}
-      {activeTab === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {mockStages.map(stage => {
-            const stageOpps = mockOpportunities.filter(o => o.stageId === stage.id);
-            const stageTotal = stageOpps.reduce((acc, curr) => acc + curr.estimatedValue, 0);
-
-            return (
-              <div key={stage.id} className="flex flex-col bg-muted/40 rounded-xl p-3 border space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
-                    {stage.name}
-                  </h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-bold text-muted-foreground">
-                    {stageOpps.length}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground font-medium border-b pb-2">
-                  Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(stageTotal)}
-                </div>
-
-                <div className="space-y-3 min-h-[300px]">
-                  {stageOpps.map(opp => (
-                    <div
-                      key={opp.id}
-                      className="p-3.5 bg-card rounded-lg border shadow-sm space-y-3 hover:border-blue-500/50 transition-all cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm font-semibold leading-tight line-clamp-2">{opp.title}</h4>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span>{opp.leadName || opp.partyName}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                          <span>Previsão: {opp.expectedClosingDate || "A definir"}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t text-xs">
-                        <span className="font-bold text-foreground">
-                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(opp.estimatedValue)}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                          {opp.confidenceScore}% prob.
-                        </span>
-                      </div>
-
-                      {opp.activities && opp.activities.length > 0 && (
-                        <div className="pt-1 text-[11px] text-muted-foreground flex items-center gap-1.5">
-                          <Clock className="w-3 h-3 text-amber-500" />
-                          <span className="truncate">{opp.activities[0].summary}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {stageOpps.length === 0 && (
-                    <div className="h-32 flex items-center justify-center text-xs text-muted-foreground border border-dashed rounded-lg">
-                      Nenhuma oportunidade
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Tab: Intenções de Compra */}
-      {activeTab === "intents" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Intenções Registradas & Fila de Espera</h2>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+          <div className="flex items-center gap-2">
+            <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors shadow-xs">
+              <Filter className="w-3.5 h-3.5 text-slate-500" />
+              Filtrar Funil
+            </button>
+            <button className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20">
               <Plus className="w-3.5 h-3.5" />
-              Cadastrar Intenção
+              Nova Oportunidade
             </button>
           </div>
+        </div>
 
-          <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/50 border-b text-xs uppercase text-muted-foreground">
+        {/* Indicadores Topo estilo HBVisionX */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-purple-600" />
+              Métricas Comerciais em Tempo Real
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-purple-600"></div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Pipeline Ativo Estimado
+              </span>
+              <div className="text-lg font-extrabold text-slate-900">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalEstimatedPipeline)}
+              </div>
+              <p className="text-[10px] text-purple-600 font-semibold mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                {mockOpportunities.length} negociações abertas
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500"></div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Fila de Espera (Intenções)
+              </span>
+              <div className="text-lg font-extrabold text-blue-600">{mockPurchaseIntents.length} Clientes</div>
+              <p className="text-[10px] text-slate-500 mt-1">Aguardando especificações exatas</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Matches no Estoque Real
+              </span>
+              <div className="text-lg font-extrabold text-amber-600">{mockMatches.length} Aparelhos</div>
+              <p className="text-[10px] text-emerald-600 font-semibold mt-1">Aprovados para venda imediata</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Leads Qualificados LGPD
+              </span>
+              <div className="text-lg font-extrabold text-slate-900">{mockLeads.length}</div>
+              <p className="text-[10px] text-emerald-600 font-semibold mt-1">Consentimento de contato ativo</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Reserva Alert */}
+        {reservationMessage && (
+          <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-800 flex items-center gap-3 shadow-xs">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <p className="text-xs font-bold">{reservationMessage}</p>
+          </div>
+        )}
+
+        {/* Abas Estilo HBVisionX */}
+        <div className="flex border-b border-slate-200 space-x-2 bg-white px-4 pt-3 rounded-t-2xl shadow-xs">
+          <button
+            onClick={() => setActiveTab("kanban")}
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+              activeTab === "kanban"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Kanban className="w-3.5 h-3.5" />
+            Funil Comercial (Kanban)
+          </button>
+          <button
+            onClick={() => setActiveTab("intents")}
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+              activeTab === "intents"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            Intenções de Compra & Fila de Espera
+          </button>
+          <button
+            onClick={() => setActiveTab("matching")}
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+              activeTab === "matching"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            Matching com Estoque Real
+          </button>
+          <button
+            onClick={() => setActiveTab("leads")}
+            className={`pb-3 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+              activeTab === "leads"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Leads & Contatos
+          </button>
+        </div>
+
+        {/* Tab 1: Funil Kanban */}
+        {activeTab === "kanban" && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5">
+            {mockStages.map(stage => {
+              const stageOpps = mockOpportunities.filter(o => o.stageId === stage.id);
+              const stageTotal = stageOpps.reduce((acc, curr) => acc + curr.estimatedValue, 0);
+
+              return (
+                <div key={stage.id} className="flex flex-col bg-slate-100/70 rounded-2xl p-3 border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <h3 className="font-bold text-[11px] uppercase tracking-wider text-slate-700">
+                      {stage.name}
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white font-bold text-slate-700 border border-slate-200">
+                      {stageOpps.length}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-semibold">
+                    Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(stageTotal)}
+                  </div>
+
+                  <div className="space-y-2.5 min-h-[300px]">
+                    {stageOpps.map(opp => (
+                      <div
+                        key={opp.id}
+                        className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2.5 hover:border-purple-500/50 hover:shadow-sm transition-all cursor-pointer"
+                      >
+                        <h4 className="text-xs font-bold text-slate-900 leading-tight">{opp.title}</h4>
+
+                        <div className="space-y-1">
+                          <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                            <Users className="w-3 h-3 text-slate-400" />
+                            <span>{opp.leadName || opp.partyName}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span>Previsão: {opp.expectedClosingDate || "A definir"}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                          <span className="font-extrabold text-slate-900">
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(opp.estimatedValue)}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-bold border border-purple-200">
+                            {opp.confidenceScore}% prob.
+                          </span>
+                        </div>
+
+                        {opp.activities && opp.activities.length > 0 && (
+                          <div className="pt-1 text-[10px] text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-500" />
+                            <span className="truncate">{opp.activities[0].summary}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {stageOpps.length === 0 && (
+                      <div className="h-28 flex items-center justify-center text-[11px] text-slate-400 border border-dashed border-slate-300 rounded-xl">
+                        Nenhuma negociação
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Tab 2: Intenções de Compra */}
+        {activeTab === "intents" && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Target className="w-4 h-4 text-purple-600" />
+                Intenções de Compra Registradas & Fila de Espera
+              </h3>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-xs">
+                <Plus className="w-3.5 h-3.5" />
+                Cadastrar Intenção
+              </button>
+            </div>
+
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Cliente / Lead</th>
-                  <th className="py-3 px-4 font-semibold">Modelo Desejado</th>
-                  <th className="py-3 px-4 font-semibold">Especificações</th>
-                  <th className="py-3 px-4 font-semibold">Saúde Bateria</th>
-                  <th className="py-3 px-4 font-semibold">Teto Orçamento</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
-                  <th className="py-3 px-4 font-semibold text-right">Ação</th>
+                  <th className="py-3 px-4">Cliente / Lead</th>
+                  <th className="py-3 px-4">Modelo Desejado</th>
+                  <th className="py-3 px-4">Especificações</th>
+                  <th className="py-3 px-4">Saúde Bateria</th>
+                  <th className="py-3 px-4">Teto Orçamento</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y text-xs">
+              <tbody className="divide-y divide-slate-100">
                 {mockPurchaseIntents.map(intent => (
-                  <tr key={intent.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4 font-medium">{intent.leadName || intent.partyName}</td>
-                    <td className="py-3 px-4 font-semibold text-blue-600 dark:text-blue-400">
-                      {intent.desiredModelName}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
+                  <tr key={intent.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-bold text-slate-800">{intent.leadName || intent.partyName}</td>
+                    <td className="py-3 px-4 font-bold text-purple-700">{intent.desiredModelName}</td>
+                    <td className="py-3 px-4 text-slate-500">
                       {intent.desiredStorage || "Qualquer capacidade"} • {intent.desiredColor || "Qualquer cor"}
                     </td>
                     <td className="py-3 px-4">
                       {intent.minBatteryHealthPercentage ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 font-bold text-emerald-600">
                           <BatteryCharging className="w-3.5 h-3.5" />
                           &ge; {intent.minBatteryHealthPercentage}%
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">Sem restrição</span>
+                        <span className="text-slate-400">Sem restrição</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-medium">
+                    <td className="py-3 px-4 font-extrabold text-slate-900">
                       {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(intent.maxBudget)}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         {intent.status}
                       </span>
                     </td>
@@ -553,9 +561,9 @@ export default function CrmPage() {
                           setSelectedIntent(intent);
                           setActiveTab("matching");
                         }}
-                        className="px-2.5 py-1 text-xs border rounded-lg hover:bg-muted font-medium transition-colors flex items-center gap-1 ml-auto"
+                        className="px-2.5 py-1 text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors inline-flex items-center gap-1"
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <Sparkles className="w-3 h-3 text-amber-500" />
                         Ver Matches
                       </button>
                     </td>
@@ -564,46 +572,34 @@ export default function CrmPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab: Matching com Estoque Real */}
-      {activeTab === "matching" && (
-        <div className="space-y-6">
-          <div className="p-4 border rounded-xl bg-blue-500/5 border-blue-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-blue-600 text-white">
-                  Intenção Selecionada
-                </span>
-                <span className="text-sm font-bold text-foreground">
-                  {selectedIntent.desiredModelName} ({selectedIntent.desiredStorage || "Qualquer"} • {selectedIntent.desiredColor || "Qualquer"})
-                </span>
+        {/* Tab 3: Matching com Estoque Real */}
+        {activeTab === "matching" && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-50 via-violet-50 to-indigo-50 border border-purple-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-purple-600 text-white">
+                    Intenção Ativa
+                  </span>
+                  <span className="text-sm font-bold text-slate-900">
+                    {selectedIntent.desiredModelName} ({selectedIntent.desiredStorage || "Qualquer"} • {selectedIntent.desiredColor || "Qualquer"})
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-1">
+                  Cliente: <strong className="text-slate-900">{selectedIntent.leadName || selectedIntent.partyName}</strong> •
+                  Bateria Mínima: <strong className="text-slate-900">{selectedIntent.minBatteryHealthPercentage}%</strong> •
+                  Teto Orçamento: <strong className="text-slate-900">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedIntent.maxBudget)}</strong>
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Cliente: <strong className="text-foreground">{selectedIntent.leadName || selectedIntent.partyName}</strong> •
-                Bateria Mínima: <strong className="text-foreground">{selectedIntent.minBatteryHealthPercentage}%</strong> •
-                Teto Orçamento: <strong className="text-foreground">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedIntent.maxBudget)}</strong>
-              </p>
-            </div>
 
-            <button
-              onClick={() => setActiveTab("intents")}
-              className="text-xs px-3 py-1.5 border rounded-lg hover:bg-muted transition-colors font-medium self-start md:self-auto"
-            >
-              Trocar Intenção
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-blue-600" />
-                Unidades Serializadas Compatíveis no Estoque Real (ApprovedForSale)
-              </h3>
-              <span className="text-xs text-muted-foreground">
-                Ordenado por Score de Aderência Algorítmica
-              </span>
+              <button
+                onClick={() => setActiveTab("intents")}
+                className="text-xs px-3 py-1.5 border border-purple-200 rounded-xl bg-white hover:bg-purple-50 text-purple-700 font-bold transition-colors shadow-xs"
+              >
+                Trocar Intenção
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -612,54 +608,54 @@ export default function CrmPage() {
                 return (
                   <div
                     key={match.inventoryUnitId}
-                    className="p-5 border rounded-xl bg-card shadow-sm space-y-4 hover:border-blue-500/40 transition-all"
+                    className="p-5 border border-slate-200 rounded-2xl bg-white shadow-xs space-y-4 hover:border-purple-400 transition-all"
                   >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-semibold text-muted-foreground">
+                          <span className="text-xs font-mono font-bold text-slate-500">
                             {match.skuCode}
                           </span>
-                          <span className="px-2 py-0.5 text-[10px] rounded-full font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          <span className="px-2 py-0.5 text-[10px] rounded-full font-extrabold bg-amber-50 text-amber-700 border border-amber-200">
                             Match Score: {match.matchScore}%
                           </span>
                         </div>
-                        <h4 className="text-base font-bold mt-1">{match.modelName}</h4>
-                        <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                          IMEI / Serial: <strong>{match.serialNumberOrImei}</strong>
+                        <h4 className="text-sm font-extrabold text-slate-900 mt-1">{match.modelName}</h4>
+                        <p className="text-xs font-mono text-slate-500 mt-0.5">
+                          IMEI / Serial: <strong className="text-slate-900">{match.serialNumberOrImei}</strong>
                         </p>
                       </div>
 
                       <div className="text-right">
-                        <div className="text-lg font-bold text-foreground">
+                        <div className="text-base font-extrabold text-slate-900">
                           {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(match.retailPrice)}
                         </div>
-                        <span className="text-[11px] text-emerald-600 font-medium">Dentro do Orçamento</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">Dentro do Orçamento</span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 py-2 px-3 bg-muted/40 rounded-lg text-xs">
+                    <div className="grid grid-cols-3 gap-2 py-2.5 px-3 bg-slate-50 rounded-xl text-xs border border-slate-100">
                       <div>
-                        <span className="text-muted-foreground block text-[10px]">Saúde Bateria</span>
-                        <span className="font-bold flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Saúde Bateria</span>
+                        <span className="font-extrabold flex items-center gap-1 text-emerald-600">
                           <BatteryCharging className="w-3.5 h-3.5" />
                           {match.batteryHealthPercentage}%
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px]">Grau Cosmético</span>
-                        <span className="font-semibold">{match.cosmeticGrade}</span>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Grau Estético</span>
+                        <span className="font-bold text-slate-800">{match.cosmeticGrade}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px]">Condição</span>
-                        <span className="font-semibold">{match.condition}</span>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Condição</span>
+                        <span className="font-bold text-slate-800">{match.condition}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-xs text-slate-500 font-medium">
                           {isReservedByUi ? "Reservado Oficialmente" : "Disponível para Reserva"}
                         </span>
                       </div>
@@ -667,7 +663,7 @@ export default function CrmPage() {
                       {isReservedByUi ? (
                         <button
                           disabled
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium cursor-not-allowed"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold cursor-not-allowed"
                         >
                           <Check className="w-3.5 h-3.5" />
                           Reserva Ativa (48h)
@@ -675,10 +671,10 @@ export default function CrmPage() {
                       ) : (
                         <button
                           onClick={() => handleReserveMatch(match)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
                         >
                           <BookmarkCheck className="w-3.5 h-3.5" />
-                          Reservar Unidade no Estoque
+                          Reservar no Estoque
                         </button>
                       )}
                     </div>
@@ -687,53 +683,54 @@ export default function CrmPage() {
               })}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab: Leads & Contatos */}
-      {activeTab === "leads" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Leads Cadastrados & Base de Contatos</h2>
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
-              <Plus className="w-3.5 h-3.5" />
-              Novo Lead
-            </button>
-          </div>
+        {/* Tab 4: Leads */}
+        {activeTab === "leads" && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-600" />
+                Base de Leads & Qualificação de Contatos
+              </h3>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-xs">
+                <Plus className="w-3.5 h-3.5" />
+                Novo Lead
+              </button>
+            </div>
 
-          <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted/50 border-b text-xs uppercase text-muted-foreground">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
                 <tr>
-                  <th className="py-3 px-4 font-semibold">Nome</th>
-                  <th className="py-3 px-4 font-semibold">Contato</th>
-                  <th className="py-3 px-4 font-semibold">Canal / Origem</th>
-                  <th className="py-3 px-4 font-semibold">Campanha</th>
-                  <th className="py-3 px-4 font-semibold">LGPD Marketing</th>
-                  <th className="py-3 px-4 font-semibold">Status Party</th>
-                  <th className="py-3 px-4 font-semibold text-right">Ação</th>
+                  <th className="py-3 px-4">Nome</th>
+                  <th className="py-3 px-4">Contato</th>
+                  <th className="py-3 px-4">Canal / Origem</th>
+                  <th className="py-3 px-4">Campanha</th>
+                  <th className="py-3 px-4">LGPD Marketing</th>
+                  <th className="py-3 px-4">Status Party</th>
+                  <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
-              <tbody className="divide-y text-xs">
+              <tbody className="divide-y divide-slate-100">
                 {mockLeads.map(lead => (
-                  <tr key={lead.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4 font-semibold">{lead.name}</td>
-                    <td className="py-3 px-4 text-muted-foreground">
+                  <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-4 font-bold text-slate-800">{lead.name}</td>
+                    <td className="py-3 px-4 text-slate-500">
                       <div>{lead.phone}</div>
-                      {lead.email && <div className="text-[11px] text-muted-foreground">{lead.email}</div>}
+                      {lead.email && <div className="text-[10px] text-slate-400">{lead.email}</div>}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded bg-muted font-medium">{lead.channel}</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 font-bold text-slate-700">{lead.channel}</span>
                     </td>
-                    <td className="py-3 px-4 text-muted-foreground">{lead.sourceCampaign || "Orgânico / Direto"}</td>
+                    <td className="py-3 px-4 text-slate-500">{lead.sourceCampaign || "Orgânico / Direto"}</td>
                     <td className="py-3 px-4">
                       {lead.lgpdMarketingOptIn ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 font-bold text-emerald-600">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           Autorizado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1 font-bold text-amber-600">
                           <AlertCircle className="w-3.5 h-3.5" />
                           Opt-Out
                         </span>
@@ -741,18 +738,18 @@ export default function CrmPage() {
                     </td>
                     <td className="py-3 px-4">
                       {lead.convertedPartyId ? (
-                        <span className="px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <span className="px-2 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 border border-purple-200">
                           Cliente Vinculado
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground">
+                        <span className="px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">
                           Lead Prospect
                         </span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       {!lead.convertedPartyId && (
-                        <button className="px-2.5 py-1 text-xs border rounded-lg hover:bg-muted font-medium transition-colors">
+                        <button className="px-2.5 py-1 text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                           Converter em Cliente
                         </button>
                       )}
@@ -762,8 +759,8 @@ export default function CrmPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </RootShellLayout>
   );
 }
