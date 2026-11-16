@@ -15,7 +15,6 @@ import {
   Building2,
   Menu,
   X,
-  ChevronDown,
   ChevronRight,
   LogOut,
   Bell,
@@ -23,17 +22,11 @@ import {
   Sparkles,
   TrendingUp,
   Receipt,
-  Printer,
   ShieldCheck,
-  CheckCircle2,
-  Store,
-  Layers
+  Moon,
+  Clock,
+  ArrowRightLeft
 } from "lucide-react";
-
-interface NavSubItem {
-  name: string;
-  href: string;
-}
 
 interface NavSection {
   title: string;
@@ -42,7 +35,6 @@ interface NavSection {
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
-    subItems?: NavSubItem[];
   }[];
 }
 
@@ -89,7 +81,7 @@ export default function RootShellLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#f1f5f9] text-[#0f172a] flex flex-col md:flex-row font-sans">
+    <div className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans">
       {/* Mobile Top Header */}
       <header className="md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50">
         <div className="flex items-center gap-2.5">
@@ -118,7 +110,7 @@ export default function RootShellLayout({
           ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Brand Header Fixo no topo do sidebar */}
+        {/* Brand Header */}
         <div className="p-4 border-b border-[#161f33] hidden md:flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-center font-extrabold text-white text-base shadow-lg shadow-purple-600/25">
@@ -136,7 +128,7 @@ export default function RootShellLayout({
           </div>
         </div>
 
-        {/* Navigation Menu com Scrollbar Independente */}
+        {/* Navigation Menu */}
         <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto dark-scrollbar">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1">
@@ -185,7 +177,7 @@ export default function RootShellLayout({
             </div>
           ))}
 
-          {/* CTA Banner estilo HB Studio */}
+          {/* CTA Banner */}
           <div className="p-3 rounded-xl bg-gradient-to-br from-violet-950/60 to-purple-900/40 border border-purple-500/30 space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold text-white">
               <Sparkles className="w-4 h-4 text-purple-400" />
@@ -201,7 +193,7 @@ export default function RootShellLayout({
           </div>
         </nav>
 
-        {/* User Session Footer Fixo no Rodapé */}
+        {/* User Session Footer */}
         <div className="p-3 border-t border-[#161f33] bg-[#070b14] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 text-white font-bold flex items-center justify-center text-xs shadow-md">
@@ -221,51 +213,86 @@ export default function RootShellLayout({
         </div>
       </aside>
 
-      {/* Main Content Viewport com Scroll Independente */}
+      {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8fafc]">
-        {/* Top Navbar HB Studio Style Fixo */}
-        <header className="h-14 bg-white border-b border-slate-200 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
-          {/* Breadcrumb & Context */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span className="font-bold text-slate-900">Boa tarde, Henrique</span>
-              <span className="text-slate-300">•</span>
-              <span>Sex, 16 de Nov • 22:00</span>
+        {/* Top Navbar IDÊNTICO AO DESIGN SYSTEM HBVISIONX */}
+        <header className="h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
+          {/* Lado Esquerdo: Saudação, Data e Status do Caixa */}
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-slate-900 tracking-tight">
+                  Boa tarde, Henrique
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-xs font-medium text-slate-500">
+                  Sex, 16 de Nov
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  22:00
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Painel Geral de Controle e Retaguarda
+              </span>
             </div>
 
-            {/* Status do Caixa Pill */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <div className="h-7 w-px bg-slate-200"></div>
+
+            {/* Status do Caixa Pill - Estilo Original HBVisionX */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/90 text-xs font-bold shadow-xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
               <span>Caixa Aberto (Turno 01)</span>
             </div>
           </div>
 
-          {/* Quick Search & Actions */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-72">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Centro: Barra de Busca Centralizada com Design Clean */}
+          <div className="flex-1 max-w-md mx-6">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Buscar clientes, IMEI, peças ou OS..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-slate-800 transition-all"
+                placeholder="Buscar páginas, menus, clientes, IMEI ou OS..."
+                className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50/80 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800 transition-all placeholder:text-slate-400 shadow-inner/10"
               />
             </div>
+          </div>
 
-            <div className="h-4 w-px bg-slate-200"></div>
-
-            <button className="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 relative transition-colors">
+          {/* Lado Direito: Notificações, Tema & Perfil com Badge de Cargo */}
+          <div className="flex items-center gap-3.5">
+            {/* Botão de Notificação */}
+            <button
+              title="Notificações"
+              className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 relative transition-colors border border-transparent hover:border-slate-200"
+            >
               <Bell className="w-4 h-4" />
               <span className="w-2 h-2 rounded-full bg-purple-600 absolute top-1.5 right-1.5 ring-2 ring-white" />
             </button>
 
-            {/* User Dropdown Preview */}
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="w-7 h-7 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-xs">
-                H
+            <div className="h-6 w-px bg-slate-200"></div>
+
+            {/* Perfil Operador - Estilo HBVisionX */}
+            <div className="flex items-center gap-3 pl-1">
+              <div className="text-right leading-tight">
+                <span className="text-xs font-extrabold text-slate-900 block tracking-tight">
+                  Henrique Barreto
+                </span>
+                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/80 inline-block mt-0.5">
+                  Operador PDV / Admin
+                </span>
               </div>
-              <div className="text-left text-xs leading-none">
-                <span className="font-bold block text-slate-800">Henrique</span>
-                <span className="text-[10px] text-slate-500">Diretoria</span>
+
+              {/* Avatar com Badge Numérico estilo HBVision */}
+              <div className="relative">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-900 to-slate-800 text-white font-extrabold flex items-center justify-center text-xs shadow-md border-2 border-white ring-1 ring-slate-200">
+                  H
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" title="Online"></span>
               </div>
             </div>
           </div>
