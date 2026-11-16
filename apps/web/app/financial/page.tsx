@@ -94,8 +94,8 @@ export default function FinancialPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                Módulo 12 • Controladoria
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
+                Controladoria & Finanças
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
@@ -251,8 +251,8 @@ export default function FinancialPage() {
                 <h3 className="text-sm font-bold text-slate-900">Demonstração do Resultado do Exercício (DRE)</h3>
                 <p className="text-xs text-slate-500">Mês Corrente • Regime de Competência Oficial</p>
               </div>
-              <span className="text-xs font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                Auditoria HBVision
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                Oficial HB Studio
               </span>
             </div>
 

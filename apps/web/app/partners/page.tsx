@@ -195,10 +195,10 @@ export default function PartnersCapitalPage() {
             <Users className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
               Gestão Societária, Capital Social & Governança
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                MOD-13 Ativo
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                Governança Ativa
               </span>
             </h1>
             <p className="text-sm text-slate-400 mt-1">

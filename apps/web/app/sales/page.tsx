@@ -375,45 +375,37 @@ export default function SalesPage() {
     <RootShellLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                MOD-05 · Sales & PDV
-              </span>
-              <span className="flex items-center gap-1 text-xs text-slate-500">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                sales.pos.use + sales.create
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                Frente de Caixa
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mt-1">Frente de Caixa (PDV) & Vendas</h1>
-            <p className="text-sm text-slate-500">
-              Checkout balcão ágil, orçamentos, baixa atômica de IMEI/serial e recebimentos múltiplos no Kardex.
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">PDV Balcão & Vendas</h1>
+            <p className="text-xs text-slate-500">
+              Checkout balcão ágil, orçamentos, baixa atômica de IMEI/serial e múltiplos métodos de pagamento.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCostPermission(!showCostPermission)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                showCostPermission
-                  ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
-                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-              }`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
-              {showCostPermission ? <Eye className="w-4 h-4 text-amber-600" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
-              <span>{showCostPermission ? "Modo Gerente (sales.cost.view: ON)" : "Modo Operador (sales.cost.view: OFF)"}</span>
+              {showCostPermission ? <Eye className="w-3.5 h-3.5 text-purple-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+              <span>{showCostPermission ? "Margem Visível" : "Margem Oculta"}</span>
             </button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 bg-white px-6 rounded-t-xl gap-6">
+        <div className="flex border-b border-slate-200 bg-white px-6 rounded-t-2xl gap-2 pt-2 shadow-xs">
           <button
             onClick={() => setActiveTab("pos")}
-            className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === "pos"
-                ? "border-emerald-600 text-emerald-700"
+                ? "border-purple-600 text-purple-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -422,9 +414,9 @@ export default function SalesPage() {
           </button>
           <button
             onClick={() => setActiveTab("sales")}
-            className={`py-4 text-sm font-medium border-b-2 flex items-center gap-2 transition-colors ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-colors ${
               activeTab === "sales"
-                ? "border-emerald-600 text-emerald-700"
+                ? "border-purple-600 text-purple-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >

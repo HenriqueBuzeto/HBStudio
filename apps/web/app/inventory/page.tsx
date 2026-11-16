@@ -330,23 +330,18 @@ export default function InventoryDashboardPage() {
             </div>
           </div>
 
-          {/* Toggle de Permissão de Custo (Simulação Fail-Closed) */}
+          {/* Ações */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setCanViewCost(!canViewCost)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                canViewCost 
-                  ? "bg-amber-500/10 text-amber-300 border-amber-500/30" 
-                  : "bg-slate-800 text-slate-400 border-slate-700"
-              }`}
-              title="Alternar permissão inventory.cost.view"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
-              {canViewCost ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>{canViewCost ? "Custo Real Visível (inventory.cost.view)" : "Custo Oculto (Fail-Closed)"}</span>
+              {canViewCost ? <Eye className="w-3.5 h-3.5 text-purple-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+              <span>{canViewCost ? "Custos Visíveis" : "Custos Ocultos"}</span>
             </button>
             <button
               onClick={() => setActiveTab("receipt")}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-600/20"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-4 h-4" />
               <span>Recebimento / Kardex</span>

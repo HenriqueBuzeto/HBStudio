@@ -189,10 +189,10 @@ export default function CashManagementPage() {
             <DollarSign className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
               Caixa & Gestão de Turnos
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                MOD-06 Ativo
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Caixa Aberto
               </span>
             </h1>
             <p className="text-sm text-slate-400">
@@ -258,7 +258,7 @@ export default function CashManagementPage() {
               <div className="mt-2 text-2xl font-black text-cyan-400">
                 R$ 8.450,00
               </div>
-              <p className="text-xs text-slate-400 mt-2">PIX / Cartões (MOD-05 segregado)</p>
+              <p className="text-xs text-slate-400 mt-2">PIX / Cartões (Valores Registrados)</p>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">

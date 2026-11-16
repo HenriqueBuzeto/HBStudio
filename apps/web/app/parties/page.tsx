@@ -204,12 +204,12 @@ export default function CustomersPage() {
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Users className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
-              Gestão de Pessoas (Clientes & Fornecedores)
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+              <Users className="w-6 h-6 text-purple-600" />
+              Gestão de Clientes & Fornecedores
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Módulo MOD-01: Cadastro unificado, equipamentos do cliente, preferências de privacidade e histórico integrado.
+            <p className="text-xs text-slate-500">
+              Cadastro unificado, equipamentos do cliente, preferências de privacidade LGPD e histórico de atendimentos.
             </p>
           </div>
           <button
@@ -408,7 +408,7 @@ export default function CustomersPage() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Novo Cadastro Unificado (MOD-01)</h3>
+            <h3 className="text-lg font-bold text-slate-900">Novo Cadastro</h3>
             <form onSubmit={handleCreateParty} className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome Completo / Razão Social *</label>

@@ -307,14 +307,6 @@ export default function ProcurementPage() {
           </div>
         </div>
 
-        {/* Banner de Conformidade Arquitetural */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-4 text-emerald-800">
-          <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
-          <div className="text-xs">
-            <span className="font-bold">Integração Transacional Real (MOD-03):</span> O recebimento de mercadorias e a compra de usados não criam tabelas paralelas de saldo. Todo lançamento alimenta diretamente o <strong>Kardex oficial append-only (StockMovements)</strong> e atualiza o saldo materializado (StockBalances) com fail-closed estrito.
-          </div>
-        </div>
-
         {/* Métricas Rápidas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
