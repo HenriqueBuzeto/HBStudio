@@ -2270,6 +2270,857 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.ToTable("financial_settlements", (string)null);
                 });
 
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetExpense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DocumentReference")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpenseDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("FinancialStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("PartnerReimbursementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PayingPartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReceiptAttachmentPath")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RegisteredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("TenantId", "FinancialStatus");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TripId");
+
+                    b.HasIndex("TenantId", "VehicleId");
+
+                    b.HasIndex("TenantId", "Category", "ExpenseDateUtc");
+
+                    b.ToTable("fleet_expenses", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetFueling", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FinancialAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FinancialStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Fuel")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FuelingDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GasStationName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsFullTank")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("Liters")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("PartnerReimbursementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PayingPartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("PricePerLiter")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("ReceiptAttachmentPath")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReceiptDocumentReference")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RegisteredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("TenantId", "FinancialStatus");
+
+                    b.HasIndex("TenantId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "TripId");
+
+                    b.HasIndex("TenantId", "VehicleId", "FuelingDateUtc");
+
+                    b.ToTable("fleet_fuelings", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetMaintenancePlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastServiceDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("LastServiceOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("NextServiceDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("NextServiceOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("OilSpecification")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RecommendedIntervalDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RecommendedIntervalKm")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("TenantId", "VehicleId", "IsActive");
+
+                    b.ToTable("fleet_maintenance_plans", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetMaintenanceService", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountPayableId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("FilterReplaced")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("FinancialStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InvoiceDocumentReference")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("LaborCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("MaintenancePlanId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("NextRecommendedDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("NextRecommendedOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("OilBrandAndSpecs")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("PartnerReimbursementId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PartsCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("PayingPartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ReceiptAttachmentPath")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RegisteredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ServiceDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("WorkshopName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenancePlanId");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("TenantId", "FinancialStatus");
+
+                    b.HasIndex("TenantId", "VehicleId", "ServiceDateUtc");
+
+                    b.ToTable("fleet_maintenance_services", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetTrip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DestinationCity")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("DistanceKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("DriverName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DriverUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("EndTimeUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("FinalOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("InitialOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OriginCity")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("StartTimeUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalAllocatedCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalFuelExpenses")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalOtherExpenses")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("TripNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VehicleId");
+
+                    b.HasIndex("TenantId", "StartTimeUtc");
+
+                    b.HasIndex("TenantId", "TripNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "VehicleId", "Status");
+
+                    b.ToTable("fleet_trips", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetTripAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AllocatedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("AllocatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AllocatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AllocationPercentage")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InventoryUnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Justification")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetReference")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TargetType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId");
+
+                    b.HasIndex("TenantId", "InventoryUnitId");
+
+                    b.HasIndex("TenantId", "TripId");
+
+                    b.HasIndex("TenantId", "TargetType", "TargetId");
+
+                    b.ToTable("fleet_trip_allocations", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetVehicle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AverageConsumptionKmPerLiter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("CurrentOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Fuel")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("InitialOdometerKm")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("InternalCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("OwnerPartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Ownership")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Plate")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ResponsibleName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("TankCapacityLiters")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UtilizationStartDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "InternalCode")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Plate")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "BranchId", "Status");
+
+                    b.ToTable("fleet_vehicles", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.ProductPriceSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AllocatedLogisticsCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ApprovalNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ApprovedFinalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("CalculatedSuggestedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("CalculationBreakdownJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("CommercialProvisions")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InventoryUnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("MarkupRateApplied")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("MinimumAllowedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("PricingPolicyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("RealAcquisitionCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ReferencePrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TargetNegotiationPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalCostBase")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "InventoryUnitId");
+
+                    b.HasIndex("TenantId", "ProductSkuId", "Status");
+
+                    b.ToTable("product_price_suggestions", (string)null);
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.ProductPricingPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("EstimatedDeliveryLogisticsRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("EstimatedPickupLogisticsRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("OtherCommercialCostRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("PreferRealCostOverEstimate")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RoundingRule")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TargetAcquisitionDiscountRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("TargetBrandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("TargetCondition")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TargetMarkupRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("TargetMinMarginRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("TargetModelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BranchId", "IsActive");
+
+                    b.HasIndex("TenantId", "Scope", "TargetSkuId");
+
+                    b.ToTable("product_pricing_policies", (string)null);
+                });
+
             modelBuilder.Entity("IdentityAccess.Domain.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6868,6 +7719,88 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.HasOne("Financial.Domain.AccountReceivable", null)
                         .WithMany("Settlements")
                         .HasForeignKey("AccountReceivableId");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetExpense", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetTrip", "Trip")
+                        .WithMany()
+                        .HasForeignKey("TripId");
+
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetVehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId");
+
+                    b.Navigation("Trip");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetFueling", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetTrip", "Trip")
+                        .WithMany()
+                        .HasForeignKey("TripId");
+
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetVehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetMaintenancePlan", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetVehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetMaintenanceService", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetMaintenancePlan", "MaintenancePlan")
+                        .WithMany()
+                        .HasForeignKey("MaintenancePlanId");
+
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetVehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MaintenancePlan");
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetTrip", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetVehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("FleetLogistics.Domain.Entities.FleetTripAllocation", b =>
+                {
+                    b.HasOne("FleetLogistics.Domain.Entities.FleetTrip", "Trip")
+                        .WithMany()
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
                 });
 
             modelBuilder.Entity("IdentityAccess.Domain.Branch", b =>

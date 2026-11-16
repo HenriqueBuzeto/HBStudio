@@ -58,6 +58,10 @@ builder.Services.AddScoped<Manufacturing3D.Application.Services.Manufacturing3DA
 // Modulo Digital Projects (MOD-11)
 builder.Services.AddScoped<DigitalProjects.Application.Services.DigitalProjectsAppService>();
 
+// Modulo FleetLogistics & ProductPricingEngine (MOD-16)
+builder.Services.AddScoped<FleetLogistics.Application.Services.IFleetLogisticsService, FleetLogistics.Application.Services.FleetLogisticsService>();
+builder.Services.AddScoped<FleetLogistics.Application.Services.IProductPricingEngineService, FleetLogistics.Application.Services.ProductPricingEngineService>();
+
 // Modulo IdentityAccess & Segurança dos Sócios
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddScoped<ISessionRevocationManager, IdentityAccess.Application.Services.DbSessionRevocationManager>();
@@ -2125,6 +2129,321 @@ app.MapPost("/api/projects/{id:guid}/change-requests/{crId:guid}/approve", async
     await svc.ApproveChangeRequestAsync(id, crId, notes ?? "Aprovado aditivo contratual", ct);
     return Results.Ok();
 }).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+#endregion
+
+#region FleetLogistics & Precificação Inteligente Endpoints (MOD-16)
+var fleetGroup = app.MapGroup("/api/fleet").RequireAuthorization();
+
+// Veículos
+fleetGroup.MapGet("/vehicles", async (
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var vehicles = await fleetService.GetVehiclesAsync(executionContext.TenantId, ct);
+    return Results.Ok(vehicles);
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapGet("/vehicles/{id:guid}", async (
+    Guid id,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var vehicle = await fleetService.GetVehicleByIdAsync(executionContext.TenantId, id, ct);
+    return vehicle != null ? Results.Ok(vehicle) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapPost("/vehicles", async (
+    FleetLogistics.Application.DTOs.CreateVehicleRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var vehicle = await fleetService.CreateVehicleAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, ct);
+    return Results.Created($"/api/fleet/vehicles/{vehicle.Id}", vehicle);
+}).RequireAuthorization(PermissionCatalog.FleetVehiclesManage);
+
+fleetGroup.MapPut("/vehicles/{id:guid}", async (
+    Guid id,
+    FleetLogistics.Application.DTOs.UpdateVehicleRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var vehicle = await fleetService.UpdateVehicleAsync(executionContext.TenantId, id, req, ct);
+    return vehicle != null ? Results.Ok(vehicle) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetVehiclesManage);
+
+fleetGroup.MapPost("/vehicles/{id:guid}/correct-odometer", async (
+    Guid id,
+    FleetLogistics.Application.DTOs.CorrectOdometerRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var vehicle = await fleetService.CorrectOdometerAsync(executionContext.TenantId, id, req, executionContext.UserId, ct);
+    return vehicle != null ? Results.Ok(vehicle) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetOdometerCorrect);
+
+fleetGroup.MapDelete("/vehicles/{id:guid}", async (
+    Guid id,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var success = await fleetService.DeactivateVehicleAsync(executionContext.TenantId, id, ct);
+    return success ? Results.Ok(new { message = "Veículo desativado com sucesso." }) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetVehiclesManage);
+
+// Viagens
+fleetGroup.MapGet("/trips", async (
+    Guid? vehicleId,
+    FleetLogistics.Domain.Entities.TripStatus? status,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var trips = await fleetService.GetTripsAsync(executionContext.TenantId, vehicleId, status, ct);
+    return Results.Ok(trips);
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapGet("/trips/{id:guid}", async (
+    Guid id,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var trip = await fleetService.GetTripByIdAsync(executionContext.TenantId, id, ct);
+    return trip != null ? Results.Ok(trip) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapPost("/trips", async (
+    FleetLogistics.Application.DTOs.CreateTripRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var trip = await fleetService.CreateTripAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, ct);
+    return Results.Created($"/api/fleet/trips/{trip.Id}", trip);
+}).RequireAuthorization(PermissionCatalog.FleetTripsCreate);
+
+fleetGroup.MapPost("/trips/{id:guid}/complete", async (
+    Guid id,
+    FleetLogistics.Application.DTOs.CompleteTripRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var trip = await fleetService.CompleteTripAsync(executionContext.TenantId, id, req, ct);
+    return trip != null ? Results.Ok(trip) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetTripsClose);
+
+fleetGroup.MapPost("/trips/{id:guid}/cancel", async (
+    Guid id,
+    string reason,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var trip = await fleetService.CancelTripAsync(executionContext.TenantId, id, reason, ct);
+    return trip != null ? Results.Ok(trip) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.FleetTripsManage);
+
+// Abastecimentos Rápidos
+fleetGroup.MapGet("/fuelings", async (
+    Guid? vehicleId,
+    Guid? tripId,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var fuelings = await fleetService.GetFuelingsAsync(executionContext.TenantId, vehicleId, tripId, ct);
+    return Results.Ok(fuelings);
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapPost("/fuelings", async (
+    FleetLogistics.Application.DTOs.CreateFuelingRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var fueling = await fleetService.CreateFuelingAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, executionContext.UserId, ct);
+    return Results.Created($"/api/fleet/fuelings/{fueling.Id}", fueling);
+}).RequireAuthorization(PermissionCatalog.FleetFuelingCreate);
+
+// Despesas
+fleetGroup.MapGet("/expenses", async (
+    Guid? vehicleId,
+    Guid? tripId,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var expenses = await fleetService.GetExpensesAsync(executionContext.TenantId, vehicleId, tripId, ct);
+    return Results.Ok(expenses);
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+fleetGroup.MapPost("/expenses", async (
+    FleetLogistics.Application.DTOs.CreateExpenseRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var expense = await fleetService.CreateExpenseAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, executionContext.UserId, ct);
+    return Results.Created($"/api/fleet/expenses/{expense.Id}", expense);
+}).RequireAuthorization(PermissionCatalog.FleetExpensesCreate);
+
+// Manutenção Preventiva & Troca de Óleo
+fleetGroup.MapGet("/maintenance-plans", async (
+    Guid? vehicleId,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var plans = await fleetService.GetMaintenancePlansAsync(executionContext.TenantId, vehicleId, ct);
+    return Results.Ok(plans);
+}).RequireAuthorization(PermissionCatalog.FleetMaintenanceView);
+
+fleetGroup.MapPost("/maintenance-plans", async (
+    FleetLogistics.Application.DTOs.CreateMaintenancePlanRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var plan = await fleetService.CreateMaintenancePlanAsync(executionContext.TenantId, req, ct);
+    return Results.Created($"/api/fleet/maintenance-plans/{plan.Id}", plan);
+}).RequireAuthorization(PermissionCatalog.FleetMaintenanceManage);
+
+fleetGroup.MapGet("/maintenance-services", async (
+    Guid? vehicleId,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var services = await fleetService.GetMaintenanceServicesAsync(executionContext.TenantId, vehicleId, ct);
+    return Results.Ok(services);
+}).RequireAuthorization(PermissionCatalog.FleetMaintenanceView);
+
+fleetGroup.MapPost("/maintenance-services", async (
+    FleetLogistics.Application.DTOs.CreateMaintenanceServiceRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var service = await fleetService.RecordMaintenanceServiceAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, executionContext.UserId, ct);
+    return Results.Created($"/api/fleet/maintenance-services/{service.Id}", service);
+}).RequireAuthorization(PermissionCatalog.FleetMaintenanceComplete);
+
+// Rateios de Viagem para Produtos
+fleetGroup.MapGet("/allocations", async (
+    Guid? tripId,
+    Guid? inventoryUnitId,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var allocations = await fleetService.GetAllocationsAsync(executionContext.TenantId, tripId, inventoryUnitId, ct);
+    return Results.Ok(allocations);
+}).RequireAuthorization(PermissionCatalog.FleetCostView);
+
+fleetGroup.MapPost("/allocations", async (
+    FleetLogistics.Application.DTOs.AllocateTripCostRequest req,
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var allocation = await fleetService.AllocateTripCostAsync(executionContext.TenantId, req, executionContext.UserId, ct);
+    return Results.Created($"/api/fleet/allocations/{allocation.Id}", allocation);
+}).RequireAuthorization(PermissionCatalog.FleetAllocationsManage);
+
+// Dashboard
+fleetGroup.MapGet("/dashboard", async (
+    FleetLogistics.Application.Services.IFleetLogisticsService fleetService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var summary = await fleetService.GetDashboardSummaryAsync(executionContext.TenantId, executionContext.BranchId, ct);
+    return Results.Ok(summary);
+}).RequireAuthorization(PermissionCatalog.FleetView);
+
+// Motor de Precificação Inteligente Endpoints
+var pricingGroup = app.MapGroup("/api/pricing").RequireAuthorization();
+
+pricingGroup.MapGet("/policies", async (
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var policies = await pricingService.GetPoliciesAsync(executionContext.TenantId, ct);
+    return Results.Ok(policies);
+}).RequireAuthorization(PermissionCatalog.PricingView);
+
+pricingGroup.MapPost("/policies", async (
+    FleetLogistics.Application.DTOs.CreatePricingPolicyRequest req,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var policy = await pricingService.CreatePolicyAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, ct);
+    return Results.Created($"/api/pricing/policies/{policy.Id}", policy);
+}).RequireAuthorization(PermissionCatalog.PricingPoliciesManage);
+
+pricingGroup.MapPut("/policies/{id:guid}", async (
+    Guid id,
+    FleetLogistics.Application.DTOs.CreatePricingPolicyRequest req,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var policy = await pricingService.UpdatePolicyAsync(executionContext.TenantId, id, req, ct);
+    return policy != null ? Results.Ok(policy) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.PricingPoliciesManage);
+
+pricingGroup.MapPost("/suggestions/generate", async (
+    FleetLogistics.Application.DTOs.GeneratePriceSuggestionRequest req,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var suggestion = await pricingService.GeneratePriceSuggestionAsync(executionContext.TenantId, executionContext.BranchId ?? Guid.Empty, req, ct);
+    return Results.Ok(suggestion);
+}).RequireAuthorization(PermissionCatalog.PricingSuggestionsGenerate);
+
+pricingGroup.MapGet("/suggestions", async (
+    Guid? productSkuId,
+    Guid? inventoryUnitId,
+    FleetLogistics.Domain.Entities.PriceApprovalStatus? status,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var suggestions = await pricingService.GetSuggestionsAsync(executionContext.TenantId, productSkuId, inventoryUnitId, status, ct);
+    return Results.Ok(suggestions);
+}).RequireAuthorization(PermissionCatalog.PricingSuggestionsView);
+
+pricingGroup.MapPost("/suggestions/{id:guid}/approve", async (
+    Guid id,
+    FleetLogistics.Application.DTOs.ApprovePriceSuggestionRequest req,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var suggestion = await pricingService.ApprovePriceSuggestionAsync(executionContext.TenantId, id, req, executionContext.UserId, ct);
+    return suggestion != null ? Results.Ok(suggestion) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.PricingApprove);
+
+pricingGroup.MapPost("/suggestions/{id:guid}/reject", async (
+    Guid id,
+    string reason,
+    FleetLogistics.Application.Services.IProductPricingEngineService pricingService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var suggestion = await pricingService.RejectPriceSuggestionAsync(executionContext.TenantId, id, reason, executionContext.UserId, ct);
+    return suggestion != null ? Results.Ok(suggestion) : Results.NotFound();
+}).RequireAuthorization(PermissionCatalog.PricingApprove);
 
 #endregion
 

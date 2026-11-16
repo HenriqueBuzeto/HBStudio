@@ -140,6 +140,37 @@ public static class PermissionCatalog
     public const string MessagingConversationsReply = "messaging.conversations.reply";
     public const string MessagingNotificationsView = "messaging.notifications.view";
 
+    // Fretes & Frota (MOD-16 FleetLogistics)
+    public const string FleetView = "fleet.view";
+    public const string FleetVehiclesManage = "fleet.vehicles.manage";
+    public const string FleetTripsCreate = "fleet.trips.create";
+    public const string FleetTripsManage = "fleet.trips.manage";
+    public const string FleetTripsClose = "fleet.trips.close";
+    public const string FleetFuelingCreate = "fleet.fueling.create";
+    public const string FleetFuelingManage = "fleet.fueling.manage";
+    public const string FleetExpensesCreate = "fleet.expenses.create";
+    public const string FleetExpensesApprove = "fleet.expenses.approve";
+    public const string FleetMaintenanceView = "fleet.maintenance.view";
+    public const string FleetMaintenanceManage = "fleet.maintenance.manage";
+    public const string FleetMaintenanceComplete = "fleet.maintenance.complete";
+    public const string FleetOdometerCorrect = "fleet.odometer.correct";
+    public const string FleetCostView = "fleet.cost.view";
+    public const string FleetAllocationsManage = "fleet.allocations.manage";
+    public const string FleetReportsView = "fleet.reports.view";
+    public const string FleetReimbursementRequest = "fleet.reimbursement.request";
+    public const string FleetSettingsManage = "fleet.settings.manage";
+
+    // Motor de Precificação Inteligente (ProductPricingEngine)
+    public const string PricingView = "pricing.view";
+    public const string PricingCostView = "pricing.cost.view";
+    public const string PricingPoliciesManage = "pricing.policies.manage";
+    public const string PricingSimulate = "pricing.simulate";
+    public const string PricingSuggestionsView = "pricing.suggestions.view";
+    public const string PricingSuggestionsGenerate = "pricing.suggestions.generate";
+    public const string PricingApprove = "pricing.approve";
+    public const string PricingOverride = "pricing.override";
+    public const string PricingMinimumOverride = "pricing.minimum.override";
+
     public static readonly IReadOnlyCollection<string> All = typeof(PermissionCatalog)
         .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
         .Where(f => f.IsLiteral && !f.IsInitOnly && f.FieldType == typeof(string))

@@ -35,6 +35,9 @@
     <ProjectReference Include="..\..\src\Modules\DigitalProjects\DigitalProjects.Domain\DigitalProjects.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\DigitalProjects\DigitalProjects.Infrastructure\DigitalProjects.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\IdentityAccess\IdentityAccess.Application\IdentityAccess.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Domain\FleetLogistics.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Application\FleetLogistics.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Infrastructure\FleetLogistics.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

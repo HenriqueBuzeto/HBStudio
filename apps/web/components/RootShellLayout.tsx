@@ -29,7 +29,8 @@ import {
   Code2,
   Moon,
   Clock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Truck
 } from "lucide-react";
 
 interface NavSection {
@@ -57,6 +58,7 @@ const navSections: NavSection[] = [
       { name: "Catálogo & Aparelhos", href: "/catalog", icon: Boxes },
       { name: "Estoque & Kardex", href: "/inventory", icon: Package },
       { name: "Compras & Entrada", href: "/procurement", icon: Receipt },
+      { name: "Fretes & Frota", href: "/fretes", icon: Truck, badge: "Frota" },
       { name: "Assistência Técnica (OS)", href: "/repairs", icon: Wrench, badge: "OS" },
       { name: "Fábrica 3D & Custos", href: "/manufacturing", icon: Printer, badge: "3D" },
       { name: "Projetos Digitais & Dev", href: "/projects", icon: Code2, badge: "Dev" },

@@ -157,6 +157,17 @@ public class AppDbContext : DbContext, IIdentityDbContext
     public DbSet<DigitalProjectChangeRequest> DigitalProjectChangeRequests => Set<DigitalProjectChangeRequest>();
     public DbSet<DigitalProjectContractVersion> DigitalProjectContractVersions => Set<DigitalProjectContractVersion>();
 
+    // Modulo FleetLogistics & ProductPricingEngine (MOD-16) - Fretes, Frota, Manutenção e Precificação Inteligente
+    public DbSet<FleetLogistics.Domain.Entities.FleetVehicle> FleetVehicles => Set<FleetLogistics.Domain.Entities.FleetVehicle>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetTrip> FleetTrips => Set<FleetLogistics.Domain.Entities.FleetTrip>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetFueling> FleetFuelings => Set<FleetLogistics.Domain.Entities.FleetFueling>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetExpense> FleetExpenses => Set<FleetLogistics.Domain.Entities.FleetExpense>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenancePlan> FleetMaintenancePlans => Set<FleetLogistics.Domain.Entities.FleetMaintenancePlan>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenanceService> FleetMaintenanceServices => Set<FleetLogistics.Domain.Entities.FleetMaintenanceService>();
+    public DbSet<FleetLogistics.Domain.Entities.FleetTripAllocation> FleetTripAllocations => Set<FleetLogistics.Domain.Entities.FleetTripAllocation>();
+    public DbSet<FleetLogistics.Domain.Entities.ProductPricingPolicy> ProductPricingPolicies => Set<FleetLogistics.Domain.Entities.ProductPricingPolicy>();
+    public DbSet<FleetLogistics.Domain.Entities.ProductPriceSuggestion> ProductPriceSuggestions => Set<FleetLogistics.Domain.Entities.ProductPriceSuggestion>();
+
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
     {
@@ -1719,6 +1730,135 @@ public class AppDbContext : DbContext, IIdentityDbContext
             b.HasKey(v => v.Id);
             b.Property(v => v.Version).IsRowVersion();
             b.HasIndex(v => new { v.TenantId, v.DigitalProjectId, v.VersionNumber }).IsUnique();
+        });
+
+        // Configuração Módulo FleetLogistics & Precificação Inteligente (MOD-16)
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetVehicle>(b =>
+        {
+            b.ToTable("fleet_vehicles");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Version).IsRowVersion();
+            b.Property(v => v.TankCapacityLiters).HasPrecision(18, 2);
+            b.Property(v => v.InitialOdometerKm).HasPrecision(18, 2);
+            b.Property(v => v.CurrentOdometerKm).HasPrecision(18, 2);
+            b.Property(v => v.AverageConsumptionKmPerLiter).HasPrecision(18, 2);
+            b.HasIndex(v => new { v.TenantId, v.Plate }).IsUnique();
+            b.HasIndex(v => new { v.TenantId, v.InternalCode }).IsUnique();
+            b.HasIndex(v => new { v.TenantId, v.BranchId, v.Status });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTrip>(b =>
+        {
+            b.ToTable("fleet_trips");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.Version).IsRowVersion();
+            b.Property(t => t.InitialOdometerKm).HasPrecision(18, 2);
+            b.Property(t => t.FinalOdometerKm).HasPrecision(18, 2);
+            b.Property(t => t.DistanceKm).HasPrecision(18, 2);
+            b.Property(t => t.TotalFuelExpenses).HasPrecision(18, 2);
+            b.Property(t => t.TotalOtherExpenses).HasPrecision(18, 2);
+            b.Property(t => t.TotalAllocatedCost).HasPrecision(18, 2);
+            b.HasIndex(t => new { t.TenantId, t.TripNumber }).IsUnique();
+            b.HasIndex(t => new { t.TenantId, t.VehicleId, t.Status });
+            b.HasIndex(t => new { t.TenantId, t.StartTimeUtc });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetFueling>(b =>
+        {
+            b.ToTable("fleet_fuelings");
+            b.HasKey(f => f.Id);
+            b.Property(f => f.Version).IsRowVersion();
+            b.Property(f => f.TotalAmount).HasPrecision(18, 2);
+            b.Property(f => f.Liters).HasPrecision(18, 3);
+            b.Property(f => f.PricePerLiter).HasPrecision(18, 4);
+            b.Property(f => f.OdometerKm).HasPrecision(18, 2);
+            b.HasIndex(f => new { f.TenantId, f.VehicleId, f.FuelingDateUtc });
+            b.HasIndex(f => new { f.TenantId, f.TripId });
+            b.HasIndex(f => new { f.TenantId, f.FinancialStatus });
+            b.HasIndex(f => new { f.TenantId, f.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetExpense>(b =>
+        {
+            b.ToTable("fleet_expenses");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Version).IsRowVersion();
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+            b.HasIndex(e => new { e.TenantId, e.Category, e.ExpenseDateUtc });
+            b.HasIndex(e => new { e.TenantId, e.TripId });
+            b.HasIndex(e => new { e.TenantId, e.VehicleId });
+            b.HasIndex(e => new { e.TenantId, e.FinancialStatus });
+            b.HasIndex(e => new { e.TenantId, e.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenancePlan>(b =>
+        {
+            b.ToTable("fleet_maintenance_plans");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();
+            b.Property(p => p.LastServiceOdometerKm).HasPrecision(18, 2);
+            b.Property(p => p.NextServiceOdometerKm).HasPrecision(18, 2);
+            b.HasIndex(p => new { p.TenantId, p.VehicleId, p.IsActive });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenanceService>(b =>
+        {
+            b.ToTable("fleet_maintenance_services");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Version).IsRowVersion();
+            b.Property(s => s.OdometerKm).HasPrecision(18, 2);
+            b.Property(s => s.PartsCost).HasPrecision(18, 2);
+            b.Property(s => s.LaborCost).HasPrecision(18, 2);
+            b.Property(s => s.TotalCost).HasPrecision(18, 2);
+            b.Property(s => s.NextRecommendedOdometerKm).HasPrecision(18, 2);
+            b.HasIndex(s => new { s.TenantId, s.VehicleId, s.ServiceDateUtc });
+            b.HasIndex(s => new { s.TenantId, s.FinancialStatus });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTripAllocation>(b =>
+        {
+            b.ToTable("fleet_trip_allocations");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Version).IsRowVersion();
+            b.Property(a => a.AllocatedAmount).HasPrecision(18, 2);
+            b.Property(a => a.AllocationPercentage).HasPrecision(18, 4);
+            b.HasIndex(a => new { a.TenantId, a.TripId });
+            b.HasIndex(a => new { a.TenantId, a.TargetType, a.TargetId });
+            b.HasIndex(a => new { a.TenantId, a.InventoryUnitId });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPricingPolicy>(b =>
+        {
+            b.ToTable("product_pricing_policies");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();
+            b.Property(p => p.TargetAcquisitionDiscountRate).HasPrecision(18, 4);
+            b.Property(p => p.TargetMarkupRate).HasPrecision(18, 4);
+            b.Property(p => p.TargetMinMarginRate).HasPrecision(18, 4);
+            b.Property(p => p.EstimatedPickupLogisticsRate).HasPrecision(18, 4);
+            b.Property(p => p.EstimatedDeliveryLogisticsRate).HasPrecision(18, 4);
+            b.Property(p => p.OtherCommercialCostRate).HasPrecision(18, 4);
+            b.HasIndex(p => new { p.TenantId, p.BranchId, p.IsActive });
+            b.HasIndex(p => new { p.TenantId, p.Scope, p.TargetSkuId });
+        });
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPriceSuggestion>(b =>
+        {
+            b.ToTable("product_price_suggestions");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Version).IsRowVersion();
+            b.Property(s => s.ReferencePrice).HasPrecision(18, 2);
+            b.Property(s => s.TargetNegotiationPrice).HasPrecision(18, 2);
+            b.Property(s => s.RealAcquisitionCost).HasPrecision(18, 2);
+            b.Property(s => s.AllocatedLogisticsCost).HasPrecision(18, 2);
+            b.Property(s => s.CommercialProvisions).HasPrecision(18, 2);
+            b.Property(s => s.TotalCostBase).HasPrecision(18, 2);
+            b.Property(s => s.MarkupRateApplied).HasPrecision(18, 4);
+            b.Property(s => s.CalculatedSuggestedPrice).HasPrecision(18, 2);
+            b.Property(s => s.MinimumAllowedPrice).HasPrecision(18, 2);
+            b.Property(s => s.ApprovedFinalPrice).HasPrecision(18, 2);
+            b.HasIndex(s => new { s.TenantId, s.ProductSkuId, s.Status });
+            b.HasIndex(s => new { s.TenantId, s.InventoryUnitId });
         });
 
         // Configurar Filtros Globais Multi-Tenant Automaticos
