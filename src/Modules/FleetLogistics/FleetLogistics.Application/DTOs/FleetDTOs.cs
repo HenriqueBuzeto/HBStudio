@@ -138,6 +138,7 @@ public record CreatePricingPolicyRequest(
     decimal TargetAcquisitionDiscountRate,
     decimal TargetMarkupRate,
     decimal TargetMinMarginRate,
+    decimal MaxCounterDiscountRate = 0.05m,
     decimal EstimatedPickupLogisticsRate = 0.05m,
     decimal EstimatedDeliveryLogisticsRate = 0.10m,
     decimal OtherCommercialCostRate = 0m,
@@ -148,6 +149,20 @@ public record CreatePricingPolicyRequest(
     Guid? TargetModelId = null,
     Guid? TargetSkuId = null,
     int? TargetCondition = null,
+    string? Description = null
+);
+
+public record UpdatePricingPolicyRequest(
+    string Name,
+    decimal TargetAcquisitionDiscountRate,
+    decimal TargetMarkupRate,
+    decimal TargetMinMarginRate,
+    decimal MaxCounterDiscountRate,
+    decimal EstimatedPickupLogisticsRate,
+    decimal EstimatedDeliveryLogisticsRate,
+    decimal OtherCommercialCostRate,
+    PricingRoundingRule RoundingRule,
+    bool PreferRealCostOverEstimate,
     string? Description = null
 );
 

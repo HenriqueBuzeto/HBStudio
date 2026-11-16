@@ -33,8 +33,9 @@ public class ProductPricingPolicy : TenantEntity
     public Guid? TargetModelId { get; private set; }
     public Guid? TargetSkuId { get; private set; }
     public int? TargetCondition { get; private set; }              // 1=BrandNew, 2=PreOwned
-    public decimal TargetAcquisitionDiscountRate { get; private set; } // Ex: 0.15m (15% de desconto-alvo na compra)
-    public decimal TargetMarkupRate { get; private set; }             // Ex: 0.30m (30% de markup de revenda)
+    public decimal TargetAcquisitionDiscountRate { get; private set; } // Ex: 0.15m (15% de desconto-alvo na COMPRA de usados)
+    public decimal TargetMarkupRate { get; private set; }             // Ex: 0.30m (30% de markup de revenda sobre o custo total)
+    public decimal MaxCounterDiscountRate { get; private set; }       // Ex: 0.05m (5% de desconto comercial máximo permitido no BALCÃO/PDV)
     public decimal TargetMinMarginRate { get; private set; }          // Ex: 0.15m (15% de margem líquida mínima permitida)
     public decimal EstimatedPickupLogisticsRate { get; private set; } // Ex: 0.05m (5% provisão de frete para retirada)
     public decimal EstimatedDeliveryLogisticsRate { get; private set; } // Ex: 0.10m (10% provisão de frete para entrega)
@@ -58,6 +59,7 @@ public class ProductPricingPolicy : TenantEntity
         decimal targetAcquisitionDiscountRate,
         decimal targetMarkupRate,
         decimal targetMinMarginRate,
+        decimal maxCounterDiscountRate = 0.05m,
         decimal estimatedPickupLogisticsRate = 0.05m,
         decimal estimatedDeliveryLogisticsRate = 0.10m,
         decimal otherCommercialCostRate = 0m,
@@ -74,6 +76,8 @@ public class ProductPricingPolicy : TenantEntity
             throw new ArgumentException("Nome da política é obrigatório.", nameof(name));
         if (targetMarkupRate < 0)
             throw new ArgumentException("Markup não pode ser negativo.", nameof(targetMarkupRate));
+        if (maxCounterDiscountRate < 0 || maxCounterDiscountRate > 0.50m)
+            throw new ArgumentException("Desconto de balcão deve estar entre 0% e 50%.", nameof(maxCounterDiscountRate));
 
         BranchId = branchId;
         Name = name.Trim();
@@ -81,6 +85,7 @@ public class ProductPricingPolicy : TenantEntity
         TargetAcquisitionDiscountRate = targetAcquisitionDiscountRate;
         TargetMarkupRate = targetMarkupRate;
         TargetMinMarginRate = targetMinMarginRate;
+        MaxCounterDiscountRate = maxCounterDiscountRate;
         EstimatedPickupLogisticsRate = estimatedPickupLogisticsRate;
         EstimatedDeliveryLogisticsRate = estimatedDeliveryLogisticsRate;
         OtherCommercialCostRate = otherCommercialCostRate;
@@ -101,6 +106,7 @@ public class ProductPricingPolicy : TenantEntity
         decimal targetAcquisitionDiscountRate,
         decimal targetMarkupRate,
         decimal targetMinMarginRate,
+        decimal maxCounterDiscountRate,
         decimal estimatedPickupLogisticsRate,
         decimal estimatedDeliveryLogisticsRate,
         decimal otherCommercialCostRate,
@@ -112,6 +118,7 @@ public class ProductPricingPolicy : TenantEntity
         TargetAcquisitionDiscountRate = targetAcquisitionDiscountRate;
         TargetMarkupRate = targetMarkupRate;
         TargetMinMarginRate = targetMinMarginRate;
+        MaxCounterDiscountRate = maxCounterDiscountRate;
         EstimatedPickupLogisticsRate = estimatedPickupLogisticsRate;
         EstimatedDeliveryLogisticsRate = estimatedDeliveryLogisticsRate;
         OtherCommercialCostRate = otherCommercialCostRate;

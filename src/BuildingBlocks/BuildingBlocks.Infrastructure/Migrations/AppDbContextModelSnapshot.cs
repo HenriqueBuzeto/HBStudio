@@ -878,6 +878,9 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.Property<DateTime>("AcquisitionDateUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("AllocatedFreightCost")
+                        .HasColumnType("numeric");
+
                     b.Property<int?>("BatteryHealthPercentage")
                         .HasColumnType("integer");
 
@@ -2977,6 +2980,9 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
+                    b.Property<decimal>("MaxCounterDiscountPrice")
+                        .HasColumnType("numeric");
+
                     b.Property<decimal>("MinimumAllowedPrice")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -3052,6 +3058,9 @@ namespace BuildingBlocks.Infrastructure.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<decimal>("MaxCounterDiscountRate")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Name")
                         .IsRequired()

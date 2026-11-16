@@ -517,7 +517,27 @@ public class FleetLogisticsService : IFleetLogisticsService
         var trip = await _db.Set<FleetTrip>().FirstOrDefaultAsync(t => t.TenantId == tenantId && t.Id == req.TripId, ct)
             ?? throw new InvalidOperationException("Viagem não encontrada.");
 
+        // CPC 16(R1) / IAS 2: Despesas comerciais de entrega não podem ser capitalizadas no estoque
+        if (req.TargetType == AllocationTargetType.SalesDelivery)
+        {
+            // Entrega de venda a cliente é despesa comercial e não pode ser incorporada ao custo do estoque
+            if (req.InventoryUnitId.HasValue)
+            {
+                throw new InvalidOperationException("Despesas de frete para entrega a clientes (SalesDelivery) são despesas operacionais/comerciais e não podem ser incorporadas ao custo de estoque do produto (CPC 16 item 16).");
+            }
+        }
+
         trip.RegisterAllocation(req.AllocatedAmount);
+
+        // Se for aquisição de aparelho usado e foi informada a unidade serializada (InventoryUnit), incorpora o frete ao estoque
+        if (req.InventoryUnitId.HasValue && (req.TargetType == AllocationTargetType.UsedDeviceAcquisition || req.TargetType == AllocationTargetType.ProcurementOrder))
+        {
+            var unit = await _db.Set<InventoryUnit>().FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Id == req.InventoryUnitId.Value, ct);
+            if (unit != null)
+            {
+                unit.IncorporateFreightCost(req.AllocatedAmount);
+            }
+        }
 
         var allocation = new FleetTripAllocation(
             tenantId,
@@ -609,6 +629,7 @@ public class ProductPricingEngineService : IProductPricingEngineService
             req.TargetAcquisitionDiscountRate,
             req.TargetMarkupRate,
             req.TargetMinMarginRate,
+            req.MaxCounterDiscountRate,
             req.EstimatedPickupLogisticsRate,
             req.EstimatedDeliveryLogisticsRate,
             req.OtherCommercialCostRate,
@@ -638,6 +659,7 @@ public class ProductPricingEngineService : IProductPricingEngineService
             req.TargetAcquisitionDiscountRate,
             req.TargetMarkupRate,
             req.TargetMinMarginRate,
+            req.MaxCounterDiscountRate,
             req.EstimatedPickupLogisticsRate,
             req.EstimatedDeliveryLogisticsRate,
             req.OtherCommercialCostRate,
@@ -675,16 +697,18 @@ public class ProductPricingEngineService : IProductPricingEngineService
                 branchId,
                 "Política Padrão de Fábrica",
                 PricingPolicyScope.GlobalTenant,
-                targetAcquisitionDiscountRate: 0.15m, // 15% de desconto de negociação
-                targetMarkupRate: 0.30m,              // 30% de markup comercial
-                targetMinMarginRate: 0.15m,           // 15% margem mínima
+                targetAcquisitionDiscountRate: 0.15m, // 15% de desconto-alvo na COMPRA de usados
+                targetMarkupRate: 0.30m,              // 30% de markup comercial de revenda
+                targetMinMarginRate: 0.15m,           // 15% margem mínima de rentabilidade
+                maxCounterDiscountRate: 0.05m,        // 5% desconto comercial máximo permitido no BALCÃO/PDV
                 estimatedPickupLogisticsRate: 0.05m,  // 5% provisão de frete retirada
                 estimatedDeliveryLogisticsRate: 0.10m,// 10% provisão de entrega
                 otherCommercialCostRate: 0.03m,       // 3% taxas
                 roundingRule: PricingRoundingRule.EndWithNineZero
             );
 
-        // 2. Cálculo do Desconto-Alvo de Negociação (para a proposta de compra)
+        // 2. Cálculo da Proposta de Compra (Desconto-Alvo de Aquisição)
+        // EXCLUSIVO para negociar a compra de quem está vendendo o aparelho à HB Studio. NÃO altera custo nem preço de venda.
         var targetNegotiationPrice = Math.Round(req.ReferencePrice * (1 - policy.TargetAcquisitionDiscountRate), 2);
 
         // 3. Apuração do Frete / Custo Logístico (Real vs Estimado)
@@ -719,18 +743,27 @@ public class ProductPricingEngineService : IProductPricingEngineService
         // 7. Aplicação da Regra de Arredondamento
         var suggestedPrice = ApplyRounding(suggestedRaw, policy.RoundingRule);
 
-        // 8. Preço Mínimo Autorizado (garante margem mínima estrita)
+        // 8. Preço com Desconto Máximo Comercial de Balcão (independente do desconto de compra)
+        var maxCounterDiscountPrice = Math.Round(suggestedPrice * (1 - policy.MaxCounterDiscountRate), 2);
+
+        // 9. Preço Mínimo Autorizado (garante margem mínima estrita de rentabilidade)
         var minAllowedRaw = policy.TargetMinMarginRate < 1
             ? totalCostBase / (1 - policy.TargetMinMarginRate)
             : totalCostBase * 1.10m;
         var minimumAllowedPrice = Math.Round(minAllowedRaw, 2);
+
+        // Se o desconto comercial máximo de balcão violar a margem mínima da empresa, o piso de corte prevalece
+        if (maxCounterDiscountPrice < minimumAllowedPrice)
+        {
+            maxCounterDiscountPrice = minimumAllowedPrice;
+        }
 
         var breakdown = new
         {
             PolicyName = policy.Name,
             PolicyVersion = policy.VersionNumber,
             ReferencePrice = req.ReferencePrice,
-            TargetDiscountRate = policy.TargetAcquisitionDiscountRate,
+            TargetAcquisitionDiscountRate = policy.TargetAcquisitionDiscountRate,
             TargetNegotiationPrice = targetNegotiationPrice,
             RealAcquisitionCost = req.RealAcquisitionCost,
             AllocatedLogistics = allocatedLogistics,
@@ -739,6 +772,8 @@ public class ProductPricingEngineService : IProductPricingEngineService
             MarkupRate = policy.TargetMarkupRate,
             SuggestedRaw = suggestedRaw,
             FinalSuggestedPrice = suggestedPrice,
+            MaxCounterDiscountRate = policy.MaxCounterDiscountRate,
+            MaxCounterDiscountPrice = maxCounterDiscountPrice,
             MinimumAllowedPrice = minimumAllowedPrice,
             CalculatedAtUtc = DateTime.UtcNow
         };
@@ -755,6 +790,7 @@ public class ProductPricingEngineService : IProductPricingEngineService
             policy.TargetMarkupRate,
             suggestedPrice,
             minimumAllowedPrice,
+            maxCounterDiscountPrice,
             JsonSerializer.Serialize(breakdown),
             req.InventoryUnitId,
             policy.Id

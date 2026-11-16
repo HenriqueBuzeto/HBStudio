@@ -179,17 +179,16 @@ export default function FretesPage() {
     model: "iPhone 14 Pro 128GB Roxo Profundo",
     baseCost: 3200.00,
     freightAllocated: 75.00,
-    targetDiscountPct: 15.0,
-    targetMarkupPct: 30.0,
+    targetAcquisitionDiscountPct: 15.0, // Desconto-alvo de compra de usados (negociação com o vendedor)
+    targetMarkupPct: 30.0,              // Markup comercial sobre custo total
+    maxCounterDiscountPct: 5.0,         // Desconto comercial máximo permitido no balcão/PDV
     rounding: "EndingIn90"
   });
 
   // Calculate pricing simulation dynamically
   const totalBaseCost = pricingSim.baseCost + pricingSim.freightAllocated;
   const markupMultiplier = 1 + (pricingSim.targetMarkupPct / 100);
-  const rawTargetNet = totalBaseCost * markupMultiplier;
-  const discountMultiplier = 1 - (pricingSim.targetDiscountPct / 100);
-  const rawListPrice = discountMultiplier > 0 ? (rawTargetNet / discountMultiplier) : rawTargetNet;
+  const rawListPrice = totalBaseCost * markupMultiplier;
   
   let finalSuggestedPrice = rawListPrice;
   if (pricingSim.rounding === "EndingIn90") {
@@ -199,6 +198,11 @@ export default function FretesPage() {
     finalSuggestedPrice = Math.floor(rawListPrice) + 0.99;
     if (finalSuggestedPrice < rawListPrice) finalSuggestedPrice += 1.00;
   }
+
+  const counterDiscountAmount = finalSuggestedPrice * (pricingSim.maxCounterDiscountPct / 100);
+  const maxDiscountedPrice = finalSuggestedPrice - counterDiscountAmount;
+  const profitAtMaxDiscount = maxDiscountedPrice - totalBaseCost;
+  const marginPctAtMaxDiscount = (profitAtMaxDiscount / maxDiscountedPrice) * 100;
 
   const handleCreateTrip = (e: React.FormEvent) => {
     e.preventDefault();
@@ -692,23 +696,35 @@ export default function FretesPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-slate-400">Margem Markup Desejada (%)</label>
+                    <label className="text-xs font-semibold text-slate-400">Desc. Compra Usado (%)</label>
+                    <input
+                      type="number"
+                      value={pricingSim.targetAcquisitionDiscountPct}
+                      onChange={(e) => setPricingSim({ ...pricingSim, targetAcquisitionDiscountPct: Number(e.target.value) })}
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-cyan-300"
+                      title="Desconto-alvo para negociar a compra com o vendedor"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400">Markup Revenda (%)</label>
                     <input
                       type="number"
                       value={pricingSim.targetMarkupPct}
                       onChange={(e) => setPricingSim({ ...pricingSim, targetMarkupPct: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-emerald-400 font-bold"
+                      title="Markup de revenda sobre o custo total"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-400">Margem de Negociação / Choro (%)</label>
+                    <label className="text-xs font-semibold text-slate-400">Desc. Máx. Balcão (%)</label>
                     <input
                       type="number"
-                      value={pricingSim.targetDiscountPct}
-                      onChange={(e) => setPricingSim({ ...pricingSim, targetDiscountPct: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+                      value={pricingSim.maxCounterDiscountPct}
+                      onChange={(e) => setPricingSim({ ...pricingSim, maxCounterDiscountPct: Number(e.target.value) })}
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-amber-300"
+                      title="Desconto comercial máximo permitido no balcão/PDV"
                     />
                   </div>
                 </div>
@@ -747,12 +763,16 @@ export default function FretesPage() {
                     <span className="font-mono text-emerald-400">R$ {totalBaseCost.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">(+) Lucro Mínimo ({pricingSim.targetMarkupPct}%):</span>
-                    <span className="font-mono text-white">R$ {(rawTargetNet - totalBaseCost).toFixed(2)}</span>
+                    <span className="text-slate-400">(+) Markup de Revenda ({pricingSim.targetMarkupPct}%):</span>
+                    <span className="font-mono text-white">R$ {(finalSuggestedPrice - totalBaseCost).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">(+) Margem de Desconto ({pricingSim.targetDiscountPct}%):</span>
-                    <span className="font-mono text-amber-300">R$ {(rawListPrice - rawTargetNet).toFixed(2)}</span>
+                    <span className="text-slate-400">(-) Desconto Máx. Balcão ({pricingSim.maxCounterDiscountPct}%):</span>
+                    <span className="font-mono text-amber-300">- R$ {counterDiscountAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-white/5 text-xs text-slate-400">
+                    <span>Rentabilidade no Pior Cenário de Balcão:</span>
+                    <span className="font-mono text-emerald-400 font-bold">{marginPctAtMaxDiscount.toFixed(1)}% líquida</span>
                   </div>
                 </div>
               </div>
@@ -765,9 +785,8 @@ export default function FretesPage() {
                   R$ {finalSuggestedPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <p className="text-xs text-slate-400 mt-2">
-                  Se o cliente pedir o desconto máximo de {pricingSim.targetDiscountPct}%, o aparelho sai a 
-                  <strong className="text-emerald-400"> R$ {(finalSuggestedPrice * (1 - pricingSim.targetDiscountPct / 100)).toFixed(2)}</strong>, 
-                  garantindo integralmente os {pricingSim.targetMarkupPct}% de lucro líquido da empresa!
+                  Preço piso no balcão: <strong className="text-amber-300">R$ {maxDiscountedPrice.toFixed(2)}</strong>.
+                  Mesmo com o desconto máximo permitido de {pricingSim.maxCounterDiscountPct}%, a empresa retém <strong className="text-emerald-400">R$ {profitAtMaxDiscount.toFixed(2)} ({marginPctAtMaxDiscount.toFixed(1)}%)</strong> de lucro líquido!
                 </p>
                 <button
                   onClick={() => alert("Preço aprovado pelo sócio! Atualizado oficialmente no Catálogo e PDV Balcão sem expor custos ao cliente.")}

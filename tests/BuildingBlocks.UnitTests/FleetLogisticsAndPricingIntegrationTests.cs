@@ -402,6 +402,8 @@ public class FleetLogisticsAndPricingIntegrationTests : IClassFixture<WebApplica
         sugDoc.RootElement.GetProperty("totalCostBase").GetDecimal().Should().Be(1172.00m);
         // - Preço Sugerido com 30% Markup = 1172 * 1.30 = 1523.60 -> Arredondado para ,90 = R$ 1.523,90
         sugDoc.RootElement.GetProperty("calculatedSuggestedPrice").GetDecimal().Should().Be(1523.90m);
+        // - Desconto máximo de balcão de 5% sobre 1523.90 = R$ 1.447,70 (respeita margem e não confunde com os 15% de compra)
+        sugDoc.RootElement.GetProperty("maxCounterDiscountPrice").GetDecimal().Should().Be(1447.70m);
         sugDoc.RootElement.GetProperty("status").GetInt32().Should().Be((int)PriceApprovalStatus.PendingApproval);
 
         // 6. Aprovação Comercial do Preço pelo Sócio

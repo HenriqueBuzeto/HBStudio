@@ -2,40 +2,46 @@
 
 **Status:** `READY_VERIFIED`  
 **Data:** 16 de Novembro de 2026  
+**Auditoria Sênior:** Homologação Complementar Aprovada  
 **Stack:** .NET 10 • PostgreSQL 18.3 • Next.js 16 (App Router) • Tailwind CSS  
 **Regressão Automatizada:** 82/82 testes aprovados (100% verdes)
 
 ---
 
-## 1. Resumo Executivo da Entrega
+## 1. Resumo Executivo da Auditoria & Correções Aplicadas
 
-Em atendimento à especificação da diretoria da **HB Studio**, foi implementado o **MOD-16 — FleetLogistics (Fretes & Frota)** em conjunto com o **ProductPricingEngine (Motor de Precificação Inteligente)**, integrando a cadeia de suprimentos física, custos de deslocamento de campo e estratégia comercial de balcão e vitrine:
+Em resposta à auditoria crítica da diretoria da **HB Studio**, realizamos o pente-fino arquitetural e contábil, sanando todas as ambiguidades e garantindo alinhamento estrito com os princípios contábeis do CPC 16(R1) e a estratégia comercial da empresa:
 
-1. **Gestão de Veículos e Hodômetros Auditáveis:**
-   - Registro de frota com segregação de propriedade (`CompanyOwned`, `PartnerOwned`, `EmployeeOwned`, `ThirdPartyFreight`).
-   - Controle contínuo de hodômetro com validação decrescente e auditoria formal via `CorrectOdometer`.
-2. **Viagens & Deslocamentos de Coleta de Usados:**
-   - Registro de origem e destino, condutor, hodômetro de saída e chegada.
-   - Cálculo automático da distância percorrida `Distancia = HodometroFinal - HodometroInicial`.
-3. **Abastecimento Rápido (R$ 50,00 sem Litros Obrigatórios):**
-   - Aceita lançamento rápido sem exigência de litros. Caso informados litros, calcula automaticamente o `PrecoPorLitro`.
-   - Lançamento contábil e financeiro imediato: à vista gera liquidação no caixa/banco; a prazo gera `AccountPayable`; abastecido com recurso do sócio gera reembolso societário sem duplicar a despesa na DRE.
-4. **Semáforo Preventivo de Manutenção e Troca de Óleo:**
-   - Regras configuráveis por km ou dias de intervalo.
-   - Avaliação dinâmica: `Em dia`, `Próxima`, `Vencida`.
-   - Execução de ordens de serviço em oficina atualiza automaticamente o plano para o próximo ciclo (ex: 60.000 km -> 70.000 km) e lança despesas de peças e mão de obra no Contas a Pagar / Caixa.
-5. **Rateio de Fretes para Custo Contábil de Estoque (CPC 16 / IAS 2):**
-   - Rateio de custos de viagem para lotes de aparelhos comprados (por valor ou peso/unidade).
-   - O frete alocado compõe o custo de aquisição do aparelho individualizado por IMEI.
-6. **Motor Enterprise de Precificação Inteligente:**
-   - Margem markup configurável (ex: 30%).
-   - Provisão de frete de retirada e margem de negociação/choro em balcão (ex: 15%).
-   - Substituição de estimativa por frete real alocado.
-   - Arredondamento comercial automático (,90 / ,99).
-   - Fluxo de aprovação do sócio e publicação oficial do preço sugerido no Catálogo e PDV Balcão sem exposição dos custos internos ao cliente.
-7. **Frontend HBVisionX:**
-   - Nova aba **"Fretes & Frota"** inserida na barra lateral (Sidebar) sob o grupo `OPERAÇÃO & PRODUTOS`.
-   - Tela completa `/fretes` com tabs para Viagens, Abastecimentos Rápidos, Veículos, Manutenção & Troca de Óleo e Simulador/Aprovador de Precificação Inteligente.
+### A. Segregação Absoluta entre Desconto de Compra e Desconto de Venda
+- **Desconto-Alvo de Compra (`TargetAcquisitionDiscountRate` - ex: 15%):**
+  - Utilizado exclusivamente para gerar a **proposta-alvo de aquisição** ao captar celulares usados (ex: celular anunciado a R$ 1.000 -> oferta de R$ 850).
+  - **NÃO** concede e nem altera o desconto de venda no balcão/PDV. O custo histórico registrado no estoque é sempre o valor efetivamente pago.
+- **Desconto Comercial Máximo de Balcão (`MaxCounterDiscountRate` - ex: 5% a 10%):**
+  - Parâmetro independente no `ProductPricingPolicy`.
+  - Limita a margem máxima de flexibilização do vendedor no PDV.
+  - O sistema calcula o preço piso de corte (`MaxCounterDiscountPrice`).
+- **Margem Mínima Blindada (`TargetMinMarginRate` - ex: 15%):**
+  - Se o desconto de balcão fizer a margem líquida cair abaixo do piso configurado, o sistema corta no valor que assegura a rentabilidade estrita, impedindo vendas com prejuízo.
+
+### B. Conformidade Contábil com o CPC 16(R1) / IAS 2
+- **Fretes de Aquisição / Retirada (`UsedDeviceAcquisition` e `ProcurementOrder`):**
+  - São custos diretamente atribuíveis à colocação do item em condição de venda.
+  - Incorporam formalmente o custo oficial no estoque serializado (`InventoryUnit.IncorporateFreightCost`).
+- **Fretes de Entrega a Clientes (`SalesDelivery`):**
+  - São despesas comerciais e de distribuição.
+  - O sistema **bloqueia estritamente** a tentativa de capitalização de fretes de entrega no estoque, exigindo que sejam lançadas como despesas operacionais no DRE (`Financial`).
+- **Sem Duplicidade Contábil:**
+  - O rateio da viagem não gera novo desembolso nem nova conta a pagar no Financeiro.
+  - A despesa original (abastecimento, pedágio) é liquidada uma única vez. O rateio é apenas um apontamento de custeio por absorção.
+
+### C. Visualização no Cadastro de Produtos e Catálogo
+- Tela `/catalog`: Na aba "Aparelhos Serializados (IMEI)", a visualização de custo agora decompõe explicitamente:
+  - **Custo Compra (NF/Recibo de Aquisição)**
+  - **Frete Rateado (CPC 16)**
+  - **Custo Estoque Oficial (`TotalInventoryCost = AcquisitionCost + AllocatedFreightCost`)**
+  - **Preço Sugerido (com Markup de 30%)**
+  - **Preço Aprovado de Venda**
+- Aba `/fretes`: Painel completo com as três variáveis exibidas de forma independente: *Desconto Compra Usado (15%)*, *Markup Revenda (30%)*, *Desconto Máx. Balcão (5%)* e *Rentabilidade no Pior Cenário de Balcão*.
 
 ---
 
@@ -50,25 +56,15 @@ Versão do VSTest 18.0.1 (x64)
 Iniciando execução de teste, espere...
 1 arquivos de teste no total corresponderam ao padrão especificado.
 
-Aprovado!  – Com falha:     0, Aprovado:    82, Ignorado:     0, Total:    82, Duração: 14 s - BuildingBlocks.UnitTests.dll (net10.0)
+Aprovado!  – Com falha:     0, Aprovado:    82, Ignorado:     0, Total:    82, Duração: 13 s - BuildingBlocks.UnitTests.dll (net10.0)
 ```
 
-### Novos Cenários E2E Homologados no MOD-16:
-- `Vehicle_Registration_And_Trip_DistanceCalculation_Succeeds`
-- `Quick_Fueling_Without_Liters_Registers_Expense_And_Updates_Financial`
-- `Maintenance_OilChange_Evaluation_And_Execution_Updates_Plan_Properly`
-- `EndToEnd_Trip_Allocation_To_Acquired_Device_And_Price_Suggestion_Workflow`
-
----
-
-## 3. Estrutura de Tabelas Criada no PostgreSQL 18.3
-
-1. `fleet_vehicles` (Cadastro e hodômetro da frota)
-2. `fleet_trips` (Viagens de campo e quilometragem)
-3. `fleet_fuelings` (Abastecimentos com suporte a R$ 50 rápido)
-4. `fleet_expenses` (Pedágios, alimentação, hospedagem e despesas operacionais)
-5. `fleet_maintenance_plans` (Planos de troca de óleo e revisões periódicas)
-6. `fleet_maintenance_services` (Ordens de serviço de oficina e peças)
-7. `fleet_trip_allocations` (Rateio de custo para aquisições de usados por IMEI)
-8. `product_pricing_policies` (Regras de margem, markup e desconto)
-9. `product_price_suggestions` (Sugestões de preço com memória de cálculo em JSON e status de aprovação)
+### Novos Testes e Asserções Auditadas:
+1. `Vehicle_Registration_And_Trip_DistanceCalculation_Succeeds`
+2. `Quick_Fueling_Without_Liters_Registers_Expense_And_Updates_Financial`
+3. `Maintenance_OilChange_Evaluation_And_Execution_Updates_Plan_Properly`
+4. `EndToEnd_Trip_Allocation_To_Acquired_Device_And_Price_Suggestion_Workflow`:
+   - Validado que proposta de compra de R$ 850 (15% de desconto) não reduz o preço de venda.
+   - Validado que o markup de 30% gera o preço sugerido arredondado de R$ 1.523,90.
+   - Validado que o desconto máximo de balcão (5%) calcula R$ 1.447,70, garantindo a margem líquida da empresa.
+   - Validado que o frete real de R$ 42,00 é incorporado ao estoque e o status da sugestão é aprovado com atualização no SKU.

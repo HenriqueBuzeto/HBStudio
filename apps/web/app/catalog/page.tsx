@@ -11,7 +11,10 @@ import {
   EyeOff, 
   Package, 
   Layers, 
-  FolderOpen
+  FolderOpen,
+  Sparkles,
+  Truck,
+  CheckCircle2
 } from "lucide-react";
 
 export interface SkuVariant {
@@ -45,14 +48,34 @@ export interface InventoryUnit {
   cosmeticGrade: number;
   batteryHealthPercentage?: number;
   acquisitionCost: number;
+  allocatedFreightCost?: number;
+  totalInventoryCost?: number;
   retailPrice: number;
+  suggestedPrice?: number;
   operationalStatus: number;
   operationalStatusName: string;
 }
 
 export default function CatalogPage() {
   const [models, setModels] = useState<ProductModel[]>([]);
-  const [units, setUnits] = useState<InventoryUnit[]>([]);
+  const [units, setUnits] = useState<InventoryUnit[]>([
+    {
+      id: "u-iphone14-1",
+      skuCode: "IPH14P-128-ROX",
+      modelName: "iPhone 14 Pro 128GB Roxo Profundo",
+      serialNumberOrImei: "354891828374651",
+      condition: 2,
+      cosmeticGrade: 1,
+      batteryHealthPercentage: 89,
+      acquisitionCost: 3200.00,
+      allocatedFreightCost: 42.00,
+      totalInventoryCost: 3242.00,
+      retailPrice: 4499.90,
+      suggestedPrice: 4499.90,
+      operationalStatus: 3,
+      operationalStatusName: "Aprovado para Venda"
+    }
+  ]);
   const [activeTab, setActiveTab] = useState<"models" | "units">("models");
   const [search, setSearch] = useState("");
   const [showCost, setShowCost] = useState(false);
@@ -271,8 +294,15 @@ export default function CatalogPage() {
                   <th className="py-3 px-4">IMEI / Número de Série</th>
                   <th className="py-3 px-4">Condição & Grau</th>
                   <th className="py-3 px-4">Bateria</th>
-                  {showCost && <th className="py-3 px-4">Custo Real</th>}
-                  <th className="py-3 px-4">Preço Venda</th>
+                  {showCost && (
+                    <>
+                      <th className="py-3 px-4">Custo Compra</th>
+                      <th className="py-3 px-4">Frete Rateado</th>
+                      <th className="py-3 px-4">Custo Estoque</th>
+                    </>
+                  )}
+                  <th className="py-3 px-4">Preço Sugerido</th>
+                  <th className="py-3 px-4">Preço Aprovado</th>
                   <th className="py-3 px-4">Status Operacional</th>
                 </tr>
               </thead>
@@ -294,10 +324,21 @@ export default function CatalogPage() {
                       <span className="font-bold text-emerald-600">{unit.batteryHealthPercentage}%</span>
                     </td>
                     {showCost && (
-                      <td className="py-3 px-4 font-mono text-slate-600">
-                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.acquisitionCost)}
-                      </td>
+                      <>
+                        <td className="py-3 px-4 font-mono text-slate-600">
+                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.acquisitionCost)}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-cyan-600">
+                          {unit.allocatedFreightCost ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.allocatedFreightCost) : "R$ 0,00"}
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-600">
+                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.totalInventoryCost ?? (unit.acquisitionCost + (unit.allocatedFreightCost ?? 0)))}
+                        </td>
+                      </>
                     )}
+                    <td className="py-3 px-4 font-mono font-semibold text-purple-700">
+                      {unit.suggestedPrice ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.suggestedPrice) : "—"}
+                    </td>
                     <td className="py-3 px-4 font-extrabold text-slate-900">
                       {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.retailPrice)}
                     </td>

@@ -252,6 +252,8 @@ public class InventoryUnit : TenantEntity
     public CosmeticGrade Grade { get; private set; }
     public int? BatteryHealthPercentage { get; private set; } // Ex: 88%
     public decimal AcquisitionCost { get; private set; }     // Custo real individual (sigiloso)
+    public decimal AllocatedFreightCost { get; private set; } // Frete de aquisição/retirada rateado (CPC 16 / IAS 2)
+    public decimal TotalInventoryCost => AcquisitionCost + AllocatedFreightCost; // Custo oficial total no estoque
     public Guid? SupplierPartyId { get; private set; }       // Fornecedor ou Cliente que vendeu no balcão
     public UnitOperationalStatus OperationalStatus { get; private set; }
     public string? InspectionNotes { get; private set; }
@@ -337,5 +339,15 @@ public class InventoryUnit : TenantEntity
             throw new InvalidOperationException($"Não é possível vender uma unidade física com status '{OperationalStatus}'. Deve estar 'ApprovedForSale'.");
 
         OperationalStatus = UnitOperationalStatus.Sold;
+    }
+
+    public void IncorporateFreightCost(decimal freightAmount)
+    {
+        if (freightAmount <= 0)
+            throw new ArgumentException("O valor de frete a incorporar no estoque deve ser positivo.", nameof(freightAmount));
+        if (OperationalStatus == UnitOperationalStatus.Sold)
+            throw new InvalidOperationException("Não é permitido alocar frete retroativo em unidade serializada já faturada/vendida.");
+
+        AllocatedFreightCost += freightAmount;
     }
 }

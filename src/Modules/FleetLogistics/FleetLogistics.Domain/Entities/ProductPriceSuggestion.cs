@@ -28,6 +28,7 @@ public class ProductPriceSuggestion : TenantEntity
     public decimal MarkupRateApplied { get; private set; }          // Ex: 0.30 (30%)
     public decimal CalculatedSuggestedPrice { get; private set; }   // Preço sugerido calculado matematicamente
     public decimal MinimumAllowedPrice { get; private set; }        // Preço piso pela margem mínima
+    public decimal MaxCounterDiscountPrice { get; private set; }    // Preço com desconto máximo permitido no balcão
     public decimal ApprovedFinalPrice { get; private set; }         // Preço oficial publicado
     public PriceApprovalStatus Status { get; private set; }
     public string CalculationBreakdownJson { get; private set; }    // Memória de cálculo detalhada auditável
@@ -52,6 +53,7 @@ public class ProductPriceSuggestion : TenantEntity
         decimal markupRateApplied,
         decimal calculatedSuggestedPrice,
         decimal minimumAllowedPrice,
+        decimal maxCounterDiscountPrice,
         string calculationBreakdownJson,
         Guid? inventoryUnitId = null,
         Guid? pricingPolicyId = null) : base(tenantId)
@@ -74,6 +76,7 @@ public class ProductPriceSuggestion : TenantEntity
         MarkupRateApplied = markupRateApplied;
         CalculatedSuggestedPrice = calculatedSuggestedPrice;
         MinimumAllowedPrice = minimumAllowedPrice;
+        MaxCounterDiscountPrice = maxCounterDiscountPrice;
         ApprovedFinalPrice = calculatedSuggestedPrice; // Inicialmente igual ao sugerido
         Status = PriceApprovalStatus.PendingApproval;
         CalculationBreakdownJson = calculationBreakdownJson;
