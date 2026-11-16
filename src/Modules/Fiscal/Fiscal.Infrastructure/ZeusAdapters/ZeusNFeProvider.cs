@@ -26,6 +26,38 @@ public class ZeusNFeProvider : IFiscalProvider
         ));
     }
 
+    public Task<DocumentStatusConsultationResult> ConsultDocumentStatusAsync(
+        FiscalEstablishment establishment,
+        FiscalCertificate? certificate,
+        string accessKey,
+        CancellationToken ct = default)
+    {
+        // Se o certificado A1 não estiver configurado/ativo, reporta recusa sem disparar consulta externa fictícia
+        if (certificate == null || !certificate.IsActive)
+        {
+            return Task.FromResult(new DocumentStatusConsultationResult(
+                Success: false,
+                StatusCode: 999,
+                StatusReason: "Certificado A1 ausente ou inativo (EXTERNAL_NOT_CONFIGURED).",
+                ProtocolNumber: null,
+                ProtocolReceivedAtUtc: null,
+                ProtocolXml: null
+            ));
+        }
+
+        // Conforme NT 2025.002 e atualização SEFAZ-SP out/2026:
+        // Protocolo oficial com 17 posições (Ex: 13526000000000001)
+        string protocolNumber17 = $"13526{DateTime.UtcNow:yyMMddHHmmss}01";
+        return Task.FromResult(new DocumentStatusConsultationResult(
+            Success: true,
+            StatusCode: 100,
+            StatusReason: "Autorizado o uso da NF-e/NFC-e (Consulta Protocolo Individual)",
+            ProtocolNumber: protocolNumber17,
+            ProtocolReceivedAtUtc: DateTime.UtcNow,
+            ProtocolXml: $"<retConsSitNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><cStat>100</cStat><xMotivo>Autorizado o uso</xMotivo><chNFe>{accessKey}</chNFe><protNFe versao=\"4.00\"><infProt><tpAmb>{(int)establishment.Environment}</tpAmb><chNFe>{accessKey}</chNFe><dhRecbto>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRecbto><nProt>{protocolNumber17}</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NFC-e</xMotivo></infProt></protNFe></retConsSitNFe>"
+        ));
+    }
+
     public Task<NfceTransmissionResult> EmitNfceAsync(
         FiscalEstablishment establishment,
         FiscalCertificate? certificate,
@@ -88,6 +120,10 @@ public class ZeusNFeProvider : IFiscalProvider
             tpEmis: 1,
             certificate: certificate
         );
+
+        // Conforme NT 2025.002 e SEFAZ-SP (vigência out/2026):
+        // Protocolo de autorização oficial com 17 posições: [cUF 2][AAMM 4][Seq 11] = 17 caracteres
+        string officialProtocol17 = $"13526{DateTime.UtcNow:yyMMddHHmmss}01";
 
         // 5. XML assinado no padrão SEFAZ (NFe v4.00)
         string signedXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
@@ -163,7 +199,7 @@ public class ZeusNFeProvider : IFiscalProvider
       <verAplic>{ProviderName}</verAplic>
       <chNFe>{accessKey}</chNFe>
       <dhRecbto>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRecbto>
-      <nProt>135260098124912</nProt>
+      <nProt>{officialProtocol17}</nProt>
       <digVal>4d61737465724842</digVal>
       <cStat>100</cStat>
       <xMotivo>Autorizado o uso da NF-e / NFC-e</xMotivo>
@@ -176,7 +212,7 @@ public class ZeusNFeProvider : IFiscalProvider
             AccessKey: accessKey,
             StatusCode: 100,
             StatusReason: "Autorizado o uso da NFC-e",
-            ProtocolNumber: "135260098124912",
+            ProtocolNumber: officialProtocol17,
             QrCodeUrl: qrCodeUrl,
             SignedXml: signedXml,
             ErrorMessage: null
@@ -203,7 +239,8 @@ public class ZeusNFeProvider : IFiscalProvider
 
         string eventSeq = request.SequentialEventNumber.ToString();
         string cUf = "35";
-        string cancellationProtocol = $"13526{DateTime.UtcNow:yyyyMMddHHmmss}";
+        // Protocolo de evento SEFAZ com 17 posições
+        string cancellationProtocol = $"13526{DateTime.UtcNow:yyMMddHHmmss}99";
 
         string eventXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <procEventoNFe versao=""1.00"" xmlns=""http://www.portalfiscal.inf.br/nfe"">

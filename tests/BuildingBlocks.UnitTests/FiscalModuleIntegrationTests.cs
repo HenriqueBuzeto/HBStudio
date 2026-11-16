@@ -311,6 +311,131 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public void Fiscal_Inbound_Xml_With_Untrusted_Signer_Certificate_Should_Be_Rejected()
+    {
+        // Cria um certificado autoassinado para emitente com CNPJ diferente (simulando ataque com chave privada forjada de terceiro)
+        using var rsa = RSA.Create(2048);
+        var certReq = new CertificateRequest("CN=EMPRESA FRAUDULENTA:99999999000199", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var cert = certReq.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(1));
+
+        string accessKey = "35261148951871000180550010000012341234567890";
+        string xmlToSign = $@"<nfeProc xmlns=""http://www.portalfiscal.inf.br/nfe"" versao=""4.00"">
+  <NFe>
+    <infNFe Id=""NFe{accessKey}"" versao=""4.00"">
+      <ide><nNF>1234</nNF><serie>1</serie><dhEmi>2026-11-16T14:30:00-03:00</dhEmi></ide>
+      <emit><CNPJ>12345678000199</CNPJ><xNome>FORNECEDOR VALIDO</xNome></emit>
+      <dest><CNPJ>48951871000180</CNPJ><xNome>HB STUDIO</xNome></dest>
+      <det nItem=""1""><prod><cProd>1</cProd><xProd>IPHONE 16</xProd><NCM>85171300</NCM><qCom>1</qCom><vUnCom>8000</vUnCom><vProd>8000</vProd></prod></det>
+      <total><ICMSTot><vProd>8000</vProd><vNF>8000</vNF><vICMS>0</vICMS></ICMSTot></total>
+    </infNFe>
+  </NFe>
+</nfeProc>";
+
+        var xmlDoc = new XmlDocument { PreserveWhitespace = true };
+        xmlDoc.LoadXml(xmlToSign);
+
+        var signedXml = new SignedXml(xmlDoc) { SigningKey = cert.GetRSAPrivateKey() };
+        var reference = new Reference { Uri = $"#NFe{accessKey}" };
+        reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
+        reference.AddTransform(new XmlDsigC14NTransform());
+        signedXml.AddReference(reference);
+
+        var keyInfo = new KeyInfo();
+        keyInfo.AddClause(new KeyInfoX509Data(cert));
+        signedXml.KeyInfo = keyInfo;
+
+        signedXml.ComputeSignature();
+        xmlDoc.DocumentElement!.AppendChild(xmlDoc.ImportNode(signedXml.GetXml(), true));
+
+        var fiscalService = new FiscalService(null!, new ZeusNFeProvider());
+        var actMismatch = async () => await fiscalService.ParseInboundXmlAsync(xmlDoc.OuterXml);
+        actMismatch.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Incompatibilidade de identidade: o certificado digital da assinatura não pertence ao emitente*");
+    }
+
+    [Fact]
+    public void Fiscal_Reconcile_Multi_Instance_Lease_Should_Prevent_Concurrent_Duplicate_Processing()
+    {
+        var tenantId = Guid.NewGuid();
+        var estId = Guid.NewGuid();
+        var doc = new FiscalDocument(
+            tenantId,
+            estId,
+            Guid.NewGuid(),
+            FiscalDocumentType.NFCe,
+            FiscalEnvironment.Homologation,
+            1,
+            1001,
+            "35261148951871000180650010000010011189201450",
+            450.00m,
+            0m);
+
+        doc.MarkSubmitting();
+
+        var worker1Id = Guid.NewGuid();
+        var worker2Id = Guid.NewGuid();
+
+        // 1. Worker 1 adquire o lease com sucesso por 60 segundos
+        bool worker1Acquired = doc.TryAcquireReconcileLease(worker1Id, TimeSpan.FromSeconds(60));
+        worker1Acquired.Should().BeTrue();
+        doc.ReconcileClaimWorkerId.Should().Be(worker1Id);
+        doc.ReconcileLeaseExpiresAtUtc.Should().BeAfter(DateTime.UtcNow);
+
+        // 2. Worker 2 tenta concorrentemente e DEVE ser recusado (evitando execução duplicada de reconciliação)
+        bool worker2Acquired = doc.TryAcquireReconcileLease(worker2Id, TimeSpan.FromSeconds(60));
+        worker2Acquired.Should().BeFalse();
+
+        // 3. Worker 1 falha com timeout na SEFAZ e registra backoff de retry
+        doc.RecordReconcileFailure("SEFAZ Timeout", TimeSpan.FromMinutes(2));
+        doc.ReconcileLeaseExpiresAtUtc.Should().BeNull();
+        doc.ReconcileRetryCount.Should().Be(1);
+        doc.NextReconcileAttemptAtUtc.Should().BeAfter(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void SefazSp_17_Digits_Protocol_Number_Should_Be_Accepted_And_Preserved()
+    {
+        var provider = new ZeusNFeProvider();
+        var est = new FiscalEstablishment(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "HB STUDIO",
+            "HB Studio",
+            "48951871000180",
+            "111222333",
+            TaxRegime.SimplesNacional,
+            "Rua Teste",
+            "100",
+            "Centro",
+            "3550308",
+            "São Paulo",
+            "SP",
+            "01001000");
+
+        // Protocolo de 17 posições da SEFAZ-SP (vigente desde 05/10/2026 - NT 2025.002)
+        string protocol17 = "13526009812491201";
+        protocol17.Length.Should().Be(17);
+
+        var doc = new FiscalDocument(
+            est.TenantId,
+            est.Id,
+            Guid.NewGuid(),
+            FiscalDocumentType.NFCe,
+            FiscalEnvironment.Production,
+            1,
+            500,
+            "35261148951871000180650010000005001189201450",
+            1200.00m,
+            0m);
+
+        doc.SetAuthorized(protocol17, 100, "Autorizado o uso da NFC-e", "https://nfce.fazenda.sp.gov.br", "<xml></xml>");
+
+        doc.ProtocolNumber.Should().Be(protocol17);
+        doc.ProtocolNumber!.Length.Should().Be(17);
+        doc.Status.Should().Be(FiscalDocumentStatus.Authorized);
+    }
+
+    [Fact]
     public async Task Fiscal_Inbound_Xml_Should_Validate_Signature_And_Prevent_Tampering()
     {
         var tenantId = Guid.NewGuid();

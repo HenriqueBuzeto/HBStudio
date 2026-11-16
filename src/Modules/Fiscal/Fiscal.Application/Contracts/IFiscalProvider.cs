@@ -67,10 +67,19 @@ public record ServiceStatusResult(
     string Uf,
     DateTime CheckedAtUtc);
 
+public record DocumentStatusConsultationResult(
+    bool Success,
+    int StatusCode,
+    string StatusReason,
+    string? ProtocolNumber,
+    DateTime? ProtocolReceivedAtUtc,
+    string? ProtocolXml);
+
 public interface IFiscalProvider
 {
     string ProviderName { get; }
     Task<ServiceStatusResult> CheckStatusAsync(FiscalEstablishment establishment, CancellationToken ct = default);
+    Task<DocumentStatusConsultationResult> ConsultDocumentStatusAsync(FiscalEstablishment establishment, FiscalCertificate? certificate, string accessKey, CancellationToken ct = default);
     Task<NfceTransmissionResult> EmitNfceAsync(FiscalEstablishment establishment, FiscalCertificate? certificate, FiscalCsc? csc, NfceTransmissionRequest request, CancellationToken ct = default);
     Task<NfceCancellationResult> CancelNfceAsync(FiscalEstablishment establishment, FiscalCertificate? certificate, NfceCancellationRequest request, CancellationToken ct = default);
 }

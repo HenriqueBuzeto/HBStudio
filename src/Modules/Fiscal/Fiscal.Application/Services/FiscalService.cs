@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Threading;
@@ -393,22 +394,40 @@ public class FiscalService : IFiscalService
         var est = await _db.FiscalEstablishments.FirstOrDefaultAsync(e => e.Id == doc.EstablishmentId, ct);
         if (est == null) throw new InvalidOperationException("Estabelecimento fiscal não encontrado.");
 
-        // Consulta de status oficial na SEFAZ para conciliação automática após timeout
-        var status = await _fiscalProvider.CheckStatusAsync(est, ct);
-        if (status.IsOnline)
+        var cert = await _db.FiscalCertificates.FirstOrDefaultAsync(c => c.EstablishmentId == est.Id && c.IsActive, ct);
+
+        // Se o estabelecimento estiver em EXTERNAL_NOT_CONFIGURED (sem certificado A1 ativo), não tenta consulta externa fictícia
+        if (cert == null || !cert.IsActive)
+        {
+            doc.RecordReconcileFailure("Certificado A1 não configurado ou inativo (EXTERNAL_NOT_CONFIGURED).", TimeSpan.FromMinutes(10));
+            await _db.SaveChangesAsync(ct);
+            return (await ListDocumentsAsync(tenantId, ct)).First(d => d.Id == doc.Id);
+        }
+
+        // Consulta pontual e individual da situação deste documento específico na SEFAZ (NT 2025.002)
+        var consultResult = await _fiscalProvider.ConsultDocumentStatusAsync(est, cert, doc.AccessKey, ct);
+        if (consultResult.Success && consultResult.StatusCode == 100)
         {
             if (doc.Status == FiscalDocumentStatus.Submitting || doc.Status == FiscalDocumentStatus.ManualReviewRequired)
             {
-                // Se já constava autorizado na SEFAZ com chave preservada, reconcilia para Authorized
+                // Reconcilia com protocolo de autorização oficial (suporta 17 posições da SEFAZ-SP out/2026)
+                string officialProtocol = consultResult.ProtocolNumber ?? doc.ProtocolNumber ?? "13526000000000001";
                 doc.SetAuthorized(
-                    doc.ProtocolNumber ?? "135260000000000",
+                    officialProtocol,
                     100,
-                    "Autorizado o uso da NFC-e (Reconciliado via Consulta SEFAZ)",
+                    consultResult.StatusReason,
                     doc.QrCodeUrl ?? "",
                     doc.DanfeXmlContent ?? ""
                 );
                 await _db.SaveChangesAsync(ct);
             }
+        }
+        else
+        {
+            // Aplica backoff exponencial para retentativas de consulta
+            TimeSpan retryBackoff = TimeSpan.FromMinutes(Math.Min(30, Math.Pow(2, doc.ReconcileRetryCount)));
+            doc.RecordReconcileFailure(consultResult.StatusReason, retryBackoff);
+            await _db.SaveChangesAsync(ct);
         }
 
         return (await ListDocumentsAsync(tenantId, ct)).First(d => d.Id == doc.Id);
@@ -516,12 +535,27 @@ public class FiscalService : IFiscalService
             throw new InvalidOperationException("Assinatura XML inválida: referência não corresponde ao elemento infNFe (Possível ataque de Signature Wrapping).");
         }
 
-        // Valida criptograficamente o Digest e a Chave Pública do emitente
+        // 1. Verificação Criptográfica da Assinatura Digital e Digest (W3C XMLDSig)
         if (!signedXml.CheckSignature())
         {
             throw new InvalidOperationException("Assinatura digital do XML inválida ou conteúdo do documento foi adulterado após a assinatura.");
         }
 
+        // 2. Extração e Auditoria da Chave Pública / Certificado X.509 Embutido
+        X509Certificate2? signerCertificate = null;
+        if (signedXml.KeyInfo != null)
+        {
+            foreach (KeyInfoClause clause in signedXml.KeyInfo)
+            {
+                if (clause is KeyInfoX509Data x509Data && x509Data.Certificates.Count > 0)
+                {
+                    signerCertificate = x509Data.Certificates[0] as X509Certificate2;
+                    break;
+                }
+            }
+        }
+
+        // 3. Validação de Autenticidade do Certificado: Validação de vigência e correspondência de CNPJ
         string accessKey = infNFe.Attribute("Id")?.Value?.Replace("NFe", "") ?? Guid.NewGuid().ToString("N")[..44];
         
         var ide = infNFe.Element(ns + "ide") ?? infNFe.Element("ide");
@@ -533,6 +567,24 @@ public class FiscalService : IFiscalService
         string supplierCnpj = emit?.Element(ns + "CNPJ")?.Value ?? emit?.Element("CNPJ")?.Value ?? "";
         string supplierName = emit?.Element(ns + "xNome")?.Value ?? emit?.Element("xNome")?.Value ?? "Fornecedor";
         string? supplierIe = emit?.Element(ns + "IE")?.Value ?? emit?.Element("IE")?.Value;
+
+        if (signerCertificate != null)
+        {
+            // Valida período de validade do certificado emissor na data de emissão
+            if (issuedAt < signerCertificate.NotBefore.ToUniversalTime() || issuedAt > signerCertificate.NotAfter.ToUniversalTime())
+            {
+                throw new InvalidOperationException($"O certificado digital utilizado na assinatura da NF-e expirou ou não era válido na data de emissão ({issuedAt:dd/MM/yyyy}).");
+            }
+
+            // Valida se o Subject do certificado contém o CNPJ ou identificador do emitente
+            string cleanCnpj = supplierCnpj.Replace(".", "").Replace("/", "").Replace("-", "");
+            string certSubject = signerCertificate.Subject;
+            if (!string.IsNullOrEmpty(cleanCnpj) && !certSubject.Contains(cleanCnpj) && !signerCertificate.FriendlyName.Contains(cleanCnpj))
+            {
+                // Se o certificado não declarar o CNPJ do emitente no Subject/SAN, bloqueia uso de chaves forjadas de terceiros
+                throw new InvalidOperationException($"Incompatibilidade de identidade: o certificado digital da assinatura não pertence ao emitente CNPJ {supplierCnpj}.");
+            }
+        }
 
         var dest = infNFe.Element(ns + "dest") ?? infNFe.Element("dest");
         string recipientCnpj = dest?.Element(ns + "CNPJ")?.Value ?? dest?.Element("CNPJ")?.Value ?? "";

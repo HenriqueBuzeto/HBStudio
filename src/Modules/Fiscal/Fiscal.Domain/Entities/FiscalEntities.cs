@@ -236,7 +236,7 @@ public class FiscalDocument : TenantEntity
     public string? RecipientCpf { get; private set; }
     public string? RecipientName { get; private set; }
 
-    // Protocolo e Resposta SEFAZ
+    // Protocolo e Resposta SEFAZ (Conforme NT 2025.002 e SEFAZ-SP out/2026: até 17 posições ou mais)
     public string? ProtocolNumber { get; private set; }
     public DateTime? ProtocolReceivedAtUtc { get; private set; }
     public int? SefazStatusCode { get; private set; }
@@ -246,6 +246,12 @@ public class FiscalDocument : TenantEntity
     public string? CancellationXmlContent { get; private set; }
     public string? CancellationReason { get; private set; }
     public DateTime? CancelledAtUtc { get; private set; }
+
+    // Concorrência e Lease para Reconciliação Multi-instância
+    public Guid? ReconcileClaimWorkerId { get; private set; }
+    public DateTime? ReconcileLeaseExpiresAtUtc { get; private set; }
+    public int ReconcileRetryCount { get; private set; } = 0;
+    public DateTime? NextReconcileAttemptAtUtc { get; private set; }
 
     private readonly List<FiscalDocumentItem> _items = [];
     public IReadOnlyCollection<FiscalDocumentItem> Items => _items.AsReadOnly();
@@ -296,6 +302,8 @@ public class FiscalDocument : TenantEntity
         DanfeXmlContent = xmlContent;
         ProtocolReceivedAtUtc = DateTime.UtcNow;
         Status = FiscalDocumentStatus.Authorized;
+        ReconcileLeaseExpiresAtUtc = null;
+        ReconcileClaimWorkerId = null;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
@@ -304,6 +312,8 @@ public class FiscalDocument : TenantEntity
         SefazStatusCode = statusCode;
         SefazStatusReason = statusReason;
         Status = FiscalDocumentStatus.Rejected;
+        ReconcileLeaseExpiresAtUtc = null;
+        ReconcileClaimWorkerId = null;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
@@ -340,6 +350,38 @@ public class FiscalDocument : TenantEntity
         CancellationXmlContent = xmlContent;
         CancelledAtUtc = DateTime.UtcNow;
         Status = FiscalDocumentStatus.Cancelled;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public bool TryAcquireReconcileLease(Guid workerId, TimeSpan leaseDuration)
+    {
+        var now = DateTime.UtcNow;
+        if (Status != FiscalDocumentStatus.Submitting && Status != FiscalDocumentStatus.ManualReviewRequired)
+            return false;
+
+        // Se já tem lease ativo de outro worker, recusa claim
+        if (ReconcileLeaseExpiresAtUtc.HasValue && ReconcileLeaseExpiresAtUtc.Value > now && ReconcileClaimWorkerId != workerId)
+            return false;
+
+        ReconcileClaimWorkerId = workerId;
+        ReconcileLeaseExpiresAtUtc = now.Add(leaseDuration);
+        UpdatedAtUtc = now;
+        return true;
+    }
+
+    public void RecordReconcileFailure(string reason, TimeSpan retryBackoff)
+    {
+        ReconcileRetryCount++;
+        SefazStatusReason = reason;
+        ReconcileLeaseExpiresAtUtc = null;
+        NextReconcileAttemptAtUtc = DateTime.UtcNow.Add(retryBackoff);
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void ReleaseReconcileLease()
+    {
+        ReconcileLeaseExpiresAtUtc = null;
+        ReconcileClaimWorkerId = null;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 }
