@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { PasswordField } from "./PasswordField";
 import { AuthFeedback } from "./AuthFeedback";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export function LoginForm() {
         router.push("/");
       } else if (res.status === 401 || res.status === 403) {
         // Mensagem genérica padronizada: segurança contra enumeração de contas
-        setFeedback("Não foi possível entrar. Verifique suas credenciais ou procure o responsável pelo acesso.");
+        setFeedback("Credenciais inválidas ou usuário administrativo inativo.");
       } else {
         setFeedback("Não foi possível conectar ao servidor. Tente novamente.");
       }
@@ -78,29 +78,34 @@ export function LoginForm() {
       <div className="space-y-1.5">
         <label
           htmlFor="email-input"
-          className="block text-xs font-bold text-slate-700 tracking-tight"
+          className="block text-xs font-semibold text-slate-300 tracking-tight"
         >
           E-mail Corporativo
         </label>
-        <input
-          id="email-input"
-          type="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
-          }}
-          disabled={loading}
-          autoComplete="email"
-          placeholder="seu@email.com"
-          className={`w-full px-4 py-2.5 text-sm bg-slate-50/70 hover:bg-slate-50 focus:bg-white border ${
-            fieldErrors.email
-              ? "border-rose-400 focus:ring-rose-500/20"
-              : "border-slate-200 focus:ring-purple-500/20 focus:border-purple-600"
-          } rounded-xl focus:outline-none focus:ring-2 text-slate-900 transition-all placeholder:text-slate-400 shadow-2xs`}
-        />
+        <div className="relative">
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+            <Mail className="w-4 h-4" />
+          </div>
+          <input
+            id="email-input"
+            type="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined });
+            }}
+            disabled={loading}
+            autoComplete="email"
+            placeholder="hbdevstudio@gmail.com"
+            className={`w-full pl-10 pr-4 py-3 text-sm bg-slate-900/90 hover:bg-slate-900 focus:bg-slate-950 border ${
+              fieldErrors.email
+                ? "border-rose-500/80 focus:ring-rose-500/30"
+                : "border-slate-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+            } rounded-xl focus:outline-none focus:ring-2 text-white transition-all placeholder:text-slate-500 shadow-inner`}
+          />
+        </div>
         {fieldErrors.email && (
-          <p className="text-[11px] font-semibold text-rose-500 animate-fadeIn">
+          <p className="text-[11px] font-semibold text-rose-400 animate-fadeIn">
             {fieldErrors.email}
           </p>
         )}
@@ -109,7 +114,7 @@ export function LoginForm() {
       {/* Campo Senha */}
       <PasswordField
         id="password-input"
-        label="Senha de Acesso"
+        label="Senha Master ou Suporte"
         value={password}
         onChange={(e) => {
           setPassword(e.target.value);
@@ -117,27 +122,24 @@ export function LoginForm() {
         }}
         disabled={loading}
         autoComplete="current-password"
-        placeholder="••••••••••••"
+        placeholder="••••••••"
         error={fieldErrors.password}
       />
 
-      {/* Botão Entrar no Sistema */}
+      {/* Botão de Ação com gradiente ciano / azul conforme a imagem de referência */}
       <div className="pt-2">
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-11 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 active:scale-[0.99] text-white font-extrabold text-sm rounded-xl transition-all shadow-md hover:shadow-purple-700/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+          className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:from-cyan-600 active:to-blue-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-cyan-500/20 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-white" />
-              <span>Verificando credenciais...</span>
+              <span>Autenticando...</span>
             </>
           ) : (
-            <>
-              <span>Entrar no sistema</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
+            <span>Continuar para Desafio MFA</span>
           )}
         </button>
       </div>
