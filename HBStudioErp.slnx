@@ -20,6 +20,11 @@
     <Project Path="src/Modules/Catalog/Catalog.Domain/Catalog.Domain.csproj" />
     <Project Path="src/Modules/Catalog/Catalog.Infrastructure/Catalog.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/CRM/">
+    <Project Path="src/Modules/CRM/CRM.Application/CRM.Application.csproj" />
+    <Project Path="src/Modules/CRM/CRM.Domain/CRM.Domain.csproj" />
+    <Project Path="src/Modules/CRM/CRM.Infrastructure/CRM.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Financial/">
     <Project Path="src/Modules/Financial/Financial.Application/Financial.Application.csproj" />
     <Project Path="src/Modules/Financial/Financial.Domain/Financial.Domain.csproj" />

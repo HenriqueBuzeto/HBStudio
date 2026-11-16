@@ -23,6 +23,9 @@
     <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Domain\RepairService.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Application\RepairService.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\RepairService\RepairService.Infrastructure\RepairService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CRM\CRM.Domain\CRM.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CRM\CRM.Application\CRM.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\CRM\CRM.Infrastructure\CRM.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

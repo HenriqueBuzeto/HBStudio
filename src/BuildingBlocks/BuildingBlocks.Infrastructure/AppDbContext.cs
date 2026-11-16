@@ -12,6 +12,7 @@ using CashManagement.Domain;
 using Financial.Domain;
 using PartnersCapital.Domain.Entities;
 using RepairService.Domain.Entities;
+using CRM.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -114,6 +115,15 @@ public class AppDbContext : DbContext
     public DbSet<RepairStatusHistoryEntry> RepairStatusHistoryEntries => Set<RepairStatusHistoryEntry>();
     public DbSet<RepairEvidenceAttachment> RepairEvidenceAttachments => Set<RepairEvidenceAttachment>();
     public DbSet<RepairWarrantyClaim> RepairWarrantyClaims => Set<RepairWarrantyClaim>();
+
+    // Modulo CRM (MOD-08) - CRM Inteligente, Leads, Oportunidades, Intenções de Compra e Matching de Estoque
+    public DbSet<CrmLead> CrmLeads => Set<CrmLead>();
+    public DbSet<CrmPipeline> CrmPipelines => Set<CrmPipeline>();
+    public DbSet<CrmPipelineStage> CrmPipelineStages => Set<CrmPipelineStage>();
+    public DbSet<CrmOpportunity> CrmOpportunities => Set<CrmOpportunity>();
+    public DbSet<CrmOpportunityActivity> CrmOpportunityActivities => Set<CrmOpportunityActivity>();
+    public DbSet<CrmPurchaseIntent> CrmPurchaseIntents => Set<CrmPurchaseIntent>();
+    public DbSet<CrmInventoryMatch> CrmInventoryMatches => Set<CrmInventoryMatch>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1416,6 +1426,117 @@ public class AppDbContext : DbContext
             b.HasIndex(w => new { w.TenantId, w.RepairOrderId });
         });
 
+        // Configuração CRM (MOD-08)
+        modelBuilder.Entity<CrmLead>(b =>
+        {
+            b.ToTable("crm_leads");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Name).HasMaxLength(150).IsRequired();
+            b.Property(l => l.Phone).HasMaxLength(30);
+            b.Property(l => l.Email).HasMaxLength(150);
+            b.Property(l => l.Source).HasMaxLength(50).IsRequired();
+            b.Property(l => l.MainInterest).HasMaxLength(200);
+            b.Property(l => l.Notes).HasMaxLength(1000);
+            b.Property(l => l.Version).IsRowVersion();
+
+            b.HasIndex(l => new { l.TenantId, l.BranchId });
+            b.HasIndex(l => new { l.TenantId, l.Status });
+        });
+
+        modelBuilder.Entity<CrmPipeline>(b =>
+        {
+            b.ToTable("crm_pipelines");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Name).HasMaxLength(100).IsRequired();
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.HasMany(p => p.Stages)
+             .WithOne()
+             .HasForeignKey(s => s.PipelineId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(p => new { p.TenantId, p.IsActive });
+        });
+
+        modelBuilder.Entity<CrmPipelineStage>(b =>
+        {
+            b.ToTable("crm_pipeline_stages");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Name).HasMaxLength(100).IsRequired();
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.HasIndex(s => new { s.TenantId, s.PipelineId, s.OrderIndex });
+        });
+
+        modelBuilder.Entity<CrmOpportunity>(b =>
+        {
+            b.ToTable("crm_opportunities");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.Title).HasMaxLength(200).IsRequired();
+            b.Property(o => o.Description).HasMaxLength(1000);
+            b.Property(o => o.Origin).HasMaxLength(50).IsRequired();
+            b.Property(o => o.EstimatedValue).HasPrecision(18, 2);
+            b.Property(o => o.LossReason).HasMaxLength(500);
+            b.Property(o => o.Version).IsRowVersion();
+
+            b.HasMany(o => o.Activities)
+             .WithOne()
+             .HasForeignKey(a => a.OpportunityId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
+            b.HasIndex(o => new { o.TenantId, o.PipelineId, o.StageId });
+        });
+
+        modelBuilder.Entity<CrmOpportunityActivity>(b =>
+        {
+            b.ToTable("crm_opportunity_activities");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Title).HasMaxLength(200).IsRequired();
+            b.Property(a => a.Description).HasMaxLength(1000);
+            b.Property(a => a.CompletionNotes).HasMaxLength(1000);
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.HasIndex(a => new { a.TenantId, a.OpportunityId, a.Status });
+        });
+
+        modelBuilder.Entity<CrmPurchaseIntent>(b =>
+        {
+            b.ToTable("crm_purchase_intents");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Category).HasMaxLength(100).IsRequired();
+            b.Property(i => i.Brand).HasMaxLength(100).IsRequired();
+            b.Property(i => i.ModelName).HasMaxLength(150).IsRequired();
+            b.Property(i => i.DesiredStorageCapacity).HasMaxLength(50);
+            b.Property(i => i.DesiredColor).HasMaxLength(50);
+            b.Property(i => i.MinimumCosmeticGrade).HasMaxLength(20);
+            b.Property(i => i.MaxBudgetPrice).HasPrecision(18, 2);
+            b.Property(i => i.Notes).HasMaxLength(1000);
+            b.Property(i => i.CloseReason).HasMaxLength(500);
+            b.Property(i => i.Version).IsRowVersion();
+
+            b.HasMany(i => i.Matches)
+             .WithOne()
+             .HasForeignKey(m => m.PurchaseIntentId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(i => new { i.TenantId, i.BranchId, i.Status });
+            b.HasIndex(i => new { i.TenantId, i.PartyId });
+        });
+
+        modelBuilder.Entity<CrmInventoryMatch>(b =>
+        {
+            b.ToTable("crm_inventory_matches");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.VerifiedPrice).HasPrecision(18, 2);
+            b.Property(m => m.MatchDetails).HasMaxLength(1000).IsRequired();
+            b.Property(m => m.RejectionReason).HasMaxLength(500);
+            b.Property(m => m.Version).IsRowVersion();
+
+            b.HasIndex(m => new { m.TenantId, m.PurchaseIntentId, m.ProductSkuId });
+            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId });
+        });
+
         // Configurar Filtros Globais Multi-Tenant Automaticos
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -1443,7 +1564,8 @@ public class AppDbContext : DbContext
         // 0. Corrigir entidades filhas recém-anexadas com Version == 0 marcadas erroneamente como Modified
         foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
         {
-            if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim)
+            if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
+                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch)
             {
                 var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
                 if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))

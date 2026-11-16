@@ -22,6 +22,507 @@ namespace BuildingBlocks.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("CRM.Domain.Entities.CrmInventoryMatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EvaluatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InventoryUnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsFullMatch")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MatchDetails")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PurchaseIntentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("StatusUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("VerifiedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseIntentId");
+
+                    b.HasIndex("TenantId", "InventoryUnitId");
+
+                    b.HasIndex("TenantId", "PurchaseIntentId", "ProductSkuId");
+
+                    b.ToTable("crm_inventory_matches", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmLead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedSellerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConvertedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConvertedPartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("MainInterest")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("NextContactAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BranchId");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("crm_leads", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmOpportunity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedSellerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssociatedPurchaseIntentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssociatedRepairOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConvertedSaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConvertedSalesQuoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("EstimatedValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("ExpectedClosingDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LossReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PipelineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "BranchId", "Status");
+
+                    b.HasIndex("TenantId", "PipelineId", "StageId");
+
+                    b.ToTable("crm_opportunities", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmOpportunityActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActivityType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompletionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OpportunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ScheduledForUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpportunityId");
+
+                    b.HasIndex("TenantId", "OpportunityId", "Status");
+
+                    b.ToTable("crm_opportunity_activities", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPipeline", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("PipelineType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsActive");
+
+                    b.ToTable("crm_pipelines", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPipelineStage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsLostStage")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsWonStage")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PipelineId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PipelineId");
+
+                    b.HasIndex("TenantId", "PipelineId", "OrderIndex");
+
+                    b.ToTable("crm_pipeline_stages", (string)null);
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPurchaseIntent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedSellerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CloseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ColorIsFlexible")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Condition")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DesiredColor")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("DesiredStorageCapacity")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal?>("MaxBudgetPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("MinimumBatteryHealthPercentage")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MinimumCosmeticGrade")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PreferredBranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PreferredContactChannel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TargetProductModelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ValidUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PartyId");
+
+                    b.HasIndex("TenantId", "BranchId", "Status");
+
+                    b.ToTable("crm_purchase_intents", (string)null);
+                });
+
             modelBuilder.Entity("CashManagement.Domain.CashCountDenomination", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4690,6 +5191,33 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.ToTable("sales_quote_items", (string)null);
                 });
 
+            modelBuilder.Entity("CRM.Domain.Entities.CrmInventoryMatch", b =>
+                {
+                    b.HasOne("CRM.Domain.Entities.CrmPurchaseIntent", null)
+                        .WithMany("Matches")
+                        .HasForeignKey("PurchaseIntentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmOpportunityActivity", b =>
+                {
+                    b.HasOne("CRM.Domain.Entities.CrmOpportunity", null)
+                        .WithMany("Activities")
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPipelineStage", b =>
+                {
+                    b.HasOne("CRM.Domain.Entities.CrmPipeline", null)
+                        .WithMany("Stages")
+                        .HasForeignKey("PipelineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CashManagement.Domain.CashCountDenomination", b =>
                 {
                     b.HasOne("CashManagement.Domain.CashShift", null)
@@ -5202,6 +5730,21 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasForeignKey("SalesQuoteId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmOpportunity", b =>
+                {
+                    b.Navigation("Activities");
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPipeline", b =>
+                {
+                    b.Navigation("Stages");
+                });
+
+            modelBuilder.Entity("CRM.Domain.Entities.CrmPurchaseIntent", b =>
+                {
+                    b.Navigation("Matches");
                 });
 
             modelBuilder.Entity("CashManagement.Domain.CashShift", b =>

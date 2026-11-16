@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\Modules\Financial\Financial.Domain\Financial.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\PartnersCapital\PartnersCapital.Domain\PartnersCapital.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\RepairService\RepairService.Domain\RepairService.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\CRM\CRM.Domain\CRM.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -40,6 +40,11 @@ builder.Services.AddScoped<PartnersCapital.Application.Services.PartnersCapitalS
 builder.Services.AddScoped<RepairService.Domain.Repositories.IRepairServiceRepository, RepairService.Infrastructure.Repositories.RepairServiceRepository>();
 builder.Services.AddScoped<RepairService.Application.Services.RepairServiceAppService>();
 
+// Modulo CRM (MOD-08)
+builder.Services.AddScoped<CRM.Domain.Repositories.ICrmRepository, CRM.Infrastructure.Repositories.CrmRepository>();
+builder.Services.AddScoped<CRM.Application.Services.CrmAppService>();
+builder.Services.AddScoped<Microsoft.EntityFrameworkCore.DbContext>(sp => sp.GetRequiredService<AppDbContext>());
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -1703,6 +1708,113 @@ repairsGroup.MapPost("/orders/{id:guid}/warranty/claims/{claimId:guid}/decide", 
     var updated = await service.DecideWarrantyClaimAsync(id, claimId, request, ct);
     return Results.Ok(updated);
 }).RequireAuthorization(PermissionCatalog.RepairsWarranty);
+
+// ========================================================
+// ENDPOINTS DO MÓDULO CRM (MOD-08)
+// ========================================================
+var crmGroup = app.MapGroup("/api/crm").RequireAuthorization();
+
+// Dashboard Metrics
+crmGroup.MapGet("/metrics", async (CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var metrics = await service.GetDashboardMetricsAsync(ct);
+    return Results.Ok(metrics);
+}).RequireAuthorization(PermissionCatalog.CrmView);
+
+// Leads
+crmGroup.MapGet("/leads", async (CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var leads = await service.ListLeadsAsync(ct);
+    return Results.Ok(leads);
+}).RequireAuthorization(PermissionCatalog.CrmView);
+
+crmGroup.MapPost("/leads", async (CRM.Application.DTOs.CreateLeadRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreateLeadAsync(req, ct);
+    return Results.Created($"/api/crm/leads/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+crmGroup.MapPut("/leads/{id:guid}/status", async (Guid id, CRM.Application.DTOs.UpdateLeadStatusRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var updated = await service.UpdateLeadStatusAsync(id, req, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+crmGroup.MapPost("/leads/{id:guid}/convert", async (Guid id, CRM.Application.DTOs.ConvertLeadRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var converted = await service.ConvertLeadToPartyAsync(id, req, ct);
+    return Results.Ok(converted);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+// Pipelines
+crmGroup.MapGet("/pipelines", async (CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var pipelines = await service.ListPipelinesAsync(ct);
+    return Results.Ok(pipelines);
+}).RequireAuthorization(PermissionCatalog.CrmView);
+
+crmGroup.MapPost("/pipelines", async (CRM.Application.DTOs.CreatePipelineRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreatePipelineAsync(req, ct);
+    return Results.Created($"/api/crm/pipelines/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+// Oportunidades
+crmGroup.MapGet("/opportunities", async (Guid? pipelineId, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var opps = await service.ListOpportunitiesAsync(pipelineId, ct);
+    return Results.Ok(opps);
+}).RequireAuthorization(PermissionCatalog.CrmView);
+
+crmGroup.MapPost("/opportunities", async (CRM.Application.DTOs.CreateOpportunityRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreateOpportunityAsync(req, ct);
+    return Results.Created($"/api/crm/opportunities/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+crmGroup.MapPut("/opportunities/{id:guid}/stage", async (Guid id, CRM.Application.DTOs.MoveOpportunityStageRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var updated = await service.MoveOpportunityStageAsync(id, req, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+crmGroup.MapPost("/opportunities/{id:guid}/activities", async (Guid id, CRM.Application.DTOs.AddOpportunityActivityRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var updated = await service.AddOpportunityActivityAsync(id, req, ct);
+    return Results.Ok(updated);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+// Intenções de Compra (Purchase Intents)
+crmGroup.MapGet("/intents", async (CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var intents = await service.ListActivePurchaseIntentsAsync(ct);
+    return Results.Ok(intents);
+}).RequireAuthorization(PermissionCatalog.CrmView);
+
+crmGroup.MapPost("/intents", async (CRM.Application.DTOs.CreatePurchaseIntentRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreatePurchaseIntentAsync(req, ct);
+    return Results.Created($"/api/crm/intents/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.CrmInterestManage);
+
+crmGroup.MapPost("/intents/{id:guid}/cancel", async (Guid id, string reason, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var cancelled = await service.CancelPurchaseIntentAsync(id, reason, ct);
+    return Results.Ok(cancelled);
+}).RequireAuthorization(PermissionCatalog.CrmInterestManage);
+
+// Motor de Matching
+crmGroup.MapPost("/matching/run", async (CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var result = await service.RunInventoryMatchingAsync(ct);
+    return Results.Ok(result);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
+
+crmGroup.MapPost("/matching/reserve", async (CRM.Application.DTOs.ReserveMatchedUnitRequest req, CRM.Application.Services.CrmAppService service, CancellationToken ct) =>
+{
+    var reserved = await service.ReserveMatchedUnitAsync(req, ct);
+    return Results.Ok(reserved);
+}).RequireAuthorization(PermissionCatalog.CrmManage);
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

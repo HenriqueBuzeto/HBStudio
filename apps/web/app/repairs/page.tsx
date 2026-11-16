@@ -30,7 +30,7 @@ interface RepairOrderView {
   equipmentDescription: string;
   imeiOrSerial: string;
   faultDescription: string;
-  intakePasscodePattern?: string;
+  deviceAccessMethod?: string; // Protocolo seguro: 'Desbloqueio presencial pelo cliente', 'Modo Manutenção / Diagnóstico sem senha'
   assignedTechnicianName?: string;
   intakeNotes?: string;
   rootCauseAnalysis?: string;
@@ -88,7 +88,7 @@ export default function RepairServicePage() {
       equipmentDescription: "iPhone 15 Pro Max 256GB Titânio Natural",
       imeiOrSerial: "354928110293841",
       faultDescription: "Display quebrado após queda. Face ID funcional antes da queda. Conector USB-C oxidado.",
-      intakePasscodePattern: "PIN: 147258 (Autorizado para testes laboratoriais)",
+      deviceAccessMethod: "Desbloqueado presencialmente pelo cliente para testes de bancada",
       assignedTechnicianName: "Carlos Henrique (Técnico Nível 3)",
       intakeNotes: "Aparelho recebido com película de vidro trincada e marcas nas quinas. Cliente assinou termo de custódia.",
       rootCauseAnalysis: "Vidro cerâmico do display partido com perda parcial de sensibilidade no touch. Módulo original de display danificado.",
@@ -119,7 +119,7 @@ export default function RepairServicePage() {
       equipmentDescription: "MacBook Air M2 13'' Cinza-espacial",
       imeiOrSerial: "C02G901KQ16R",
       faultDescription: "Não liga após derramamento de café sobre o teclado. Luz indicadora MagSafe laranja piscando.",
-      intakePasscodePattern: "Senha Mac: hb2026",
+      deviceAccessMethod: "Apple Diagnostics Mode (Sem necessidade de credencial pessoal)",
       assignedTechnicianName: "Mariana Alencar (Especialista Apple Silicon)",
       intakeNotes: "Aparelho desligado imediatamente. Sem tentativas de recarga pelo cliente.",
       totalEstimate: 0.00,
@@ -456,8 +456,8 @@ export default function RepairServicePage() {
                       <p className="text-slate-200 font-mono font-medium">{selectedOrder.imeiOrSerial}</p>
                     </div>
                     <div className="col-span-2">
-                      <span>Senha / Padrão Desbloqueio:</span>
-                      <p className="text-amber-400 font-mono">{selectedOrder.intakePasscodePattern || "Não fornecido pelo cliente"}</p>
+                      <span>Método de Acesso para Testes:</span>
+                      <p className="text-emerald-400 font-medium">{selectedOrder.deviceAccessMethod || "Acesso assistido / Modo Diagnóstico"}</p>
                     </div>
                   </div>
                 </div>
@@ -614,8 +614,10 @@ export default function RepairServicePage() {
                     <span>Termo de Garantia e CDC Art. 26</span>
                   </div>
                   <p className="text-slate-400 leading-relaxed">
-                    Aparelhos reparados possuem prazo decadencial de garantia legal de <strong>90 dias</strong> para produtos duráveis,
-                    contados a partir da entrega efetiva (CDC Art. 26, II).
+                    Aparelhos reparados possuem prazo decadencial de garantia legal de <strong>90 dias</strong> para vícios aparentes em produtos duráveis (CDC Art. 26, II).
+                    <span className="block mt-1 text-slate-500">
+                      <em>Nota Jurídica CDC:</em> A fluência de 90 dias não extingue direitos em casos de vícios ocultos (§ 3º) nem substitui a análise técnica individualizada de reclamações.
+                    </span>
                   </p>
                 </div>
 
