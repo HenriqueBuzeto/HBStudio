@@ -6,21 +6,9 @@ import {
   Wrench,
   Smartphone,
   ShieldCheck,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  FileText,
-  Search,
   Plus,
-  Package,
-  UserCheck,
-  Cpu,
-  CheckSquare,
-  DollarSign,
-  ChevronRight,
   Filter,
-  Check,
-  AlertCircle
+  FolderOpen
 } from "lucide-react";
 
 interface RepairOrderView {
@@ -35,101 +23,66 @@ interface RepairOrderView {
   faultDescription: string;
   deviceAccessMethod?: string;
   assignedTechnicianName?: string;
-  intakeNotes?: string;
-  rootCauseAnalysis?: string;
   totalEstimate: number;
   partsCost: number;
   laborCost: number;
-  approvedAtUtc?: string;
   legalWarrantyDays: number;
   contractualWarrantyDays: number;
   openedAt: string;
-  deliveredAt?: string;
-  checklists: Array<{
-    category: string;
-    item: string;
-    status: number;
-    notes?: string;
-    isOutput: boolean;
-  }>;
-  parts: Array<{
-    description: string;
-    sku: string;
-    serial?: string;
-    quantity: number;
-    unitPrice: number;
-    inventoryTracked: boolean;
-  }>;
 }
 
-const mockOrders: RepairOrderView[] = [
-  {
-    id: "os-001",
-    orderNumber: "OS-2026-0001",
-    status: 4,
-    statusName: "Aprovado / Em Reparo",
-    customerName: "Rodrigo Silveira",
-    customerPhone: "(11) 98765-4321",
-    equipmentDescription: "iPhone 14 Pro 128GB Roxo",
-    imeiOrSerial: "354891029384756",
-    faultDescription: "Display quebrado após queda e touch falhando intermitente",
-    deviceAccessMethod: "Apple Diagnostics Mode (Sem senha pessoal)",
-    assignedTechnicianName: "Lucas Mendes",
-    intakeNotes: "Aparelho recebido com trincos no canto superior direito do vidro.",
-    totalEstimate: 1450.00,
-    partsCost: 950.00,
-    laborCost: 500.00,
-    legalWarrantyDays: 90,
-    contractualWarrantyDays: 90,
-    openedAt: "2026-11-15 10:30",
-    checklists: [
-      { category: "Funcional", item: "FaceID / Sensores", status: 1, isOutput: false },
-      { category: "Funcional", item: "Câmera Traseira & Foco", status: 1, isOutput: false },
-      { category: "Tela", item: "Touch Screen & Calibração", status: 3, notes: "Falha intermitente", isOutput: false },
-      { category: "Bateria", item: "Saúde da Bateria", status: 1, notes: "89% original", isOutput: false }
-    ],
-    parts: [
-      {
-        description: "Tela OLED iPhone 14 Pro Original Refurbished",
-        sku: "DISP-IPH14P-OLED",
-        serial: "SN-SCR-98231",
-        quantity: 1,
-        unitPrice: 950.00,
-        inventoryTracked: true
-      }
-    ]
-  },
-  {
-    id: "os-002",
-    orderNumber: "OS-2026-0002",
-    status: 1,
-    statusName: "Recepção / Triagem",
-    customerName: "Camila Guimarães",
-    customerPhone: "(11) 97123-9988",
-    equipmentDescription: "MacBook Air M1 256GB Cinza Espacial",
-    imeiOrSerial: "C02XYZ123ABC",
-    faultDescription: "Não segura carga desconectado da tomada (bateria estufando)",
-    deviceAccessMethod: "Desbloqueio presencial pelo cliente no balcão",
-    totalEstimate: 850.00,
-    partsCost: 600.00,
-    laborCost: 250.00,
-    legalWarrantyDays: 90,
-    contractualWarrantyDays: 90,
-    openedAt: "2026-11-15 14:15",
-    checklists: [],
-    parts: []
-  }
-];
-
 export default function RepairsPage() {
-  const [activeTab, setActiveTab] = useState<"list" | "detail" | "new">("list");
-  const [selectedOrder, setSelectedOrder] = useState<RepairOrderView>(mockOrders[0]);
+  const [orders, setOrders] = useState<RepairOrderView[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<RepairOrderView | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  // Form OS
+  const [custName, setCustName] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [equip, setEquip] = useState("");
+  const [serial, setSerial] = useState("");
+  const [fault, setFault] = useState("");
+  const [method, setMethod] = useState("Apple Diagnostics Mode (Sem senha pessoal)");
+
+  const handleCreateOS = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!custName || !equip) return;
+
+    const newOS: RepairOrderView = {
+      id: `os-${Date.now()}`,
+      orderNumber: `OS-2026-${String(orders.length + 1).padStart(4, "0")}`,
+      status: 1,
+      statusName: "Recepção / Triagem",
+      customerName: custName,
+      customerPhone: custPhone,
+      equipmentDescription: equip,
+      imeiOrSerial: serial || "N/A",
+      faultDescription: fault,
+      deviceAccessMethod: method,
+      assignedTechnicianName: "Henrique Barreto",
+      totalEstimate: 0,
+      partsCost: 0,
+      laborCost: 0,
+      legalWarrantyDays: 90,
+      contractualWarrantyDays: 90,
+      openedAt: new Date().toLocaleDateString("pt-BR")
+    };
+
+    setOrders([newOS, ...orders]);
+    setSelectedOrder(newOS);
+    setShowModal(false);
+    setCustName("");
+    setCustPhone("");
+    setEquip("");
+    setSerial("");
+    setFault("");
+  };
 
   return (
     <RootShellLayout>
       <div className="space-y-6">
-        {/* Top Header Card HBVisionX */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Header estilo HBVisionX */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
@@ -145,11 +98,10 @@ export default function RepairsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors shadow-xs">
-              <Filter className="w-3.5 h-3.5 text-slate-500" />
-              Filtrar Status
-            </button>
-            <button className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20">
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+            >
               <Plus className="w-3.5 h-3.5" />
               Nova Ordem de Serviço
             </button>
@@ -171,8 +123,8 @@ export default function RepairsPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 OS em Andamento
               </span>
-              <div className="text-lg font-extrabold text-slate-900">8 Aparelhos</div>
-              <p className="text-[10px] text-amber-600 font-semibold mt-1">Triagem, diagnóstico e reparo</p>
+              <div className="text-lg font-extrabold text-slate-900">{orders.length} Aparelhos</div>
+              <p className="text-[10px] text-slate-400 mt-1">Triagem e bancada</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -180,8 +132,12 @@ export default function RepairsPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Orçamentos Aprovados
               </span>
-              <div className="text-lg font-extrabold text-purple-600">R$ 4.350,00</div>
-              <p className="text-[10px] text-slate-500 mt-1">Aguardando peças ou montagem</p>
+              <div className="text-lg font-extrabold text-purple-600">
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                  orders.reduce((acc, o) => acc + o.totalEstimate, 0)
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Aguardando montagem</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -189,8 +145,8 @@ export default function RepairsPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Prontos para Retirada
               </span>
-              <div className="text-lg font-extrabold text-emerald-600">3 Aparelhos</div>
-              <p className="text-[10px] text-slate-500 mt-1">Checklist de saída aprovado</p>
+              <div className="text-lg font-extrabold text-emerald-600">0 Aparelhos</div>
+              <p className="text-[10px] text-slate-400 mt-1">Checklist de saída aprovado</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -228,7 +184,7 @@ export default function RepairsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mockOrders.map((os) => (
+              {orders.map((os) => (
                 <tr key={os.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-4 font-mono font-bold text-purple-700">{os.orderNumber}</td>
                   <td className="py-3 px-4">
@@ -264,56 +220,112 @@ export default function RepairsPage() {
                   </td>
                 </tr>
               ))}
+              {orders.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                    <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                    <p className="font-bold text-slate-700">Nenhuma Ordem de Serviço aberta</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Nova Ordem de Serviço" para abrir um atendimento de bancada.</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Detalhes da OS Selecionada com Conformidade CDC Art. 26 */}
-        {selectedOrder && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-purple-700 uppercase">
-                  Detalhamento Técnico da Ordem
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  {selectedOrder.orderNumber} — {selectedOrder.equipmentDescription}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                  {selectedOrder.statusName}
-                </span>
-              </div>
-            </div>
+        {/* Modal Nova OS */}
+        {showModal && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4">
+              <h3 className="text-sm font-extrabold text-slate-900">Abertura de Ordem de Serviço</h3>
+              <form onSubmit={handleCreateOS} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Nome do Cliente *</label>
+                    <input
+                      type="text"
+                      required
+                      value={custName}
+                      onChange={(e) => setCustName(e.target.value)}
+                      placeholder="Nome do cliente"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Telefone</label>
+                    <input
+                      type="text"
+                      value={custPhone}
+                      onChange={(e) => setCustPhone(e.target.value)}
+                      placeholder="(11) 90000-0000"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                    />
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">Técnico Responsável</span>
-                <p className="font-bold text-slate-800">{selectedOrder.assignedTechnicianName || "Aguardando Alocação"}</p>
-                <p className="text-slate-500">Aberto em: {selectedOrder.openedAt}</p>
-              </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Aparelho / Modelo *</label>
+                    <input
+                      type="text"
+                      required
+                      value={equip}
+                      onChange={(e) => setEquip(e.target.value)}
+                      placeholder="Ex: iPhone 14 Pro"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">IMEI ou Serial</label>
+                    <input
+                      type="text"
+                      value={serial}
+                      onChange={(e) => setSerial(e.target.value)}
+                      placeholder="15 dígitos"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
 
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1 text-xs">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">Composição do Orçamento</span>
-                <p className="text-slate-700">Peças: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedOrder.partsCost)}</p>
-                <p className="text-slate-700">Mão de Obra: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedOrder.laborCost)}</p>
-                <p className="font-extrabold text-slate-900 pt-1 border-t border-slate-200">
-                  Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(selectedOrder.totalEstimate)}
-                </p>
-              </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Defeito Relatado</label>
+                  <textarea
+                    rows={2}
+                    value={fault}
+                    onChange={(e) => setFault(e.target.value)}
+                    placeholder="Descreva o problema constatado pelo cliente"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  />
+                </div>
 
-              <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-200 space-y-1.5 text-xs">
-                <span className="text-purple-800 font-extrabold uppercase text-[10px] flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-                  Garantias & Vícios Ocultos (CDC Art. 26)
-                </span>
-                <p className="text-slate-700">Garantia Legal: <strong>{selectedOrder.legalWarrantyDays} dias</strong></p>
-                <p className="text-slate-700">Garantia Comercial: <strong>{selectedOrder.contractualWarrantyDays} dias</strong></p>
-                <p className="text-[10px] text-purple-900/80 leading-tight">
-                  Nos termos do Art. 26 § 3º do CDC, em caso de vício oculto o prazo decadencial inicia-se no momento em que ficar evidenciado o defeito.
-                </p>
-              </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Protocolo Seguro de Acesso</label>
+                  <select
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none font-medium"
+                  >
+                    <option value="Apple Diagnostics Mode (Sem senha pessoal)">Apple Diagnostics Mode (Sem senha pessoal)</option>
+                    <option value="Desbloqueio presencial pelo cliente no balcão">Desbloqueio presencial pelo cliente no balcão</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                  >
+                    Abrir OS
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

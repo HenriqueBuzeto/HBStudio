@@ -7,20 +7,12 @@ import {
   UserPlus, 
   Search, 
   Smartphone, 
-  Truck, 
-  ShieldCheck, 
   Phone, 
   Mail, 
-  MapPin, 
   Plus, 
   CheckCircle2, 
-  AlertCircle,
-  FileText,
-  Clock,
-  Filter,
-  Eye,
-  Building,
-  UserCheck
+  ShieldCheck,
+  FolderOpen
 } from "lucide-react";
 
 export interface PartyContact {
@@ -70,60 +62,21 @@ export interface Party {
   consents: PartyConsent[];
 }
 
-const initialParties: Party[] = [
-  {
-    id: "p-01",
-    type: 1,
-    name: "Carlos Eduardo Silva",
-    documentNumber: "123.456.789-01",
-    isActive: true,
-    isCustomer: true,
-    isSupplier: false,
-    notes: "Cliente frequente para troca de display e compra de seminovos Apple.",
-    contacts: [
-      { id: "c-01", name: "Carlos Eduardo", email: "carlos.silva@email.com", phone: "(11) 98765-4321", whatsApp: "(11) 98765-4321", isPrimary: true }
-    ],
-    equipments: [
-      { id: "eq-01", equipmentType: "Smartphone", brand: "Apple", model: "iPhone 14 Pro 128GB", color: "Roxo Profundo", imei1: "354891029384756", notes: "Sem marcas na carcaça" }
-    ],
-    consents: [
-      { id: "cs-01", channel: "WhatsApp", purpose: "Comunicações de OS e Avisos", isOptIn: true, origin: "Balcão", eventDateUtc: "2026-11-10T14:30:00Z" }
-    ]
-  },
-  {
-    id: "p-02",
-    type: 2,
-    name: "Tech Parts & Serviços LTDA",
-    tradeName: "TechParts Distribuidora",
-    documentNumber: "12.345.678/0001-99",
-    stateRegistration: "110.223.344.555",
-    isActive: true,
-    isCustomer: true,
-    isSupplier: true,
-    notes: "Fornecedor homologado de telas OLED e baterias originais.",
-    contacts: [
-      { id: "c-02", name: "Roberto Vendas", email: "comercial@techparts.com.br", phone: "(11) 3333-4444", whatsApp: "(11) 97777-8888", isPrimary: true }
-    ],
-    equipments: [],
-    consents: [
-      { id: "cs-02", channel: "Email", purpose: "Recebimento de Ordens de Compra", isOptIn: true, origin: "Contrato Fornecedor", eventDateUtc: "2026-11-01T09:00:00Z" }
-    ]
-  }
-];
-
 export default function PartiesPage() {
-  const [parties, setParties] = useState<Party[]>(initialParties);
+  const [parties, setParties] = useState<Party[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "customers" | "suppliers">("customers");
-  const [selectedParty, setSelectedParty] = useState<Party | null>(parties[0]);
+  const [selectedParty, setSelectedParty] = useState<Party | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Formulário de Criação
+  // Formulário de Criação Completo
   const [newName, setNewName] = useState("");
   const [newType, setNewType] = useState<1 | 2>(1);
   const [newDoc, setNewDoc] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newEquipmentModel, setNewEquipmentModel] = useState("");
+  const [newEquipmentImei, setNewEquipmentImei] = useState("");
   const [isCust, setIsCust] = useState(true);
   const [isSupp, setIsSupp] = useState(false);
 
@@ -150,19 +103,25 @@ export default function PartiesPage() {
       isActive: true,
       isCustomer: isCust,
       isSupplier: isSupp,
-      contacts: newPhone || newEmail ? [{
+      contacts: (newPhone || newEmail) ? [{
         id: `c-${Date.now()}`,
         name: newName,
         phone: newPhone || undefined,
         email: newEmail || undefined,
         isPrimary: true
       }] : [],
-      equipments: [],
+      equipments: newEquipmentModel ? [{
+        id: `eq-${Date.now()}`,
+        equipmentType: "Smartphone",
+        brand: "Apple",
+        model: newEquipmentModel,
+        imei1: newEquipmentImei || undefined
+      }] : [],
       consents: [
         {
           id: `cs-${Date.now()}`,
           channel: "WhatsApp",
-          purpose: "Comunicação de Atendimento",
+          purpose: "Comunicação de Atendimento & OS",
           isOptIn: true,
           origin: "Cadastro Balcão",
           eventDateUtc: new Date().toISOString()
@@ -177,6 +136,8 @@ export default function PartiesPage() {
     setNewDoc("");
     setNewPhone("");
     setNewEmail("");
+    setNewEquipmentModel("");
+    setNewEquipmentImei("");
   };
 
   return (
@@ -209,7 +170,7 @@ export default function PartiesPage() {
           </div>
         </div>
 
-        {/* Toolbar de Filtro e Busca estilo HBVisionX */}
+        {/* Toolbar de Filtro e Busca */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs">
             <button
@@ -318,8 +279,10 @@ export default function PartiesPage() {
                 })}
                 {filteredParties.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400">
-                      Nenhum registro encontrado com os filtros aplicados.
+                    <td colSpan={5} className="py-16 text-center text-slate-400">
+                      <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-700">Nenhum cadastro registrado</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Novo Cadastro" para adicionar o primeiro cliente ou fornecedor.</p>
                     </td>
                   </tr>
                 )}
@@ -366,6 +329,9 @@ export default function PartiesPage() {
                         )}
                       </div>
                     ))}
+                    {selectedParty.contacts.length === 0 && (
+                      <p className="text-xs text-slate-400 italic">Nenhum telefone ou e-mail cadastrado.</p>
+                    )}
                   </div>
                 </div>
 
@@ -418,7 +384,7 @@ export default function PartiesPage() {
             ) : (
               <div className="bg-white rounded-2xl border border-slate-200/90 p-8 text-center text-slate-400 shadow-xs">
                 <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                <p className="text-xs font-semibold">Selecione uma pessoa para visualizar detalhes cadastrais e equipamentos.</p>
+                <p className="text-xs font-semibold">Selecione uma pessoa na lista para visualizar seus dados.</p>
               </div>
             )}
           </div>
@@ -429,7 +395,7 @@ export default function PartiesPage() {
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl space-y-4">
               <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                <h3 className="text-sm font-extrabold text-slate-900">Novo Cadastro</h3>
+                <h3 className="text-sm font-extrabold text-slate-900">Novo Cadastro Completo</h3>
                 <button
                   onClick={() => setShowCreateModal(false)}
                   className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
@@ -453,7 +419,7 @@ export default function PartiesPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Tipo de Pessoa</label>
+                    <label className="font-bold text-slate-700 block mb-1">Tipo</label>
                     <select
                       value={newType}
                       onChange={(e) => setNewType(Number(e.target.value) as 1 | 2)}
@@ -498,7 +464,27 @@ export default function PartiesPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 pt-2">
+                <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-2">
+                  <span className="font-bold text-purple-900 block text-[11px]">Vincular Aparelho do Cliente (Opcional)</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Modelo (ex: iPhone 14 Pro 128GB)"
+                      value={newEquipmentModel}
+                      onChange={(e) => setNewEquipmentModel(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-purple-200 rounded-lg text-slate-800"
+                    />
+                    <input
+                      type="text"
+                      placeholder="IMEI (15 dígitos)"
+                      value={newEquipmentImei}
+                      onChange={(e) => setNewEquipmentImei(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-purple-200 rounded-lg text-slate-800 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-1">
                   <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
                     <input
                       type="checkbox"

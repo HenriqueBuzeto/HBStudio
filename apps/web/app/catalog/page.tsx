@@ -11,11 +11,7 @@ import {
   EyeOff, 
   Package, 
   Layers, 
-  Tag, 
-  CheckCircle2, 
-  ShieldCheck,
-  ChevronRight,
-  Filter
+  FolderOpen
 } from "lucide-react";
 
 export interface SkuVariant {
@@ -45,79 +41,63 @@ export interface InventoryUnit {
   modelName: string;
   serialNumberOrImei: string;
   imei2?: string;
-  condition: number; // 1 = New, 2 = UsedPreOwned, 3 = Refurbished, 4 = ScrapParts
-  cosmeticGrade: number; // 1 = GradeA_Plus, 2 = GradeA, 3 = GradeB, 4 = GradeC
+  condition: number;
+  cosmeticGrade: number;
   batteryHealthPercentage?: number;
   acquisitionCost: number;
   retailPrice: number;
-  operationalStatus: number; // 1 = IntakeInspecting, 2 = InLabRefurbish, 3 = ApprovedForSale, 4 = Reserved, 5 = Sold, 6 = ReturnRMA, 7 = Scrapped
+  operationalStatus: number;
   operationalStatusName: string;
 }
 
-const initialModels: ProductModel[] = [
-  {
-    id: "m-01",
-    brand: "Apple",
-    name: "iPhone 14 Pro Max",
-    category: "Smartphones",
-    serializationPolicy: 1,
-    isActive: true,
-    skus: [
-      { id: "s-01", skuCode: "IPH14PM-128-PURPLE", variantName: "128GB Roxo Profundo", color: "Roxo Profundo", storage: "128GB", defaultPrice: 5899.00, availableQuantity: 2, isActive: true },
-      { id: "s-02", skuCode: "IPH14PM-256-GOLD", variantName: "256GB Dourado", color: "Dourado", storage: "256GB", defaultPrice: 6499.00, availableQuantity: 1, isActive: true }
-    ]
-  },
-  {
-    id: "m-02",
-    brand: "HB 3D",
-    name: "Filamento PLA Premium 1.75mm",
-    category: "Insumos 3D",
-    serializationPolicy: 2,
-    isActive: true,
-    skus: [
-      { id: "s-03", skuCode: "FIL-PLA-PREM-BLK", variantName: "Preto Fosco 1kg", color: "Preto", defaultPrice: 119.90, availableQuantity: 15, isActive: true }
-    ]
-  }
-];
-
-const initialUnits: InventoryUnit[] = [
-  {
-    id: "u-01",
-    skuCode: "IPH14PM-128-PURPLE",
-    modelName: "iPhone 14 Pro Max",
-    serialNumberOrImei: "354891029384756",
-    imei2: "354891029384757",
-    condition: 2,
-    cosmeticGrade: 1,
-    batteryHealthPercentage: 92,
-    acquisitionCost: 3850.00,
-    retailPrice: 5899.00,
-    operationalStatus: 3,
-    operationalStatusName: "Aprovado para Venda"
-  },
-  {
-    id: "u-02",
-    skuCode: "IPH14PM-128-PURPLE",
-    modelName: "iPhone 14 Pro Max",
-    serialNumberOrImei: "354891029384758",
-    condition: 2,
-    cosmeticGrade: 2,
-    batteryHealthPercentage: 88,
-    acquisitionCost: 3600.00,
-    retailPrice: 5499.00,
-    operationalStatus: 3,
-    operationalStatusName: "Aprovado para Venda"
-  }
-];
-
 export default function CatalogPage() {
-  const [models, setModels] = useState<ProductModel[]>(initialModels);
-  const [units, setUnits] = useState<InventoryUnit[]>(initialUnits);
+  const [models, setModels] = useState<ProductModel[]>([]);
+  const [units, setUnits] = useState<InventoryUnit[]>([]);
   const [activeTab, setActiveTab] = useState<"models" | "units">("models");
   const [search, setSearch] = useState("");
   const [showCost, setShowCost] = useState(false);
   const [isCreateModelOpen, setIsCreateModelOpen] = useState(false);
   const [isRegisterUnitOpen, setIsRegisterUnitOpen] = useState(false);
+
+  // Form Novo Modelo
+  const [brand, setBrand] = useState("Apple");
+  const [modelName, setModelName] = useState("");
+  const [category, setCategory] = useState("Smartphones");
+  const [policy, setPolicy] = useState(1);
+  const [skuCode, setSkuCode] = useState("");
+  const [skuName, setSkuName] = useState("");
+  const [price, setPrice] = useState("");
+
+  const handleCreateModel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modelName || !skuCode) return;
+
+    const newModel: ProductModel = {
+      id: `m-${Date.now()}`,
+      brand,
+      name: modelName,
+      category,
+      serializationPolicy: policy,
+      isActive: true,
+      skus: [
+        {
+          id: `s-${Date.now()}`,
+          skuCode: skuCode.toUpperCase(),
+          variantName: skuName || modelName,
+          defaultPrice: parseFloat(price) || 0,
+          availableQuantity: 0,
+          isActive: true
+        }
+      ]
+    };
+
+    setModels([newModel, ...models]);
+    setIsCreateModelOpen(false);
+    setModelName("");
+    setSkuCode("");
+    setSkuName("");
+    setPrice("");
+  };
 
   return (
     <RootShellLayout>
@@ -247,8 +227,8 @@ export default function CatalogPage() {
                             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(sku.defaultPrice)}
                           </td>
                           <td className="py-2.5 px-3">
-                            <span className="inline-flex items-center gap-1 font-bold text-emerald-600">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span className="inline-flex items-center gap-1 font-bold text-slate-500">
+                              <span className="w-2 h-2 rounded-full bg-slate-300"></span>
                               {sku.availableQuantity} un pronta(s)
                             </span>
                           </td>
@@ -264,6 +244,20 @@ export default function CatalogPage() {
                 </div>
               </div>
             ))}
+
+            {models.length === 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center text-slate-400 shadow-xs">
+                <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="font-bold text-slate-700 text-sm">Nenhum modelo cadastrado no catálogo</p>
+                <p className="text-xs text-slate-400 mt-1">Cadastre novos modelos de smartphones, acessórios ou peças de reposição.</p>
+                <button
+                  onClick={() => setIsCreateModelOpen(true)}
+                  className="mt-4 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                >
+                  Cadastrar Primeiro Modelo
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -314,8 +308,136 @@ export default function CatalogPage() {
                     </td>
                   </tr>
                 ))}
+                {units.length === 0 && (
+                  <tr>
+                    <td colSpan={showCost ? 7 : 6} className="py-16 text-center text-slate-400">
+                      <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-700">Nenhum aparelho serializado cadastrado</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Os aparelhos entram automaticamente através do recebimento de compras ou cadastro de seminovos.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Modal de Criação de Modelo */}
+        {isCreateModelOpen && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Cadastrar Novo Modelo</h3>
+                <button
+                  onClick={() => setIsCreateModelOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateModel} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Marca</label>
+                    <input
+                      type="text"
+                      required
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                      placeholder="Ex: Apple, Samsung, Xiaomi"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Categoria</label>
+                    <input
+                      type="text"
+                      required
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Ex: Smartphones, Peças, Acessórios"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nome do Modelo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}
+                    placeholder="Ex: iPhone 15 Pro, Tela OLED Galaxy S23"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Código SKU *</label>
+                    <input
+                      type="text"
+                      required
+                      value={skuCode}
+                      onChange={(e) => setSkuCode(e.target.value)}
+                      placeholder="IPH15P-128-NAT"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Variação / Cor</label>
+                    <input
+                      type="text"
+                      value={skuName}
+                      onChange={(e) => setSkuName(e.target.value)}
+                      placeholder="128GB Titânio"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Preço Venda (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="5800.00"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={policy === 1}
+                      onChange={(e) => setPolicy(e.target.checked ? 1 : 2)}
+                      className="rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    Exigir Rastreamento Obrigatório por IMEI (Aparelhos)
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModelOpen(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                  >
+                    Salvar Modelo
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

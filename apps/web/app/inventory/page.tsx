@@ -9,14 +9,8 @@ import {
   TrendingUp, 
   Eye, 
   EyeOff, 
-  ShieldCheck, 
-  Layers, 
-  ArrowRightLeft,
-  Boxes,
-  Smartphone,
-  CheckCircle2,
-  Calendar,
-  Warehouse
+  Warehouse,
+  FolderOpen
 } from "lucide-react";
 
 export interface StockBalance {
@@ -45,74 +39,9 @@ export interface StockMovement {
   reason: string;
 }
 
-const initialBalances: StockBalance[] = [
-  {
-    id: "bal-01",
-    skuCode: "IPH14PM-128-PURPLE",
-    skuDescription: "iPhone 14 Pro Max 128GB Roxo",
-    warehouseName: "Loja Principal",
-    onHandQuantity: 3,
-    reservedQuantity: 1,
-    blockedQuantity: 0,
-    availableQuantity: 2,
-    averageUnitCost: 3850.00,
-    totalValuation: 11550.00
-  },
-  {
-    id: "bal-02",
-    skuCode: "DISP-IPH14P-OLED",
-    skuDescription: "Display OLED iPhone 14 Pro Original",
-    warehouseName: "Bancada Manutenção",
-    onHandQuantity: 8,
-    reservedQuantity: 2,
-    blockedQuantity: 0,
-    availableQuantity: 6,
-    averageUnitCost: 320.00,
-    totalValuation: 2560.00
-  },
-  {
-    id: "bal-03",
-    skuCode: "PLA-BLACK-1KG",
-    skuDescription: "Filamento PLA Preto 1.75mm 1kg",
-    warehouseName: "Almoxarifado Geral",
-    onHandQuantity: 15.5,
-    reservedQuantity: 0.5,
-    blockedQuantity: 0,
-    availableQuantity: 15,
-    averageUnitCost: 65.00,
-    totalValuation: 1007.50
-  }
-];
-
-const initialMovements: StockMovement[] = [
-  {
-    id: "mov-01",
-    movementDateUtc: "2026-11-15 14:20",
-    skuCode: "IPH14PM-128-PURPLE",
-    skuDescription: "iPhone 14 Pro Max 128GB Roxo",
-    movementType: "Entrada por Compra",
-    quantity: 1,
-    unitCost: 3850.00,
-    serialNumberOrImei: "354891029384756",
-    documentReference: "COMPRA-2026-089",
-    reason: "Aquisição de seminovo com laudo aprovado"
-  },
-  {
-    id: "mov-02",
-    movementDateUtc: "2026-11-15 11:00",
-    skuCode: "DISP-IPH14P-OLED",
-    skuDescription: "Display OLED iPhone 14 Pro Original",
-    movementType: "Consumo em OS",
-    quantity: -1,
-    unitCost: 320.00,
-    documentReference: "OS-2026-0001",
-    reason: "Instalação em reparo autorizado pelo cliente"
-  }
-];
-
 export default function InventoryPage() {
-  const [balances, setBalances] = useState<StockBalance[]>(initialBalances);
-  const [movements, setMovements] = useState<StockMovement[]>(initialMovements);
+  const [balances, setBalances] = useState<StockBalance[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
   const [activeTab, setActiveTab] = useState<"balances" | "kardex">("balances");
   const [search, setSearch] = useState("");
   const [canViewCost, setCanViewCost] = useState(true);
@@ -168,7 +97,7 @@ export default function InventoryPage() {
                 Saldo Físico (On Hand)
               </span>
               <div className="text-lg font-extrabold text-slate-900">{totalOnHand} un</div>
-              <p className="text-[10px] text-slate-500 mt-1">Presente fisicamente na loja</p>
+              <p className="text-[10px] text-slate-400 mt-1">Presente fisicamente na loja</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -177,7 +106,7 @@ export default function InventoryPage() {
                 Reservado em Vendas / OS
               </span>
               <div className="text-lg font-extrabold text-amber-600">{totalReserved} un</div>
-              <p className="text-[10px] text-amber-600 font-semibold mt-1">Comprometido em pedidos</p>
+              <p className="text-[10px] text-slate-400 mt-1">Comprometido em pedidos</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -186,7 +115,7 @@ export default function InventoryPage() {
                 Disponível para Venda
               </span>
               <div className="text-lg font-extrabold text-emerald-600">{totalAvailable} un</div>
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">Livre para faturamento</p>
+              <p className="text-[10px] text-slate-400 mt-1">Livre para faturamento</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -199,7 +128,7 @@ export default function InventoryPage() {
                   ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValuation)
                   : "••••••"}
               </div>
-              <p className="text-[10px] text-purple-600 font-medium mt-1">Custo médio ponderado</p>
+              <p className="text-[10px] text-slate-400 mt-1">Custo médio ponderado</p>
             </div>
           </div>
         </div>
@@ -279,6 +208,15 @@ export default function InventoryPage() {
                     )}
                   </tr>
                 ))}
+                {balances.length === 0 && (
+                  <tr>
+                    <td colSpan={canViewCost ? 7 : 5} className="py-16 text-center text-slate-400">
+                      <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-700">Estoque inicial zerado</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Dê entrada em produtos via Compras ou Recebimento para alimentar o Kardex.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -320,6 +258,15 @@ export default function InventoryPage() {
                     <td className="py-3 px-4 text-slate-500">{m.reason}</td>
                   </tr>
                 ))}
+                {movements.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center text-slate-400">
+                      <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-700">Nenhum movimento registrado no Kardex</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Todo lançamento oficial de estoque fica gravado de forma imutável aqui.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -4,23 +4,9 @@ import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {
   Users,
-  PieChart,
-  ShieldCheck,
-  TrendingUp,
-  Wallet,
-  HandCoins,
-  ArrowUpRight,
-  ArrowDownRight,
-  FileCheck2,
-  AlertTriangle,
-  Scale,
-  Award,
-  Layers,
-  Banknote,
-  Percent,
-  CheckCircle2,
   Building2,
-  Plus
+  Plus,
+  FolderOpen
 } from "lucide-react";
 
 interface PartnerView {
@@ -36,38 +22,45 @@ interface PartnerView {
   notes: string;
 }
 
-const partnersData: PartnerView[] = [
-  {
-    id: "p1",
-    name: "Henrique Barreto",
-    document: "123.456.789-00",
-    role: "Sócio Administrador / Operação",
-    equityPercentage: 50.0,
-    quotas: 50000,
-    nominalValue: 50000.0,
-    monthlyProLaboreCap: 8000.0,
-    active: true,
-    notes: "Responsável pela administração geral, laboratório e frente comercial."
-  },
-  {
-    id: "p2",
-    name: "Sócio Estratégico & Investidor",
-    document: "987.654.321-99",
-    role: "Sócio Investidor / Financeiro",
-    equityPercentage: 50.0,
-    quotas: 50000,
-    nominalValue: 50000.0,
-    monthlyProLaboreCap: 0.0,
-    active: true,
-    notes: "Aporte financeiro inicial e estratégia de expansão."
-  }
-];
-
 export default function PartnersPage() {
-  const [activeTab, setActiveTab] = useState<"quotas" | "contributions" | "loans" | "distribution">("quotas");
+  const [partners, setPartners] = useState<PartnerView[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [name, setName] = useState("");
+  const [doc, setDoc] = useState("");
+  const [role, setRole] = useState("Sócio Administrador");
+  const [percentage, setPercentage] = useState("");
+  const [capital, setCapital] = useState("");
 
-  const totalEquity = partnersData.reduce((acc, p) => acc + p.equityPercentage, 0);
-  const totalNominalCapital = partnersData.reduce((acc, p) => acc + p.nominalValue, 0);
+  const totalEquity = partners.reduce((acc, p) => acc + p.equityPercentage, 0);
+  const totalNominalCapital = partners.reduce((acc, p) => acc + p.nominalValue, 0);
+
+  const handleAddPartner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name) return;
+
+    const pVal = parseFloat(percentage) || 0;
+    const cVal = parseFloat(capital) || 0;
+
+    const newP: PartnerView = {
+      id: `p-${Date.now()}`,
+      name,
+      document: doc,
+      role,
+      equityPercentage: pVal,
+      quotas: cVal,
+      nominalValue: cVal,
+      monthlyProLaboreCap: 0,
+      active: true,
+      notes: "Registrado no contrato social"
+    };
+
+    setPartners([...partners, newP]);
+    setShowModal(false);
+    setName("");
+    setDoc("");
+    setPercentage("");
+    setCapital("");
+  };
 
   return (
     <RootShellLayout>
@@ -89,9 +82,12 @@ export default function PartnersPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20">
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+            >
               <Plus className="w-3.5 h-3.5" />
-              Novo Aporte / Mútuo
+              Cadastrar Sócio
             </button>
           </div>
         </div>
@@ -114,7 +110,7 @@ export default function PartnersPage() {
               <div className="text-lg font-extrabold text-slate-900">
                 {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalNominalCapital)}
               </div>
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">100% Integralizado</p>
+              <p className="text-[10px] text-slate-400 mt-1">Capital integralizado</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -123,7 +119,7 @@ export default function PartnersPage() {
                 Soma de Quotas
               </span>
               <div className="text-lg font-extrabold text-emerald-600">{totalEquity}%</div>
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">Equilíbrio exato 100%</p>
+              <p className="text-[10px] text-slate-400 mt-1">{totalEquity === 100 ? "Equilíbrio exato 100%" : "Cadastre os sócios"}</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -131,8 +127,8 @@ export default function PartnersPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Sócios Registrados
               </span>
-              <div className="text-lg font-extrabold text-slate-900">{partnersData.length} Sócios</div>
-              <p className="text-[10px] text-slate-500 mt-1">Acordo societário ativo</p>
+              <div className="text-lg font-extrabold text-slate-900">{partners.length} Sócios</div>
+              <p className="text-[10px] text-slate-400 mt-1">Acordo societário</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -140,8 +136,8 @@ export default function PartnersPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Teto Pró-Labore
               </span>
-              <div className="text-lg font-extrabold text-slate-900">R$ 8.000,00</div>
-              <p className="text-[10px] text-slate-500 mt-1">Remuneração operacional</p>
+              <div className="text-lg font-extrabold text-slate-900">R$ 0,00</div>
+              <p className="text-[10px] text-slate-400 mt-1">Remuneração mensal</p>
             </div>
           </div>
         </div>
@@ -169,7 +165,7 @@ export default function PartnersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {partnersData.map((p) => (
+              {partners.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3.5 px-4">
                     <div className="font-extrabold text-slate-900">{p.name}</div>
@@ -197,9 +193,91 @@ export default function PartnersPage() {
                   </td>
                 </tr>
               ))}
+              {partners.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                    <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                    <p className="font-bold text-slate-700">Nenhum sócio cadastrado</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Cadastrar Sócio" para registrar o quadro societário da empresa.</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Modal Cadastrar Sócio */}
+        {showModal && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-xl space-y-4">
+              <h3 className="text-sm font-extrabold text-slate-900">Cadastrar Sócio</h3>
+              <form onSubmit={handleAddPartner} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nome Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nome do sócio"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">CPF</label>
+                  <input
+                    type="text"
+                    value={doc}
+                    onChange={(e) => setDoc(e.target.value)}
+                    placeholder="000.000.000-00"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Participação (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      required
+                      value={percentage}
+                      onChange={(e) => setPercentage(e.target.value)}
+                      placeholder="Ex: 50"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Aporte Nominal (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={capital}
+                      onChange={(e) => setCapital(e.target.value)}
+                      placeholder="50000.00"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                  >
+                    Salvar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </RootShellLayout>
   );

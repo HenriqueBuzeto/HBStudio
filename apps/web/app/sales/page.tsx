@@ -143,7 +143,7 @@ export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<"pos" | "sales" | "quotes" | "returns">("pos");
   const [showCostPermission, setShowCostPermission] = useState(true);
 
-  // Cart / PDV State
+  // Cart / PDV State - Inicializado limpo (sem dados mock)
   const [cartItems, setCartItems] = useState<Array<{
     skuId: string;
     code: string;
@@ -155,213 +155,17 @@ export default function SalesPage() {
     inventoryUnitId?: string;
     serialOrImei?: string;
     batteryHealth?: number;
-  }>>([
-    {
-      skuId: "sku-iph14p",
-      code: "IPH14P-128-GOLD",
-      name: "iPhone 14 Pro 128GB Dourado (Usado Grade A)",
-      condition: "Usado",
-      unitPrice: 4200.00,
-      quantity: 1,
-      unitCost: 2800.00,
-      inventoryUnitId: "unit-iph-1",
-      serialOrImei: "354891028374651",
-      batteryHealth: 92
-    },
-    {
-      skuId: "sku-cab-c",
-      code: "CAB-USBC-1M",
-      name: "Cabo USB-C Original 1 Metro",
-      condition: "Novo",
-      unitPrice: 60.00,
-      quantity: 2,
-      unitCost: 25.00
-    }
-  ]);
+  }>>([]);
 
-  const [discountTotal, setDiscountTotal] = useState<number>(20.00);
+  const [discountTotal, setDiscountTotal] = useState<number>(0.00);
   const [chargesTotal, setChargesTotal] = useState<number>(0.00);
-  const [customerName, setCustomerName] = useState<string>("Lucas Rocha de Oliveira");
-  const [sellerName, setSellerName] = useState<string>("Carlos Vendedor");
+  const [customerName, setCustomerName] = useState<string>("");
+  const [sellerName, setSellerName] = useState<string>("Henrique Barreto");
 
-  // Mock Sales List (reflete endpoints reais da API)
-  const [salesList] = useState<Sale[]>([
-    {
-      id: "sale-01",
-      branchId: "branch-sp",
-      saleNumber: "VD-2026-0089",
-      customerPartyId: "cust-01",
-      customerName: "Mariana Souza Lima",
-      sellerUserId: "user-carlos",
-      createdByUserId: "user-carlos",
-      status: "Fulfilled",
-      paymentStatus: "Confirmed",
-      fulfillmentStatus: "Fulfilled",
-      subtotal: 4320.00,
-      chargesTotal: 0.00,
-      discountTotal: 50.00,
-      grandTotal: 4270.00,
-      paidTotal: 4270.00,
-      balanceRemaining: 0.00,
-      totalHistoricalCost: 2850.00,
-      estimatedProfitMargin: 33.26,
-      observations: "Retirada no balcão da loja física com garantia de 90 dias",
-      confirmedAtUtc: "2026-11-14T09:45:00Z",
-      fulfilledAtUtc: "2026-11-14T09:50:00Z",
-      createdAtUtc: "2026-11-14T09:40:00Z",
-      version: 3,
-      items: [
-        {
-          id: "item-1",
-          productSkuId: "sku-iph14p",
-          historicalSkuCode: "IPH14P-128-GOLD",
-          historicalDescription: "iPhone 14 Pro 128GB Dourado Usado Grade A",
-          itemCondition: 2,
-          quantity: 1,
-          unitPrice: 4200.00,
-          discount: 50.00,
-          totalAmount: 4150.00,
-          historicalUnitCost: 2800.00,
-          totalCost: 2800.00,
-          inventoryUnitId: "unit-01",
-          serialOrImei: "354891028374651",
-          warrantyDays: 90
-        },
-        {
-          id: "item-2",
-          productSkuId: "sku-cab-c",
-          historicalSkuCode: "CAB-USBC-1M",
-          historicalDescription: "Cabo USB-C Original 1 Metro",
-          itemCondition: 1,
-          quantity: 2,
-          unitPrice: 60.00,
-          discount: 0.00,
-          totalAmount: 120.00,
-          historicalUnitCost: 25.00,
-          totalCost: 50.00,
-          warrantyDays: 90
-        }
-      ],
-      payments: [
-        {
-          id: "pay-1",
-          method: "Pix",
-          amount: 2000.00,
-          installments: 1,
-          status: "Confirmed",
-          authorizationCode: "PIX-BACEN-88491A",
-          transactionReference: "E2E000293847291823",
-          confirmedAtUtc: "2026-11-14T09:45:00Z"
-        },
-        {
-          id: "pay-2",
-          method: "CreditCard",
-          amount: 2270.00,
-          installments: 3,
-          status: "Confirmed",
-          authorizationCode: "AUT-STONE-77491",
-          transactionReference: "NSU-88391029",
-          confirmedAtUtc: "2026-11-14T09:47:00Z"
-        }
-      ]
-    },
-    {
-      id: "sale-02",
-      branchId: "branch-sp",
-      saleNumber: "VD-2026-0090",
-      customerPartyId: "cust-02",
-      customerName: "Felipe Rodrigues",
-      sellerUserId: "user-ana",
-      createdByUserId: "user-ana",
-      status: "Reserved",
-      paymentStatus: "Pending",
-      fulfillmentStatus: "NotFulfilled",
-      subtotal: 180.00,
-      chargesTotal: 15.00,
-      discountTotal: 0.00,
-      grandTotal: 195.00,
-      paidTotal: 0.00,
-      balanceRemaining: 195.00,
-      totalHistoricalCost: 75.00,
-      estimatedProfitMargin: 61.54,
-      observations: "Aguardando confirmação de Pix pelo cliente",
-      createdAtUtc: "2026-11-14T10:15:00Z",
-      version: 1,
-      items: [
-        {
-          id: "item-3",
-          productSkuId: "sku-cab-c",
-          historicalSkuCode: "CAB-USBC-1M",
-          historicalDescription: "Cabo USB-C Original 1 Metro",
-          itemCondition: 1,
-          quantity: 3,
-          unitPrice: 60.00,
-          discount: 0.00,
-          totalAmount: 180.00,
-          historicalUnitCost: 25.00,
-          totalCost: 75.00,
-          warrantyDays: 90
-        }
-      ],
-      payments: [
-        {
-          id: "pay-3",
-          method: "Pix",
-          amount: 195.00,
-          installments: 1,
-          status: "Pending",
-          transactionReference: "PIX-QR-PENDING-994"
-        }
-      ]
-    }
-  ]);
-
-  // Quotes List
-  const [quotesList] = useState<SalesQuote[]>([
-    {
-      id: "quote-1",
-      branchId: "branch-sp",
-      quoteNumber: "COT-2026-0045",
-      customerName: "TechCorp Consultoria LTDA",
-      sellerUserId: "user-carlos",
-      status: "ConvertedToSale",
-      validUntilUtc: "2026-11-20T18:00:00Z",
-      paymentTermsExpected: "1x Cartão de Crédito ou Faturado 15D",
-      shippingTotal: 25.00,
-      discountTotal: 50.00,
-      subtotal: 1800.00,
-      grandTotal: 1775.00,
-      itemsCount: 5,
-      notes: "Cotação para upgrade de cabos e carregadores originais de escritório",
-      createdAtUtc: "2026-11-13T14:30:00Z"
-    }
-  ]);
-
-  // Returns List
-  const [returnsList] = useState<SaleReturn[]>([
-    {
-      id: "ret-1",
-      branchId: "branch-sp",
-      saleId: "sale-01",
-      returnNumber: "DEV-2026-0012",
-      reason: "Cabo incompatível com porta USB-A do notebook antigo",
-      status: "InspectedAndRestocked",
-      inspectionNotes: "Embalagem íntegra e sem marcas de uso; recolocado no estoque para revenda.",
-      totalRefundAmount: 60.00,
-      createdAtUtc: "2026-11-14T10:00:00Z",
-      items: [
-        {
-          id: "ret-item-1",
-          saleItemId: "item-2",
-          productSkuId: "sku-cab-c",
-          skuCode: "CAB-USBC-1M",
-          skuName: "Cabo USB-C Original 1 Metro",
-          quantity: 1,
-          refundAmount: 60.00
-        }
-      ]
-    }
-  ]);
+  // Vendas, Cotações e Devoluções limpas (sem mocks fictícios)
+  const [salesList] = useState<Sale[]>([]);
+  const [quotesList] = useState<SalesQuote[]>([]);
+  const [returnsList] = useState<SaleReturn[]>([]);
 
   // Calculations for PDV
   const subtotalCart = cartItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
@@ -493,60 +297,72 @@ export default function SalesPage() {
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                  {cartItems.map((item, idx) => (
-                    <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50/70 transition-colors">
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg mt-0.5 ${item.condition === "Usado" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
-                          {item.condition === "Usado" ? <Smartphone className="w-4 h-4" /> : <Package className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 font-mono text-slate-600">
-                              {item.code}
-                            </span>
-                          </div>
-                          {item.serialOrImei && (
-                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                              <span className="font-mono bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
-                                IMEI: {item.serialOrImei}
-                              </span>
-                              {item.batteryHealth && (
-                                <span className="text-slate-600">
-                                  Saúde da Bateria: <strong>{item.batteryHealth}%</strong>
-                                </span>
-                              )}
-                              <span className="text-emerald-700 font-medium">Garantia 90 dias</span>
-                            </div>
-                          )}
-                          {showCostPermission && (
-                            <div className="text-xs text-amber-700 mt-1 flex items-center gap-2 font-mono">
-                              <span>Custo Unitário: R$ {item.unitCost.toFixed(2)}</span>
-                              <span>·</span>
-                              <span>Margem Unitária: {(((item.unitPrice - item.unitCost) / item.unitPrice) * 100).toFixed(1)}%</span>
-                            </div>
-                          )}
-                        </div>
+                  {cartItems.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
+                        <ShoppingCart className="w-7 h-7" />
                       </div>
-
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-xs text-slate-400 font-mono">
-                            {item.quantity} un x R$ {item.unitPrice.toFixed(2)}
-                          </div>
-                          <div className="text-base font-bold text-slate-900 font-mono">
-                            R$ {(item.quantity * item.unitPrice).toFixed(2)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setCartItems(cartItems.filter((_, i) => i !== idx))}
-                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">Carrinho Vazio</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                        Utilize o campo acima para bipar o código de barras ou buscar o IMEI/SKU do produto para iniciar a venda.
+                      </p>
                     </div>
-                  ))}
+                  ) : (
+                    cartItems.map((item, idx) => (
+                      <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50/70 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg mt-0.5 ${item.condition === "Usado" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
+                            {item.condition === "Usado" ? <Smartphone className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 font-mono text-slate-600">
+                                {item.code}
+                              </span>
+                            </div>
+                            {item.serialOrImei && (
+                              <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                <span className="font-mono bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                                  IMEI: {item.serialOrImei}
+                                </span>
+                                {item.batteryHealth && (
+                                  <span className="text-slate-600">
+                                    Saúde da Bateria: <strong>{item.batteryHealth}%</strong>
+                                  </span>
+                                )}
+                                <span className="text-emerald-700 font-medium">Garantia 90 dias</span>
+                              </div>
+                            )}
+                            {showCostPermission && (
+                              <div className="text-xs text-amber-700 mt-1 flex items-center gap-2 font-mono">
+                                <span>Custo Unitário: R$ {item.unitCost.toFixed(2)}</span>
+                                <span>·</span>
+                                <span>Margem Unitária: {(((item.unitPrice - item.unitCost) / item.unitPrice) * 100).toFixed(1)}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <div className="text-xs text-slate-400 font-mono">
+                              {item.quantity} un x R$ {item.unitPrice.toFixed(2)}
+                            </div>
+                            <div className="text-base font-bold text-slate-900 font-mono">
+                              R$ {(item.quantity * item.unitPrice).toFixed(2)}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCartItems(cartItems.filter((_, i) => i !== idx))}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -669,183 +485,225 @@ export default function SalesPage() {
 
         {/* TAB 2: HISTÓRICO DE VENDAS */}
         {activeTab === "sales" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
-              <h3 className="font-semibold text-slate-800 text-sm">Vendas Realizadas na Filial</h3>
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Histórico de Vendas</h3>
+                <p className="text-xs text-slate-500">Transações e notas de saída geradas no balcão e online.</p>
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
                   placeholder="Filtrar por nº de venda ou cliente..."
-                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Nº Venda</th>
-                    <th className="py-3 px-4">Cliente</th>
-                    <th className="py-3 px-4">Status Venda</th>
-                    <th className="py-3 px-4">Status Pagamento</th>
-                    <th className="py-3 px-4">Total</th>
-                    {showCostPermission && <th className="py-3 px-4">Margem Bruta</th>}
-                    <th className="py-3 px-4">Data/Hora</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {salesList.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">{sale.saleNumber}</td>
-                      <td className="py-3 px-4 font-sans">{sale.customerName ?? "Consumidor Final"}</td>
-                      <td className="py-3 px-4 font-sans">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          sale.status === "Fulfilled" ? "bg-emerald-100 text-emerald-800" :
-                          sale.status === "Reserved" ? "bg-amber-100 text-amber-800" :
-                          "bg-slate-100 text-slate-800"
-                        }`}>
-                          {sale.status === "Fulfilled" ? "Entregue / Concluída" :
-                           sale.status === "Reserved" ? "Estoque Reservado" : sale.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-sans">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          sale.paymentStatus === "Confirmed" ? "bg-emerald-100 text-emerald-800" :
-                          sale.paymentStatus === "Pending" ? "bg-amber-100 text-amber-800" :
-                          "bg-slate-100 text-slate-800"
-                        }`}>
-                          {sale.paymentStatus === "Confirmed" ? "100% Quitado" :
-                           sale.paymentStatus === "Pending" ? "Pendente" : sale.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        R$ {sale.grandTotal.toFixed(2)}
-                      </td>
-                      {showCostPermission && (
-                        <td className="py-3 px-4 text-emerald-700 font-semibold">
-                          {sale.estimatedProfitMargin ? `${sale.estimatedProfitMargin}%` : "—"}
-                        </td>
-                      )}
-                      <td className="py-3 px-4 text-xs text-slate-500 font-sans">
-                        {new Date(sale.createdAtUtc).toLocaleString("pt-BR")}
-                      </td>
-                      <td className="py-3 px-4 text-right font-sans">
-                        <button className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
-                          Ver Comprovante
-                        </button>
-                      </td>
+            {salesList.length === 0 ? (
+              <div className="p-16 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
+                  <Receipt className="w-7 h-7" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">Nenhuma Venda Registrada</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  As vendas faturadas e finalizadas no Terminal PDV Balcão serão listadas aqui com integração ao Kardex.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Nº Venda</th>
+                      <th className="py-3 px-4">Cliente</th>
+                      <th className="py-3 px-4">Status Venda</th>
+                      <th className="py-3 px-4">Status Pagamento</th>
+                      <th className="py-3 px-4">Total</th>
+                      {showCostPermission && <th className="py-3 px-4">Margem Bruta</th>}
+                      <th className="py-3 px-4">Data/Hora</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {salesList.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">{sale.saleNumber}</td>
+                        <td className="py-3 px-4 font-sans">{sale.customerName ?? "Consumidor Final"}</td>
+                        <td className="py-3 px-4 font-sans">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            sale.status === "Fulfilled" ? "bg-emerald-100 text-emerald-800" :
+                            sale.status === "Reserved" ? "bg-amber-100 text-amber-800" :
+                            "bg-slate-100 text-slate-800"
+                          }`}>
+                            {sale.status === "Fulfilled" ? "Entregue / Concluída" :
+                             sale.status === "Reserved" ? "Estoque Reservado" : sale.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-sans">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            sale.paymentStatus === "Confirmed" ? "bg-emerald-100 text-emerald-800" :
+                            sale.paymentStatus === "Pending" ? "bg-amber-100 text-amber-800" :
+                            "bg-slate-100 text-slate-800"
+                          }`}>
+                            {sale.paymentStatus === "Confirmed" ? "100% Quitado" :
+                             sale.paymentStatus === "Pending" ? "Pendente" : sale.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          R$ {sale.grandTotal.toFixed(2)}
+                        </td>
+                        {showCostPermission && (
+                          <td className="py-3 px-4 text-emerald-700 font-semibold">
+                            {sale.estimatedProfitMargin ? `${sale.estimatedProfitMargin}%` : "—"}
+                          </td>
+                        )}
+                        <td className="py-3 px-4 text-xs text-slate-500 font-sans">
+                          {new Date(sale.createdAtUtc).toLocaleString("pt-BR")}
+                        </td>
+                        <td className="py-3 px-4 text-right font-sans">
+                          <button className="text-xs text-purple-600 hover:text-purple-700 font-medium">
+                            Ver Comprovante
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
         {/* TAB 3: ORÇAMENTOS COMERCIAIS */}
         {activeTab === "quotes" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-              <h3 className="font-semibold text-slate-800 text-sm">Orçamentos e Propostas Comerciais</h3>
-              <button className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Orçamentos e Propostas Comerciais</h3>
+                <p className="text-xs text-slate-500">Propostas com reserva temporária de estoque e validade comercial.</p>
+              </div>
+              <button className="px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs">
                 <Plus className="w-3.5 h-3.5" />
                 Novo Orçamento
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Nº Cotação</th>
-                    <th className="py-3 px-4">Cliente / Razão</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Validade</th>
-                    <th className="py-3 px-4">Total</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {quotesList.map((quote) => (
-                    <tr key={quote.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">{quote.quoteNumber}</td>
-                      <td className="py-3 px-4 font-sans">{quote.customerName}</td>
-                      <td className="py-3 px-4 font-sans">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          {quote.status === "ConvertedToSale" ? "Convertido em Venda" : quote.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-xs font-sans text-slate-500">
-                        {new Date(quote.validUntilUtc).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        R$ {quote.grandTotal.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 text-right font-sans">
-                        <button className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                          Visualizar PDF
-                        </button>
-                      </td>
+            {quotesList.length === 0 ? (
+              <div className="p-16 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
+                  <FileText className="w-7 h-7" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">Nenhum Orçamento Emitido</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Crie orçamentos formais com validade em dias para negociação com clientes corporativos ou de balcão.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Nº Cotação</th>
+                      <th className="py-3 px-4">Cliente / Razão</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Validade</th>
+                      <th className="py-3 px-4">Total</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {quotesList.map((quote) => (
+                      <tr key={quote.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">{quote.quoteNumber}</td>
+                        <td className="py-3 px-4 font-sans">{quote.customerName}</td>
+                        <td className="py-3 px-4 font-sans">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {quote.status === "ConvertedToSale" ? "Convertido em Venda" : quote.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-xs font-sans text-slate-500">
+                          {new Date(quote.validUntilUtc).toLocaleDateString("pt-BR")}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          R$ {quote.grandTotal.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-sans">
+                          <button className="text-xs text-purple-600 hover:text-purple-700 font-medium">
+                            Visualizar PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
         {/* TAB 4: DEVOLUÇÕES & TROCAS */}
         {activeTab === "returns" && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
               <div>
-                <h3 className="font-semibold text-slate-800 text-sm">Registro de Devoluções de Venda</h3>
+                <h3 className="font-bold text-slate-800 text-sm">Registro de Devoluções de Venda</h3>
                 <p className="text-xs text-slate-500">
                   Devolução física vinculada à venda original; o reabastecimento no Kardex exige inspeção técnica prévia.
                 </p>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Nº Devolução</th>
-                    <th className="py-3 px-4">Motivo Declarado</th>
-                    <th className="py-3 px-4">Status Físico</th>
-                    <th className="py-3 px-4">Reembolso</th>
-                    <th className="py-3 px-4">Laudo / Inspeção</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {returnsList.map((ret) => (
-                    <tr key={ret.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">{ret.returnNumber}</td>
-                      <td className="py-3 px-4 font-sans text-xs">{ret.reason}</td>
-                      <td className="py-3 px-4 font-sans">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          {ret.status === "InspectedAndRestocked" ? "Reintegrado ao Estoque" : ret.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        R$ {ret.totalRefundAmount.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 font-sans text-xs text-slate-500">
-                        {ret.inspectionNotes ?? "Aguardando laudo técnico"}
-                      </td>
-                      <td className="py-3 px-4 text-right font-sans">
-                        <button className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
-                          Ver Detalhes
-                        </button>
-                      </td>
+            {returnsList.length === 0 ? (
+              <div className="p-16 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
+                  <RotateCcw className="w-7 h-7" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">Nenhuma Devolução Registrada</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  Trocas e devoluções balcão auditadas com checklist de integridade física serão catalogadas nesta aba.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-700 uppercase tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Nº Devolução</th>
+                      <th className="py-3 px-4">Motivo Declarado</th>
+                      <th className="py-3 px-4">Status Físico</th>
+                      <th className="py-3 px-4">Reembolso</th>
+                      <th className="py-3 px-4">Laudo / Inspeção</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {returnsList.map((ret) => (
+                      <tr key={ret.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-bold text-slate-900">{ret.returnNumber}</td>
+                        <td className="py-3 px-4 font-sans text-xs">{ret.reason}</td>
+                        <td className="py-3 px-4 font-sans">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                            {ret.status === "InspectedAndRestocked" ? "Reintegrado ao Estoque" : ret.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          R$ {ret.totalRefundAmount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 font-sans text-xs text-slate-500">
+                          {ret.inspectionNotes ?? "Aguardando laudo técnico"}
+                        </td>
+                        <td className="py-3 px-4 text-right font-sans">
+                          <button className="text-xs text-purple-600 hover:text-purple-700 font-medium">
+                            Ver Detalhes
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -19,78 +19,46 @@ import {
   Search,
   Filter,
   Download,
-  AlertTriangle,
   Receipt,
-  Wallet
+  Wallet,
+  FolderOpen
 } from "lucide-react";
 
+interface FinancialTitle {
+  id: string;
+  partner: string;
+  titleNumber: string;
+  description: string;
+  dueDate: string;
+  originalAmount: number;
+  balance: number;
+  status: string;
+}
+
 export default function FinancialPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "dre" | "payables" | "receivables" | "reconciliation">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "dre" | "payables" | "receivables">("overview");
+  const [payables, setPayables] = useState<FinancialTitle[]>([]);
+  const [receivables, setReceivables] = useState<FinancialTitle[]>([]);
 
   const dreData = {
-    grossRevenue: 34500.00,
-    deductions: 850.00,
-    netRevenue: 33650.00,
-    cmv: 18200.00,
-    grossProfit: 15450.00,
-    grossMarginPercent: 45.9,
-    operatingExpenses: 6800.00,
-    netResult: 8650.00,
-    netMarginPercent: 25.7
+    grossRevenue: 0.00,
+    deductions: 0.00,
+    netRevenue: 0.00,
+    cmv: 0.00,
+    grossProfit: 0.00,
+    grossMarginPercent: 0.0,
+    operatingExpenses: 0.00,
+    netResult: 0.00,
+    netMarginPercent: 0.0
   };
 
-  const payables = [
-    {
-      id: "pay-1",
-      supplier: "Distribuidora Tech Brasil",
-      titleNumber: "NF-FORN-9876",
-      description: "Fornecimento de Telas OLED e Baterias",
-      dueDate: "2026-11-25",
-      originalAmount: 3000.00,
-      paidAmount: 1000.00,
-      balance: 2000.00,
-      status: "Parcialmente Pago"
-    },
-    {
-      id: "pay-2",
-      supplier: "Imobiliária Matriz",
-      titleNumber: "ALUG-11-2026",
-      description: "Aluguel Ponto Comercial Loja Moema",
-      dueDate: "2026-11-20",
-      originalAmount: 4500.00,
-      paidAmount: 0.00,
-      balance: 4500.00,
-      status: "Em Aberto"
-    }
-  ];
-
-  const receivables = [
-    {
-      id: "rec-1",
-      customer: "Rodrigo Silveira",
-      titleNumber: "VENDA-0089",
-      description: "iPhone 15 Pro 256GB - 2ª Parcela Cartão",
-      dueDate: "2026-12-10",
-      originalAmount: 2845.00,
-      balance: 2845.00,
-      status: "A Vencer"
-    },
-    {
-      id: "rec-2",
-      customer: "Camila Guimarães",
-      titleNumber: "OS-0042",
-      description: "Reparo Display MacBook Air",
-      dueDate: "2026-11-18",
-      originalAmount: 1200.00,
-      balance: 1200.00,
-      status: "A Vencer"
-    }
-  ];
+  const totalPayables = payables.reduce((acc, curr) => acc + curr.balance, 0);
+  const totalReceivables = receivables.reduce((acc, curr) => acc + curr.balance, 0);
 
   return (
     <RootShellLayout>
       <div className="space-y-6">
-        {/* Top Header estilo HBVision */}
+        {/* Top Header estilo HBVisionX */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <div>
             <div className="flex items-center gap-2">
@@ -137,10 +105,7 @@ export default function FinancialPage() {
               <div className="text-lg font-extrabold text-slate-900">
                 {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(dreData.netRevenue)}
               </div>
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" />
-                +14.2% vs mês anterior
-              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Acumulado do mês</p>
             </div>
 
             {/* Card 2 */}
@@ -152,9 +117,7 @@ export default function FinancialPage() {
               <div className="text-lg font-extrabold text-slate-900">
                 {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(dreData.netResult)}
               </div>
-              <p className="text-[10px] text-purple-600 font-semibold mt-1">
-                Margem Líquida: {dreData.netMarginPercent}%
-              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Margem: {dreData.netMarginPercent}%</p>
             </div>
 
             {/* Card 3 */}
@@ -164,9 +127,9 @@ export default function FinancialPage() {
                 Contas a Pagar (30d)
               </span>
               <div className="text-lg font-extrabold text-rose-600">
-                R$ 6.500,00
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalPayables)}
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">2 títulos pendentes</p>
+              <p className="text-[10px] text-slate-400 mt-1">{payables.length} títulos pendentes</p>
             </div>
 
             {/* Card 4 */}
@@ -176,9 +139,9 @@ export default function FinancialPage() {
                 Contas a Receber (30d)
               </span>
               <div className="text-lg font-extrabold text-blue-600">
-                R$ 4.045,00
+                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalReceivables)}
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">Cartões e faturados</p>
+              <p className="text-[10px] text-slate-400 mt-1">{receivables.length} faturados</p>
             </div>
 
             {/* Card 5 */}
@@ -188,9 +151,9 @@ export default function FinancialPage() {
                 Saldo Disponível (Bancos)
               </span>
               <div className="text-lg font-extrabold text-slate-900">
-                R$ 19.820,00
+                R$ 0,00
               </div>
-              <p className="text-[10px] text-emerald-600 font-semibold mt-1">100% Conciliado</p>
+              <p className="text-[10px] text-slate-400 mt-1">Contas bancárias ativas</p>
             </div>
           </div>
         </div>
@@ -295,9 +258,9 @@ export default function FinancialPage() {
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                 <ArrowDownRight className="w-4 h-4 text-rose-500" />
-                Contas a Pagar e Compromissos com Fornecedores
+                Contas a Pagar e Compromissos
               </h3>
-              <span className="text-xs text-slate-500 font-medium">Próximos Vencimentos</span>
+              <span className="text-xs text-slate-500 font-medium">{payables.length} títulos</span>
             </div>
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
@@ -314,7 +277,7 @@ export default function FinancialPage() {
               <tbody className="divide-y divide-slate-100">
                 {payables.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-800">{item.supplier}</td>
+                    <td className="py-3 px-4 font-bold text-slate-800">{item.partner}</td>
                     <td className="py-3 px-4 text-slate-600">{item.description}</td>
                     <td className="py-3 px-4 font-medium">{item.dueDate}</td>
                     <td className="py-3 px-4 text-slate-600">
@@ -335,6 +298,15 @@ export default function FinancialPage() {
                     </td>
                   </tr>
                 ))}
+                {payables.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-16 text-center text-slate-400">
+                      <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                      <p className="font-bold text-slate-700">Nenhuma conta a pagar registrada</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">As compras faturadas com fornecedores aparecerão automaticamente nesta lista.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
