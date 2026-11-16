@@ -20,7 +20,6 @@ import {
   LogOut,
   Bell,
   Search,
-  Moon,
   Sparkles,
   TrendingUp,
   Receipt,
@@ -89,12 +88,11 @@ export default function RootShellLayout({
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentBranch, setCurrentBranch] = useState("Matriz Principal (SP)");
-  const [isCashOpen, setIsCashOpen] = useState(true);
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] text-[#0f172a] flex flex-col md:flex-row font-sans">
+    <div className="h-screen w-screen overflow-hidden bg-[#f1f5f9] text-[#0f172a] flex flex-col md:flex-row font-sans">
       {/* Mobile Top Header */}
-      <header className="md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] sticky top-0 z-50">
+      <header className="md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center font-bold text-white shadow-md shadow-purple-900/30">
             HB
@@ -113,15 +111,16 @@ export default function RootShellLayout({
         </button>
       </header>
 
-      {/* Sidebar HBVisionX Style */}
+      {/* Sidebar FIXA HBVisionX Style */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-40 w-64 bg-[#090e1a] text-slate-300 border-r border-[#1a2236] flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0 dark-scrollbar overflow-y-auto
+          fixed inset-y-0 left-0 z-40 w-64 bg-[#090e1a] text-slate-300 border-r border-[#1a2236] flex flex-col transition-transform duration-300 ease-in-out
+          md:static md:translate-x-0 md:h-screen md:flex-shrink-0
           ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Brand Header */}
-        <div className="p-4 border-b border-[#161f33] hidden md:flex items-center justify-between">
+        {/* Brand Header Fixo no topo do sidebar */}
+        <div className="p-4 border-b border-[#161f33] hidden md:flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-center font-extrabold text-white text-base shadow-lg shadow-purple-600/25">
               HB
@@ -138,8 +137,8 @@ export default function RootShellLayout({
           </div>
         </div>
 
-        {/* Branch / Filial Switcher */}
-        <div className="p-3 mx-3 mt-3 rounded-xl bg-[#0f172a] border border-[#1e293b]">
+        {/* Branch / Filial Switcher Fixo */}
+        <div className="p-3 mx-3 mt-3 rounded-xl bg-[#0f172a] border border-[#1e293b] flex-shrink-0">
           <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
             <span>Filial de Operação</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -157,8 +156,8 @@ export default function RootShellLayout({
           </div>
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+        {/* Navigation Menu com Scrollbar Independente */}
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto dark-scrollbar">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1">
               <h3 className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -205,25 +204,25 @@ export default function RootShellLayout({
               </div>
             </div>
           ))}
+
+          {/* CTA Upgrade / Assistência Banner estilo HBVision */}
+          <div className="p-3 rounded-xl bg-gradient-to-br from-violet-950/60 to-purple-900/40 border border-purple-500/30 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-white">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>HBVisionX v2.4</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              Motor de matching e estoque serializado sincronizados.
+            </p>
+            <button className="w-full py-1.5 px-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Auditoria Ativa
+            </button>
+          </div>
         </nav>
 
-        {/* CTA Upgrade / Assistência Banner estilo HBVision */}
-        <div className="p-3 m-3 rounded-xl bg-gradient-to-br from-violet-950/60 to-purple-900/40 border border-purple-500/30 space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-white">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>HBVisionX v2.4</span>
-          </div>
-          <p className="text-[11px] text-slate-400 leading-tight">
-            Motor de matching e estoque serializado sincronizados.
-          </p>
-          <button className="w-full py-1.5 px-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Auditoria Ativa
-          </button>
-        </div>
-
-        {/* User Session Footer */}
-        <div className="p-3 border-t border-[#161f33] bg-[#070b14] flex items-center justify-between">
+        {/* User Session Footer Fixo no Rodapé */}
+        <div className="p-3 border-t border-[#161f33] bg-[#070b14] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 text-white font-bold flex items-center justify-center text-xs shadow-md">
               H
@@ -242,16 +241,16 @@ export default function RootShellLayout({
         </div>
       </aside>
 
-      {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
-        {/* Top Navbar HBVisionX Style */}
-        <header className="h-14 bg-white border-b border-slate-200 px-6 hidden md:flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      {/* Main Content Viewport com Scroll Independente */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8fafc]">
+        {/* Top Navbar HBVisionX Style Fixo */}
+        <header className="h-14 bg-white border-b border-slate-200 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
           {/* Breadcrumb & Context */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
               <span className="font-bold text-slate-900">Boa tarde, Henrique</span>
               <span className="text-slate-300">•</span>
-              <span>Sex, 16 de Nov • 21:50</span>
+              <span>Sex, 16 de Nov • 21:58</span>
             </div>
 
             {/* Status do Caixa Pill */}
@@ -292,8 +291,8 @@ export default function RootShellLayout({
           </div>
         </header>
 
-        {/* Page Container */}
-        <main className="flex-1 p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6">
+        {/* Page Container com Scroll Vertical Próprio */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6">
           {children}
         </main>
       </div>
