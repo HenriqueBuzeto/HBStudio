@@ -138,6 +138,8 @@ builder.Services.AddScoped<Fiscal.Application.Contracts.IFiscalProvider, Fiscal.
 
 builder.Services.AddScoped<Fiscal.Application.Services.IFiscalService, Fiscal.Application.Services.FiscalService>();
 
+builder.Services.AddHostedService<Fiscal.Infrastructure.Workers.FiscalReconciliationWorker>();
+
 
 
 // Modulo IdentityAccess & Segurança dos Sócios

@@ -1,21 +1,30 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using BuildingBlocks.Domain;
 using BuildingBlocks.Infrastructure;
 using BuildingBlocks.Security;
 using Fiscal.Application.Contracts;
 using Fiscal.Application.DTOs;
+using Fiscal.Application.Services;
 using Fiscal.Domain.Entities;
+using Fiscal.Infrastructure.Workers;
 using Fiscal.Infrastructure.ZeusAdapters;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BuildingBlocks.UnitTests;
@@ -94,7 +103,7 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
         establishment.Regime.Should().Be("SimplesNacional");
         establishment.QrCodeVersion.Should().Be(3);
 
-        // 2. Registrar Token CSC (para contingência / legado V2)
+        // 2. Registrar Token CSC
         var cscReq = new RegisterCscRequest(
             CscId: "000001",
             CscToken: "ABCDEF1234567890ABCDEF1234567890",
@@ -154,6 +163,39 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public void AesGcm_Keyring_Versioning_And_Rotation_Should_Allow_Transparent_Decryption()
+    {
+        var tenantId = Guid.NewGuid();
+        byte[] originalSecret = Encoding.UTF8.GetBytes("SuperSecretFiscalCertificatePassword2026");
+        byte[] aad = AesGcmEncryptionHelper.BuildAad(tenantId, "FiscalCertificate", "Est01");
+
+        // 1. Criptografa na Versão 1 do Keyring
+        byte[] envelopeV1 = AesGcmEncryptionHelper.EncryptWithEnvelope(originalSecret, tenantId, "FiscalCertKeyringTest", aad, keyVersion: 1);
+        envelopeV1[0].Should().Be(1); // Header com KeyVersion = 1
+
+        // 2. Registra Versão 2 no Keyring (simulando rotação de segredo corporativo)
+        AesGcmEncryptionHelper.RegisterMasterKeyVersion(2, "NEW_ROTATED_MASTER_KEY_SECRET_VERSION_2_ENTROPY_2026_9999!");
+
+        // 3. Criptografa novo payload na Versão 2
+        byte[] envelopeV2 = AesGcmEncryptionHelper.EncryptWithEnvelope(originalSecret, tenantId, "FiscalCertKeyringTest", aad, keyVersion: 2);
+        envelopeV2[0].Should().Be(2);
+
+        // 4. DecryptWithEnvelope deve descriptografar com sucesso ambos os envelopes usando as chaves correspondentes
+        byte[] decryptedV1 = AesGcmEncryptionHelper.DecryptWithEnvelope(envelopeV1, tenantId, "FiscalCertKeyringTest", aad);
+        Encoding.UTF8.GetString(decryptedV1).Should().Be("SuperSecretFiscalCertificatePassword2026");
+
+        byte[] decryptedV2 = AesGcmEncryptionHelper.DecryptWithEnvelope(envelopeV2, tenantId, "FiscalCertKeyringTest", aad);
+        Encoding.UTF8.GetString(decryptedV2).Should().Be("SuperSecretFiscalCertificatePassword2026");
+
+        // 5. Envelope adulterado ou versão inexistente deve falhar
+        byte[] invalidVersionEnvelope = (byte[])envelopeV1.Clone();
+        invalidVersionEnvelope[0] = 99; // Versão desconhecida
+        var actInvalidVersion = () => AesGcmEncryptionHelper.DecryptWithEnvelope(invalidVersionEnvelope, tenantId, "FiscalCertKeyringTest", aad);
+        actInvalidVersion.Should().Throw<CryptographicException>()
+            .WithMessage("*Versão de chave-mestra '99' não encontrada*");
+    }
+
+    [Fact]
     public void QrCode_NT2025_001_V3_Online_And_Contingency_With_RsaSha1_Should_Be_Compliant()
     {
         var provider = new ZeusNFeProvider();
@@ -183,6 +225,7 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
         v3OnlineUrl.Should().EndWith($"?p={accessKey}|3|1");
 
         // Cenário 2: QR Code V3 Contingência Offline (tpEmis = 9) com Destinatário Identificado
+        // Formato: p=chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
         using var rsaKey = RSA.Create(2048);
         string v3ContingencyWithDest = provider.GenerateQrCodeUrl(
             est, accessKey, 8990.00m, "12345678909", null, tpEmis: 9, rsaPrivateKey: rsaKey);
@@ -191,13 +234,80 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
         v3ContingencyWithDest.Should().Contain("|8990.00|1|12345678909|"); // tpIdDest=1 (CPF)
 
         // Cenário 3: QR Code V3 Contingência Offline (tpEmis = 9) SEM Destinatário Identificado (Consumidor Anônimo)
-        // Regra NT 2025.001: Suprime parâmetros de destinatário sem gerar separadores vazios duplicados (||)
+        // Conforme Manual DANFE NFC-e v6.0 item 4.4.2 Tabela 7 e NT 2025.001 v1.03:
+        // As posições 6 (tpIdDest) e 7 (idDest) são OBRIGATORIAMENTE preservadas com delimitadores vazios:
+        // Formato Exigido: p=chNFe|3|tpAmb|dia|vNF|||assinatura
         string v3ContingencyNoDest = provider.GenerateQrCodeUrl(
             est, accessKey, 150.00m, null, null, tpEmis: 9, rsaPrivateKey: rsaKey);
 
-        v3ContingencyNoDest.Should().NotContain("||");
         string dia = DateTime.UtcNow.ToString("dd");
-        v3ContingencyNoDest.Should().Contain($"?p={accessKey}|3|1|{dia}|150.00|");
+        v3ContingencyNoDest.Should().Contain($"?p={accessKey}|3|1|{dia}|150.00|||");
+
+        // Extrai a parte da assinatura e os parâmetros assinados
+        string queryPart = v3ContingencyNoDest.Substring(v3ContingencyNoDest.IndexOf("?p=") + 3);
+        string[] parts = queryPart.Split('|');
+        // Total de 8 partes: [chNFe, 3, tpAmb, dia, vNF, "", "", signature]
+        parts.Length.Should().Be(8);
+        parts[0].Should().Be(accessKey);
+        parts[1].Should().Be("3");
+        parts[2].Should().Be("1"); // Homologação
+        parts[3].Should().Be(dia);
+        parts[4].Should().Be("150.00");
+        parts[5].Should().BeEmpty(); // tpIdDest vazio
+        parts[6].Should().BeEmpty(); // idDest vazio
+        parts[7].Should().NotBeNullOrWhiteSpace(); // Assinatura RSA-SHA1 em Base64
+    }
+
+    [Fact]
+    public void Fiscal_Inbound_Xml_Real_XmlDSig_CheckSignature_Should_Validate_Or_Reject()
+    {
+        // 1. Gera par de chaves RSA para teste de assinatura real XMLDSig
+        using var rsa = RSA.Create(2048);
+
+        string accessKey = "35261148951871000180550010000012341234567890";
+        string xmlToSign = $@"<nfeProc xmlns=""http://www.portalfiscal.inf.br/nfe"" versao=""4.00"">
+  <NFe>
+    <infNFe Id=""NFe{accessKey}"" versao=""4.00"">
+      <ide><nNF>1234</nNF><serie>1</serie><dhEmi>2026-11-16T14:30:00-03:00</dhEmi></ide>
+      <emit><CNPJ>12345678000199</CNPJ><xNome>FORNECEDOR INTEGRAL</xNome></emit>
+      <dest><CNPJ>48951871000180</CNPJ><xNome>HB STUDIO</xNome></dest>
+      <det nItem=""1""><prod><cProd>1</cProd><xProd>IPHONE 16</xProd><NCM>85171300</NCM><qCom>1</qCom><vUnCom>8000</vUnCom><vProd>8000</vProd></prod></det>
+      <total><ICMSTot><vProd>8000</vProd><vNF>8000</vNF><vICMS>0</vICMS></ICMSTot></total>
+    </infNFe>
+  </NFe>
+</nfeProc>";
+
+        // 2. Aplica assinatura XMLDSig W3C canônica sobre o elemento infNFe
+        var xmlDoc = new XmlDocument { PreserveWhitespace = true };
+        xmlDoc.LoadXml(xmlToSign);
+
+        var signedXml = new SignedXml(xmlDoc) { SigningKey = rsa };
+        var reference = new Reference { Uri = $"#NFe{accessKey}" };
+        reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
+        reference.AddTransform(new XmlDsigC14NTransform());
+        signedXml.AddReference(reference);
+
+        var keyInfo = new KeyInfo();
+        keyInfo.AddClause(new RSAKeyValue(rsa));
+        signedXml.KeyInfo = keyInfo;
+
+        signedXml.ComputeSignature();
+        var xmlDigitalSignature = signedXml.GetXml();
+        xmlDoc.DocumentElement!.AppendChild(xmlDoc.ImportNode(xmlDigitalSignature, true));
+
+        string validSignedXml = xmlDoc.OuterXml;
+
+        var fiscalService = new FiscalService(null!, new ZeusNFeProvider());
+
+        // 3. Deve analisar e aceitar o XML com assinatura válida
+        var parseAct = async () => await fiscalService.ParseInboundXmlAsync(validSignedXml);
+        parseAct.Should().NotThrowAsync();
+
+        // 4. Cenário de Ataque / Adulteração: Altera o valor da mercadoria de 8000 para 9999 após assinado
+        string tamperedXml = validSignedXml.Replace("<vProd>8000</vProd>", "<vProd>9999</vProd>");
+        var parseTamperedAct = async () => await fiscalService.ParseInboundXmlAsync(tamperedXml);
+        parseTamperedAct.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Assinatura digital do XML inválida ou conteúdo do documento foi adulterado*");
     }
 
     [Fact]

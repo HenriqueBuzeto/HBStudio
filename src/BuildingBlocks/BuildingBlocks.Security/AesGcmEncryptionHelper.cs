@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,44 +8,88 @@ using System.Text;
 namespace BuildingBlocks.Security;
 
 /// <summary>
-/// Provedor criptográfico corporativo AES-256-GCM (Authenticated Encryption) com Derivação de Chaves HKDF
-/// e vinculação estrita de contexto via AAD (Additional Authenticated Data).
+/// Provedor criptográfico corporativo AES-256-GCM (Authenticated Encryption) com Derivação HKDF,
+/// Keyring Versionado para Rotação Transparente de Chaves e AAD para isolamento Multi-tenant.
 /// 
-/// Protege chaves privadas, senhas de certificados A1 e tokens CSC contra adulteração, vazamentos e misturas entre tenants.
-/// Formato de saída: [12 bytes Nonce] + [16 bytes Tag de Autenticação] + [Ciphertext]
+/// Formato de saída do envelope cifrado:
+/// [1 byte: KeyVersion] + [12 bytes: Nonce CSPRNG] + [16 bytes: Tag de Autenticação] + [Ciphertext]
 /// </summary>
 public static class AesGcmEncryptionHelper
 {
     private const int NonceSizeBytes = 12; // 96 bits recomendado pelo NIST SP 800-38D
     private const int TagSizeBytes = 16;   // 128 bits padrão de autenticação
+    private const byte CurrentKeyVersion = 1; // Versão ativa para novas criptografias
 
-    // Chave-mestra em repouso configurável via variável de ambiente "HB_STUDIO_FISCAL_MASTER_KEY"
-    // Alta entropia (256 bits). Caso não configurada no ambiente local, utiliza fallback seguro corporativo.
-    private static readonly string DefaultMasterKeySecret = 
-        Environment.GetEnvironmentVariable("HB_STUDIO_FISCAL_MASTER_KEY") 
-        ?? "HB_STUDIO_ENTERPRISE_ERP_FISCAL_MASTER_KEY_SECRET_2026_HIGH_ENTROPY_V1!";
+    // Keyring de Chaves-Mestras por Versão (permite rotação sem quebrar registros antigos)
+    private static readonly ConcurrentDictionary<byte, string> MasterKeyRing = new()
+    {
+        [1] = Environment.GetEnvironmentVariable("HB_STUDIO_FISCAL_MASTER_KEY_V1") 
+              ?? Environment.GetEnvironmentVariable("HB_STUDIO_FISCAL_MASTER_KEY") 
+              ?? "HB_STUDIO_ENTERPRISE_ERP_FISCAL_MASTER_KEY_SECRET_2026_HIGH_ENTROPY_V1!",
+        [2] = Environment.GetEnvironmentVariable("HB_STUDIO_FISCAL_MASTER_KEY_V2")
+              ?? "HB_STUDIO_ENTERPRISE_ERP_FISCAL_MASTER_KEY_SECRET_2026_HIGH_ENTROPY_V2_ROTATION!"
+    };
 
     /// <summary>
-    /// Derivação de subchave independente e determinística para o Tenant usando HKDF (RFC 5869)
-    /// a partir da Chave-Mestra do Sistema + TenantId + Domínio de Propósito.
-    /// Não utiliza identificadores previsíveis como segredo.
+    /// Registra ou substitui uma chave no Keyring Versionado para rotação dinâmica.
     /// </summary>
-    public static byte[] DeriveTenantKey(Guid tenantId, string purpose = "FiscalA1AndCscProtection")
+    public static void RegisterMasterKeyVersion(byte version, string secret)
     {
-        byte[] ikm = Encoding.UTF8.GetBytes(DefaultMasterKeySecret);
-        byte[] salt = tenantId.ToByteArray(); // Salt exclusivo e fixo do Tenant
-        byte[] info = Encoding.UTF8.GetBytes($"HB_STUDIO_ERP_{purpose}_{tenantId:N}");
+        if (string.IsNullOrWhiteSpace(secret)) throw new ArgumentException("Segredo não pode ser vazio.", nameof(secret));
+        MasterKeyRing[version] = secret;
+    }
+
+    /// <summary>
+    /// Deriva a subchave de 256 bits exclusiva para o Tenant via HKDF (RFC 5869)
+    /// com base na versão da chave-mestra, Salt do Tenant e Domínio de Contexto.
+    /// </summary>
+    public static byte[] DeriveTenantKey(Guid tenantId, string purpose = "FiscalA1AndCscProtection", byte keyVersion = CurrentKeyVersion)
+    {
+        if (!MasterKeyRing.TryGetValue(keyVersion, out var masterSecret))
+        {
+            throw new CryptographicException($"Versão de chave-mestra '{keyVersion}' não encontrada no Keyring do sistema.");
+        }
+
+        byte[] ikm = Encoding.UTF8.GetBytes(masterSecret);
+        byte[] salt = tenantId.ToByteArray(); // 16 bytes exclusivos do Tenant
+        byte[] info = Encoding.UTF8.GetBytes($"HB_STUDIO_ERP_{purpose}_{tenantId:N}_V{keyVersion}");
 
         return HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, salt, info);
     }
 
-    /// <summary>
-    /// Cria o AAD (Additional Authenticated Data) para vincular criptograficamente o registro ao Tenant e Recurso.
-    /// Impede reutilização de payload criptografado em outro tenant ou contexto (Confused Deputy / Tampering).
-    /// </summary>
     public static byte[] BuildAad(Guid tenantId, string resourceType, string resourceId)
     {
         return Encoding.UTF8.GetBytes($"TENANT={tenantId:N};RES_TYPE={resourceType};RES_ID={resourceId};ALGO=AES-256-GCM");
+    }
+
+    /// <summary>
+    /// Criptografa o payload prefixando a versão da chave utilizada: [Version 1b][Nonce 12b][Tag 16b][Ciphertext]
+    /// </summary>
+    public static byte[] EncryptWithEnvelope(byte[] plaintext, Guid tenantId, string purpose = "FiscalA1AndCscProtection", byte[]? associatedData = null, byte keyVersion = CurrentKeyVersion)
+    {
+        byte[] key = DeriveTenantKey(tenantId, purpose, keyVersion);
+        byte[] rawEncrypted = Encrypt(plaintext, key, associatedData);
+
+        byte[] envelope = new byte[1 + rawEncrypted.Length];
+        envelope[0] = keyVersion;
+        Buffer.BlockCopy(rawEncrypted, 0, envelope, 1, rawEncrypted.Length);
+        return envelope;
+    }
+
+    /// <summary>
+    /// Descriptografa inspecionando o cabeçalho de versão para resolver a chave correta mesmo após rotações.
+    /// </summary>
+    public static byte[] DecryptWithEnvelope(byte[] envelope, Guid tenantId, string purpose = "FiscalA1AndCscProtection", byte[]? associatedData = null)
+    {
+        if (envelope == null || envelope.Length < 1 + NonceSizeBytes + TagSizeBytes)
+            throw new CryptographicException("Envelope criptografado corrompido ou incompleto.");
+
+        byte keyVersion = envelope[0];
+        byte[] rawEncrypted = new byte[envelope.Length - 1];
+        Buffer.BlockCopy(envelope, 1, rawEncrypted, 0, rawEncrypted.Length);
+
+        byte[] key = DeriveTenantKey(tenantId, purpose, keyVersion);
+        return Decrypt(rawEncrypted, key, associatedData);
     }
 
     public static byte[] Encrypt(byte[] plaintext, byte[] key, byte[]? associatedData = null)
@@ -52,7 +98,6 @@ public static class AesGcmEncryptionHelper
         if (key == null || key.Length != 32)
             throw new ArgumentException("A chave para AES-256-GCM deve possuir exatamente 32 bytes (256 bits).", nameof(key));
 
-        // Nonce aleatório criptograficamente seguro (CSPRNG) de 96 bits
         byte[] nonce = new byte[NonceSizeBytes];
         RandomNumberGenerator.Fill(nonce);
 
@@ -93,16 +138,12 @@ public static class AesGcmEncryptionHelper
 
         using (var aesGcm = new AesGcm(key, TagSizeBytes))
         {
-            // Decrypt verifica a integridade do Tag e do AAD antes de liberar os dados. Lança CryptographicException se adulterado.
             aesGcm.Decrypt(nonce, ciphertext, tag, plaintext, associatedData);
         }
 
         return plaintext;
     }
 
-    /// <summary>
-    /// Método de compatibilidade para testes e derivação genérica.
-    /// </summary>
     public static byte[] DeriveKeyFromSecret(string secret, string salt = "HB_STUDIO_FISCAL_A1_SALT_2026")
     {
         return Rfc2898DeriveBytes.Pbkdf2(

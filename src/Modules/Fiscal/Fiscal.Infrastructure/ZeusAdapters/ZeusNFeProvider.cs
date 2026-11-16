@@ -279,9 +279,12 @@ public class ZeusNFeProvider : IFiscalProvider
             else
             {
                 // 2. Emissão em Contingência Offline (tpEmis = 9):
-                // Formato oficial da NT 2025.001:
-                // Se destinatário presente: p=chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
-                // Se destinatário ausente:  p=chNFe|3|tpAmb|dia|vNF|assinatura (suprime parâmetros de destinatário sem pipes vazios duplicados)
+                // Conforme Manual de Padrões Técnicos do DANFE NFC-e v6.0 (Item 4.4.2, Tabela 7) e NT 2025.001 v1.03:
+                // Estrutura obrigatória de 8 posições (parâmetros 1 a 7 assinados):
+                // chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
+                // Quando o consumidor NÃO for identificado (venda anônima), os parâmetros 6 (tpIdDest) e 7 (idDest)
+                // permanecem vazios, mas seus separadores são OBRIGATORIAMENTE preservados (|||):
+                // p=chNFe|3|tpAmb|dia|vNF|||assinatura
                 string dia = DateTime.UtcNow.ToString("dd");
                 string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -296,10 +299,11 @@ public class ZeusNFeProvider : IFiscalProvider
                 }
                 else
                 {
-                    dataToSign = $"{accessKey}|3|{amb}|{dia}|{vNf}";
+                    // Preserva rigorosamente as posições 6 e 7 vazias com seus separadores "|"
+                    dataToSign = $"{accessKey}|3|{amb}|{dia}|{vNf}||";
                 }
 
-                // Assinatura digital RSA-SHA1 em Base64 conforme Manual NFC-e v6.0 / NT 2025.001
+                // Assinatura digital RSA-SHA1 em Base64 dos parâmetros 1 a 7
                 string signatureBase64 = ComputeRsaSha1Signature(dataToSign, rsaPrivateKey);
                 string pPayload = $"{dataToSign}|{signatureBase64}";
 

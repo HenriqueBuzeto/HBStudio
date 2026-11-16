@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -152,12 +153,11 @@ public class FiscalService : IFiscalService
         var existingCert = await _db.FiscalCertificates.FirstOrDefaultAsync(c => c.EstablishmentId == est.Id && c.IsActive, ct);
         existingCert?.Deactivate();
 
-        // Criptografia Autenticada AES-256-GCM com HKDF e AAD de vinculação ao Tenant
-        byte[] encKey = GetEncryptionKey(tenantId);
+        // Criptografia Autenticada AES-256-GCM com HKDF, Keyring versionado e AAD de vinculação ao Tenant
         byte[] aad = AesGcmEncryptionHelper.BuildAad(tenantId, "FiscalCertificate", est.Id.ToString("N"));
 
-        byte[] encPfx = AesGcmEncryptionHelper.Encrypt(rawPfx, encKey, aad);
-        byte[] encPwd = AesGcmEncryptionHelper.Encrypt(rawPwd, encKey, aad);
+        byte[] encPfx = AesGcmEncryptionHelper.EncryptWithEnvelope(rawPfx, tenantId, "FiscalCertificateProtection", aad);
+        byte[] encPwd = AesGcmEncryptionHelper.EncryptWithEnvelope(rawPwd, tenantId, "FiscalCertificateProtection", aad);
 
         var cert = new FiscalCertificate(
             tenantId,
@@ -189,10 +189,9 @@ public class FiscalService : IFiscalService
             ? $"{req.CscToken[..3]}***{req.CscToken[^3..]}"
             : "***";
 
-        // Criptografia AES-256-GCM com HKDF e AAD de vinculação ao Tenant
-        byte[] encKey = GetEncryptionKey(tenantId);
+        // Criptografia AES-256-GCM com HKDF, Keyring versionado e AAD de vinculação ao Tenant
         byte[] aad = AesGcmEncryptionHelper.BuildAad(tenantId, "FiscalCsc", req.CscId);
-        byte[] encToken = AesGcmEncryptionHelper.Encrypt(Encoding.UTF8.GetBytes(req.CscToken), encKey, aad);
+        byte[] encToken = AesGcmEncryptionHelper.EncryptWithEnvelope(Encoding.UTF8.GetBytes(req.CscToken), tenantId, "FiscalCscProtection", aad);
 
         var csc = new FiscalCsc(
             tenantId,
@@ -472,11 +471,55 @@ public class FiscalService : IFiscalService
         if (infNFe == null) throw new InvalidOperationException("Estrutura do XML não corresponde a uma NF-e válida.");
 
         // Validação da assinatura digital (<Signature>) no padrão W3C XMLDSig
-        XNamespace dsNs = "http://www.w3.org/2000/09/xmldsig#";
-        var signature = doc.Descendants(dsNs + "Signature").FirstOrDefault() ?? doc.Descendants("Signature").FirstOrDefault();
-        if (signature == null)
+        var xmlDoc = new XmlDocument { XmlResolver = null };
+        using (var sr = new StringReader(rawXml))
+        using (var reader = XmlReader.Create(sr, xmlReaderSettings))
+        {
+            xmlDoc.Load(reader);
+        }
+
+        var xmlNsManager = new XmlNamespaceManager(xmlDoc.NameTable);
+        xmlNsManager.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
+        xmlNsManager.AddNamespace("nfe", "http://www.portalfiscal.inf.br/nfe");
+
+        var signatureNode = xmlDoc.SelectSingleNode("//ds:Signature", xmlNsManager) as XmlElement
+            ?? xmlDoc.GetElementsByTagName("Signature").Cast<XmlElement>().FirstOrDefault();
+
+        if (signatureNode == null)
         {
             throw new InvalidOperationException("O XML fornecido não contém assinatura digital (<Signature>) válida.");
+        }
+
+        // Verificação criptográfica da assinatura e integridade contra adulteração (Anti-Tampering)
+        var signedXml = new SignedXml(xmlDoc);
+        signedXml.LoadXml(signatureNode);
+
+        // Mitigação contra XML Signature Wrapping (XSW): o URI da referência precisa apontar para a infNFe
+        if (signedXml.SignedInfo?.References.Count == 0)
+        {
+            throw new InvalidOperationException("Assinatura XML inválida: nenhuma referência assinada encontrada.");
+        }
+
+        bool hasValidRef = false;
+        foreach (Reference reference in signedXml.SignedInfo!.References)
+        {
+            string expectedPrefix = "#NFe";
+            if (!string.IsNullOrEmpty(reference.Uri) && reference.Uri.StartsWith(expectedPrefix))
+            {
+                hasValidRef = true;
+                break;
+            }
+        }
+
+        if (!hasValidRef)
+        {
+            throw new InvalidOperationException("Assinatura XML inválida: referência não corresponde ao elemento infNFe (Possível ataque de Signature Wrapping).");
+        }
+
+        // Valida criptograficamente o Digest e a Chave Pública do emitente
+        if (!signedXml.CheckSignature())
+        {
+            throw new InvalidOperationException("Assinatura digital do XML inválida ou conteúdo do documento foi adulterado após a assinatura.");
         }
 
         string accessKey = infNFe.Attribute("Id")?.Value?.Replace("NFe", "") ?? Guid.NewGuid().ToString("N")[..44];
