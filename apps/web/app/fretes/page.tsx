@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import RootShellLayout from "@/components/RootShellLayout";
 import {
   Truck,
   MapPin,
@@ -17,7 +18,11 @@ import {
   ChevronRight,
   RefreshCw,
   Sliders,
-  Sparkles
+  Sparkles,
+  Calendar,
+  FileText,
+  User,
+  CreditCard
 } from "lucide-react";
 
 interface Vehicle {
@@ -79,7 +84,7 @@ export default function FretesPage() {
       ownership: "CompanyOwned",
       fuel: "Flex",
       currentOdometerKm: 54300,
-      status: "Active",
+      status: "Ativo",
       isAvailable: true
     },
     {
@@ -91,7 +96,7 @@ export default function FretesPage() {
       ownership: "CompanyOwned",
       fuel: "Flex",
       currentOdometerKm: 32150,
-      status: "Active",
+      status: "Ativo",
       isAvailable: true
     }
   ]);
@@ -179,7 +184,7 @@ export default function FretesPage() {
     model: "iPhone 14 Pro 128GB Roxo Profundo",
     baseCost: 3200.00,
     freightAllocated: 75.00,
-    targetAcquisitionDiscountPct: 15.0, // Desconto-alvo de compra de usados (negociação com o vendedor)
+    targetAcquisitionDiscountPct: 15.0, // Desconto-alvo de compra de usados
     targetMarkupPct: 30.0,              // Markup comercial sobre custo total
     maxCounterDiscountPct: 5.0,         // Desconto comercial máximo permitido no balcão/PDV
     rounding: "EndingIn90"
@@ -247,232 +252,248 @@ export default function FretesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/10 pb-5">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+    <RootShellLayout>
+      <div className="space-y-6">
+        
+        {/* Top Header Card estilo HBVisionX */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                Logística & Frota
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                MOD-16 Enterprise
+              </span>
+            </div>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
+              Gestão de Fretes, Frota & Custos de Deslocamento
+            </h1>
+            <p className="text-xs text-slate-500">
+              Controle de viagens, abastecimentos rápidos (R$ 50), planos de manutenção e rateio de frete para composição de custo de estoque (CPC 16).
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              onClick={() => setShowFuelingModal(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors shadow-xs"
+            >
+              <Fuel className="w-3.5 h-3.5 text-amber-600" />
+              <span>Abastecer (R$ 50)</span>
+            </button>
+            <button
+              onClick={() => setShowNewTripModal(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Viagem</span>
+            </button>
+          </div>
+        </div>
+
+        {/* KPI Cards Estilo HBVisionX */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+              <span>Frota Ativa</span>
+              <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
+                <Truck className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 mt-2">
+              {vehicles.length} Veículos
+            </div>
+            <div className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 100% Operacionais & Disponíveis
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+              <span>Km Rodados no Mês</span>
+              <div className="p-2 rounded-xl bg-cyan-50 text-cyan-700">
+                <MapPin className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 mt-2">
+              1.420 km
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Média de 71 km por deslocamento
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+              <span>Custo Total de Fretes</span>
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-slate-900 mt-2">
+              R$ 890,00
+            </div>
+            <div className="text-xs text-purple-600 font-semibold mt-1">
+              Alocados em compras e estoque
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
+            <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+              <span>Semáforo de Manutenção</span>
+              <div className="p-2 rounded-xl bg-rose-50 text-rose-700">
+                <Wrench className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-2xl font-black text-amber-600 mt-2">
+              1 Próxima
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Óleo em dia • Freios a revisar
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs de Navegação Estilo HBVisionX */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-bold">
+          <button
+            onClick={() => setActiveTab("trips")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+              activeTab === "trips"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            Viagens & Deslocamentos
+          </button>
+
+          <button
+            onClick={() => setActiveTab("fueling")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+              activeTab === "fueling"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+            }`}
+          >
+            <Fuel className="w-3.5 h-3.5" />
+            Abastecimentos & Despesas
+          </button>
+
+          <button
+            onClick={() => setActiveTab("vehicles")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+              activeTab === "vehicles"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+            }`}
+          >
             <Truck className="w-3.5 h-3.5" />
-            MOD-16 • LOGÍSTICA & FRETES ENTERPRISE
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-            Gestão de Fretes, Frota & Custos de Deslocamento
-          </h1>
-          <p className="text-sm text-slate-400">
-            Controle de veículos, viagens, abastecimentos rápidos (R$ 50), planos de manutenção e rateio de frete para composição de custo e precificação inteligente.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowFuelingModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-sm font-semibold transition-all shadow-sm"
-          >
-            <Fuel className="w-4 h-4 text-amber-400" />
-            Abastecimento Rápido (R$ 50)
+            Frota & Hodômetros
           </button>
+
           <button
-            onClick={() => setShowNewTripModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-purple-600/30"
+            onClick={() => setActiveTab("maintenance")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+              activeTab === "maintenance"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            Iniciar Nova Viagem
+            <Wrench className="w-3.5 h-3.5" />
+            Manutenção & Troca de Óleo
+          </button>
+
+          <button
+            onClick={() => setActiveTab("pricing")}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all ${
+              activeTab === "pricing"
+                ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white shadow-sm"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            Motor de Precificação Inteligente
           </button>
         </div>
-      </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Frota Ativa</span>
-            <Truck className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-2xl font-bold text-white mt-2">
-            {vehicles.length} Veículos
-          </div>
-          <div className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" /> 100% Operacionais & Disponíveis
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Km Rodados no Mês</span>
-            <MapPin className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-2xl font-bold text-white mt-2">
-            1.420 km
-          </div>
-          <div className="text-xs text-slate-400 mt-1">
-            Média de 71 km por deslocamento
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Custo Total de Fretes</span>
-            <DollarSign className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold text-white mt-2">
-            R$ 890,00
-          </div>
-          <div className="text-xs text-cyan-400 mt-1">
-            Alocados em compras e entregas
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Semáforo de Manutenção</span>
-            <Wrench className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="text-2xl font-bold text-amber-400 mt-2">
-            1 Próxima
-          </div>
-          <div className="text-xs text-slate-400 mt-1">
-            Óleo em dia • Freios a revisar
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab("trips")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === "trips"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <MapPin className="w-4 h-4" />
-          Viagens & Deslocamentos
-        </button>
-
-        <button
-          onClick={() => setActiveTab("fueling")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === "fueling"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Fuel className="w-4 h-4" />
-          Abastecimentos & Despesas
-        </button>
-
-        <button
-          onClick={() => setActiveTab("vehicles")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === "vehicles"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Truck className="w-4 h-4" />
-          Frota & Hodômetros
-        </button>
-
-        <button
-          onClick={() => setActiveTab("maintenance")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === "maintenance"
-              ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Wrench className="w-4 h-4" />
-          Manutenção & Troca de Óleo
-        </button>
-
-        <button
-          onClick={() => setActiveTab("pricing")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === "pricing"
-              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/20"
-              : "text-slate-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          Motor de Precificação Inteligente
-        </button>
-      </div>
-
-      {/* Tab: Viagens */}
-      {activeTab === "trips" && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">Registro de Viagens de Campo e Logística</h2>
-              <span className="text-xs text-slate-400">Total: {trips.length} viagens registradas</span>
+        {/* Tab 1: Viagens */}
+        {activeTab === "trips" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-extrabold text-slate-900">Registro de Viagens de Campo e Logística</h2>
+                <p className="text-xs text-slate-500">Histórico de saídas, condutores e cálculo automático de quilometragem.</p>
+              </div>
+              <span className="text-xs font-bold text-slate-400">Total: {trips.length} viagens</span>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-white/[0.03] text-xs font-semibold uppercase text-slate-400 border-b border-white/10">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
                   <tr>
-                    <th className="px-4 py-3">Nº Viagem</th>
-                    <th className="px-4 py-3">Veículo / Placa</th>
-                    <th className="px-4 py-3">Condutor</th>
-                    <th className="px-4 py-3">Finalidade</th>
-                    <th className="px-4 py-3">Trajeto</th>
-                    <th className="px-4 py-3 text-right">Hodômetros</th>
-                    <th className="px-4 py-3 text-right">Distância</th>
-                    <th className="px-4 py-3 text-center">Status</th>
-                    <th className="px-4 py-3 text-center">Ações</th>
+                    <th className="py-3 px-4">Nº Viagem</th>
+                    <th className="py-3 px-4">Veículo / Placa</th>
+                    <th className="py-3 px-4">Condutor</th>
+                    <th className="py-3 px-4">Finalidade</th>
+                    <th className="py-3 px-4">Trajeto</th>
+                    <th className="py-3 px-4 text-right">Hodômetros</th>
+                    <th className="py-3 px-4 text-right">Distância</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-center">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-slate-100">
                   {trips.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3.5 font-mono text-purple-400 font-medium">
+                    <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-purple-700">
                         {trip.tripNumber}
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span className="font-semibold text-white">{trip.vehiclePlate}</span>
+                      <td className="py-3 px-4">
+                        <span className="font-extrabold text-slate-900">{trip.vehiclePlate}</span>
                       </td>
-                      <td className="px-4 py-3.5">{trip.driverName}</td>
-                      <td className="px-4 py-3.5 max-w-xs truncate text-slate-300" title={trip.purpose}>
+                      <td className="py-3 px-4 text-slate-700 font-medium">{trip.driverName}</td>
+                      <td className="py-3 px-4 max-w-xs truncate text-slate-600" title={trip.purpose}>
                         {trip.purpose}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-slate-400">
-                        {trip.originCity} <ArrowRight className="inline w-3 h-3 text-purple-400" /> {trip.destinationCity}
+                      <td className="py-3 px-4 text-slate-600">
+                        {trip.originCity} <ArrowRight className="inline w-3 h-3 text-purple-600" /> {trip.destinationCity}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-mono text-xs">
-                        <div>Início: <span className="text-white">{trip.startOdometerKm.toLocaleString()} km</span></div>
+                      <td className="py-3 px-4 text-right font-mono text-[11px]">
+                        <div>Início: <span className="text-slate-800 font-bold">{trip.startOdometerKm.toLocaleString()} km</span></div>
                         {trip.endOdometerKm && (
-                          <div>Fim: <span className="text-emerald-400">{trip.endOdometerKm.toLocaleString()} km</span></div>
+                          <div>Fim: <span className="text-emerald-600 font-bold">{trip.endOdometerKm.toLocaleString()} km</span></div>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-right font-bold text-white">
+                      <td className="py-3 px-4 text-right font-black text-slate-900 text-sm">
                         {trip.distanceKm ? `${trip.distanceKm} km` : "—"}
                       </td>
-                      <td className="px-4 py-3.5 text-center">
+                      <td className="py-3 px-4 text-center">
                         {trip.status === "Completed" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Concluída
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
                             Em Andamento
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-center">
+                      <td className="py-3 px-4 text-center">
                         {trip.status === "InProgress" && (
                           <button
                             onClick={() => {
                               setCloseTripEndKm(trip.startOdometerKm + 50);
                               setShowCloseTripModal(trip);
                             }}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-sm transition-all"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
                           >
                             Concluir Viagem
                           </button>
                         )}
                         {trip.status === "Completed" && (
-                          <span className="text-xs text-slate-500">Auditada</span>
+                          <span className="text-[11px] font-semibold text-slate-400">Auditada</span>
                         )}
                       </td>
                     </tr>
@@ -481,103 +502,101 @@ export default function FretesPage() {
               </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab: Abastecimentos */}
-      {activeTab === "fueling" && (
-        <div className="space-y-4">
-          <div className="p-5 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20">
-            <h3 className="text-base font-bold text-amber-300 flex items-center gap-2">
-              <Fuel className="w-5 h-5 text-amber-400" />
-              Regra de Abastecimento Rápido da HB Studio
-            </h3>
-            <p className="text-xs text-slate-300 mt-1">
-              "Abasteci R$ 50,00 de gasolina no posto sem olhar os litros". O sistema aceita lançamentos sem litros obrigatórios, registra a despesa na DRE, atualiza o financeiro conforme a forma de pagamento (se pago por sócio, entra como reembolso societário sem duplicar despesa).
-            </p>
-          </div>
+        {/* Tab 2: Abastecimentos */}
+        {activeTab === "fueling" && (
+          <div className="space-y-4">
+            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200">
+              <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <Fuel className="w-4 h-4 text-amber-600" />
+                Regra de Abastecimento Rápido da HB Studio
+              </h3>
+              <p className="text-xs text-amber-800 mt-1">
+                Lançamento rápido sem litros obrigatórios ("Abasteci R$ 50,00"). Registra a despesa na DRE, atualiza o financeiro conforme a forma de pagamento (se pago por sócio, gera reembolso societário sem duplicar despesa).
+              </p>
+            </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-            <h4 className="text-sm font-semibold text-white mb-3">Últimos Lançamentos de Combustível</h4>
-            <div className="space-y-3">
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                    <Fuel className="w-5 h-5" />
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+              <h4 className="text-sm font-extrabold text-slate-900">Últimos Lançamentos de Combustível & Despesas</h4>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                      <Fuel className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">Posto Shell Rodoanel • Gasolina Comum</div>
+                      <div className="text-xs text-slate-500">Veículo: Gol 1.0 Flex (BRA2E19) • Condutor: Henrique Barreto</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-bold text-white">Posto Shell Rodoanel • Gasolina Comum</div>
-                    <div className="text-xs text-slate-400">Veículo: Gol 1.0 Flex (BRA2E19) • Condutor: Henrique Barreto</div>
+                  <div className="text-right">
+                    <div className="text-base font-black text-emerald-600">R$ 50,00</div>
+                    <div className="text-xs text-slate-500">Pix Empresa (Liquidado à Vista)</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-emerald-400">R$ 50,00</div>
-                  <div className="text-xs text-slate-400">Pix Empresa (Liquidado à Vista)</div>
-                </div>
-              </div>
 
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                    <DollarSign className="w-5 h-5" />
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">Pedágio Rodovia dos Bandeirantes</div>
+                      <div className="text-xs text-slate-500">Despesa de Viagem: Retirada de iPhones em SP</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-bold text-white">Pedágio Rodovia dos Bandeirantes</div>
-                    <div className="text-xs text-slate-400">Despesa de Viagem: Retirada de iPhones em SP</div>
+                  <div className="text-right">
+                    <div className="text-base font-black text-slate-900">R$ 12,40</div>
+                    <div className="text-xs text-purple-600 font-semibold">Sem Parar (Contas a Pagar)</div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold text-white">R$ 12,40</div>
-                  <div className="text-xs text-purple-300">Sem Parar (A Pagar na Fatura)</div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab: Veículos */}
-      {activeTab === "vehicles" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vehicles.map((v) => (
-            <div key={v.id} className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="px-2.5 py-1 rounded-md bg-white/10 text-white font-mono font-bold text-sm border border-white/20">
-                    {v.plate}
+        {/* Tab 3: Veículos */}
+        {activeTab === "vehicles" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {vehicles.map((v) => (
+              <div key={v.id} className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-900 font-mono font-black text-sm border border-slate-200">
+                      {v.plate}
+                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 mt-2">{v.brand} {v.model}</h3>
+                    <p className="text-xs text-slate-500">Ano: {v.year} • Combustível: {v.fuel} • Propriedade: HB Studio</p>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {v.status}
                   </span>
-                  <h3 className="text-lg font-bold text-white mt-2">{v.brand} {v.model}</h3>
-                  <p className="text-xs text-slate-400">Ano: {v.year} • Combustível: {v.fuel} • Propriedade: HB Studio</p>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {v.status}
-                </span>
-              </div>
 
-              <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-2">
-                <div className="text-xs text-slate-400 flex items-center justify-between">
-                  <span>Hodômetro Oficial:</span>
-                  <span className="font-mono font-bold text-white text-base">{v.currentOdometerKm.toLocaleString()} km</span>
-                </div>
-                <div className="w-full bg-white/5 rounded-full h-2">
-                  <div className="bg-purple-500 h-2 rounded-full" style={{ width: "65%" }}></div>
-                </div>
-                <div className="text-[11px] text-slate-500 flex justify-between">
-                  <span>Última revisão: 50.000 km</span>
-                  <span>Próxima troca de óleo: 60.000 km</span>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <div className="text-xs text-slate-600 flex items-center justify-between">
+                    <span className="font-medium">Hodômetro Atual:</span>
+                    <span className="font-mono font-black text-slate-900 text-base">{v.currentOdometerKm.toLocaleString()} km</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div className="bg-purple-600 h-2 rounded-full" style={{ width: "65%" }}></div>
+                  </div>
+                  <div className="text-[11px] text-slate-500 flex justify-between">
+                    <span>Última revisão: 50.000 km</span>
+                    <span className="font-semibold text-purple-700">Próxima troca de óleo: 60.000 km</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {/* Tab: Manutenção */}
-      {activeTab === "maintenance" && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-            <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-              <Wrench className="w-5 h-5 text-purple-400" />
+        {/* Tab 4: Manutenção */}
+        {activeTab === "maintenance" && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-purple-600" />
               Semáforo Preventivo de Manutenção & Troca de Óleo
             </h3>
 
@@ -585,47 +604,46 @@ export default function FretesPage() {
               {plans.map((p) => {
                 const isOverdue = p.evaluationStatus === "Overdue";
                 const isUpcoming = p.evaluationStatus === "Upcoming";
-                const isOk = p.evaluationStatus === "UpToDate";
 
                 return (
                   <div
                     key={p.id}
                     className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                       isOverdue
-                        ? "bg-rose-500/5 border-rose-500/30"
+                        ? "bg-rose-50 border-rose-200"
                         : isUpcoming
-                        ? "bg-amber-500/5 border-amber-500/30"
-                        : "bg-emerald-500/5 border-emerald-500/20"
+                        ? "bg-amber-50 border-amber-200"
+                        : "bg-emerald-50 border-emerald-200"
                     }`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`w-2.5 h-2.5 rounded-full ${
-                          isOverdue ? "bg-rose-500 animate-ping" : isUpcoming ? "bg-amber-400" : "bg-emerald-400"
+                          isOverdue ? "bg-rose-600 animate-ping" : isUpcoming ? "bg-amber-500" : "bg-emerald-500"
                         }`} />
-                        <h4 className="text-sm font-bold text-white">{p.planName}</h4>
+                        <h4 className="text-sm font-bold text-slate-900">{p.planName}</h4>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-slate-600 mt-0.5">
                         Intervalo: a cada {p.intervalKm?.toLocaleString()} km ou {p.intervalDays} dias
                       </p>
                     </div>
 
                     <div className="flex items-center gap-6">
                       <div className="text-right">
-                        <div className="text-xs text-slate-400">Restante para revisão:</div>
-                        <div className={`text-sm font-mono font-bold ${
-                          isOverdue ? "text-rose-400" : isUpcoming ? "text-amber-300" : "text-emerald-400"
+                        <div className="text-[11px] text-slate-500">Restante para revisão:</div>
+                        <div className={`text-sm font-mono font-extrabold ${
+                          isOverdue ? "text-rose-700" : isUpcoming ? "text-amber-800" : "text-emerald-700"
                         }`}>
                           {p.kmRemaining?.toLocaleString()} km • {p.daysRemaining} dias
                         </div>
                       </div>
 
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
                         isOverdue
-                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                          ? "bg-rose-100 text-rose-800 border-rose-300"
                           : isUpcoming
-                          ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          ? "bg-amber-100 text-amber-800 border-amber-300"
+                          : "bg-emerald-100 text-emerald-800 border-emerald-300"
                       }`}>
                         {isOverdue ? "VENCIDA" : isUpcoming ? "PRÓXIMA" : "EM DIA"}
                       </span>
@@ -635,411 +653,415 @@ export default function FretesPage() {
               })}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tab: Precificação Inteligente */}
-      {activeTab === "pricing" && (
-        <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-purple-950/40 border border-purple-500/30 relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-400/10 text-amber-300 border border-amber-400/20 mb-2">
+        {/* Tab 5: Precificação Inteligente */}
+        {activeTab === "pricing" && (
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border border-purple-200">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700 border border-purple-200 mb-2">
                 <Sparkles className="w-3.5 h-3.5" /> MOTOR ENTERPRISE DE PRECIFICAÇÃO DINÂMICA
               </div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-lg font-extrabold text-slate-900">
                 Composição Exata: Custo de Aquisição + Rateio de Frete + Margem Alvo
               </h2>
-              <p className="text-sm text-slate-300 max-w-3xl mt-1">
-                Conforme o CPC 16(R1), o custo do produto engloba o preço pago ao fornecedor/cliente usado mais o frete de retirada rateado. O preço sugerido de vitrine protege a margem líquida da empresa mesmo após o desconto negociado no balcão.
+              <p className="text-xs text-slate-600 max-w-3xl mt-1">
+                Conforme o CPC 16(R1), o frete de retirada integra o custo de estoque do celular. O motor calcula o preço sugerido de vitrine garantindo a margem da empresa mesmo com o desconto negociado em balcão.
               </p>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Parâmetros de Simulação */}
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-purple-400" />
-                Parâmetros do Aparelho & Política
-              </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Parâmetros */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-purple-600" />
+                  Parâmetros do Aparelho & Política
+                </h3>
 
-              <div className="space-y-3">
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Aparelho Selecionado</label>
+                    <input
+                      type="text"
+                      value={pricingSim.model}
+                      readOnly
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold"
+                    />
+                    <span className="text-[11px] text-slate-400 font-mono mt-0.5 block">IMEI: {pricingSim.imei}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Custo Compra (R$)</label>
+                      <input
+                        type="number"
+                        value={pricingSim.baseCost}
+                        onChange={(e) => setPricingSim({ ...pricingSim, baseCost: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Frete Rateado (R$)</label>
+                      <input
+                        type="number"
+                        value={pricingSim.freightAllocated}
+                        onChange={(e) => setPricingSim({ ...pricingSim, freightAllocated: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-cyan-700 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Desc. Compra (%)</label>
+                      <input
+                        type="number"
+                        value={pricingSim.targetAcquisitionDiscountPct}
+                        onChange={(e) => setPricingSim({ ...pricingSim, targetAcquisitionDiscountPct: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-slate-900"
+                        title="Desconto-alvo para negociar a compra de usados"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Markup (%)</label>
+                      <input
+                        type="number"
+                        value={pricingSim.targetMarkupPct}
+                        onChange={(e) => setPricingSim({ ...pricingSim, targetMarkupPct: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-emerald-700 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Desc. Balcão (%)</label>
+                      <input
+                        type="number"
+                        value={pricingSim.maxCounterDiscountPct}
+                        onChange={(e) => setPricingSim({ ...pricingSim, maxCounterDiscountPct: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-amber-700 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Arredondamento Comercial</label>
+                    <select
+                      value={pricingSim.rounding}
+                      onChange={(e) => setPricingSim({ ...pricingSim, rounding: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
+                    >
+                      <option value="EndingIn90">Terminação Comercial em ,90 (Ex: R$ 4.999,90)</option>
+                      <option value="EndingIn99">Terminação Comercial em ,99 (Ex: R$ 4.999,99)</option>
+                      <option value="Exact">Exato sem Arredondamento</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Memória de Cálculo */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col justify-between">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400">Aparelho Selecionado</label>
+                  <h3 className="text-sm font-extrabold text-slate-900 mb-4">Memória de Cálculo Auditável</h3>
+                  
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">Custo Base de Compra:</span>
+                      <span className="font-mono text-slate-800 font-semibold">R$ {pricingSim.baseCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">(+) Frete Rateado (Viagem SP):</span>
+                      <span className="font-mono text-cyan-700 font-semibold">R$ {pricingSim.freightAllocated.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100 font-bold">
+                      <span className="text-slate-900">(=) Custo Contábil de Estoque:</span>
+                      <span className="font-mono text-emerald-700">R$ {totalBaseCost.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">(+) Markup de Revenda ({pricingSim.targetMarkupPct}%):</span>
+                      <span className="font-mono text-slate-800">R$ {(finalSuggestedPrice - totalBaseCost).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100">
+                      <span className="text-slate-500">(-) Desconto Máx. Balcão ({pricingSim.maxCounterDiscountPct}%):</span>
+                      <span className="font-mono text-amber-700">- R$ {counterDiscountAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-100 text-slate-500">
+                      <span>Rentabilidade no Pior Cenário de Balcão:</span>
+                      <span className="font-mono text-emerald-700 font-bold">{marginPctAtMaxDiscount.toFixed(1)}% líquida</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 rounded-xl bg-purple-50 border border-purple-200 text-center">
+                  <span className="text-[10px] uppercase font-bold text-purple-700 tracking-wider">
+                    Preço Sugerido de Vitrine (PDV / Catálogo)
+                  </span>
+                  <div className="text-3xl font-black text-slate-900 mt-1">
+                    R$ {finalSuggestedPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-2">
+                    Preço piso no balcão: <strong className="text-amber-800">R$ {maxDiscountedPrice.toFixed(2)}</strong>.
+                    Mesmo com o desconto máximo permitido de {pricingSim.maxCounterDiscountPct}%, a empresa retém <strong className="text-emerald-700 font-bold">R$ {profitAtMaxDiscount.toFixed(2)} ({marginPctAtMaxDiscount.toFixed(1)}%)</strong> de lucro líquido!
+                  </p>
+                  <button
+                    onClick={() => alert("Preço aprovado pelo sócio! Atualizado oficialmente no Catálogo e PDV Balcão sem expor custos ao cliente.")}
+                    className="mt-3.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white font-bold text-xs transition-all shadow-md shadow-purple-600/20"
+                  >
+                    Aprovar & Publicar no Catálogo / PDV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Iniciar Viagem */}
+        {showNewTripModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Iniciar Viagem de Campo</h3>
+                <button onClick={() => setShowNewTripModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleCreateTrip} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Veículo</label>
+                  <select
+                    value={newTripForm.vehicleId}
+                    onChange={(e) => setNewTripForm({ ...newTripForm, vehicleId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  >
+                    {vehicles.map(v => (
+                      <option key={v.id} value={v.id}>{v.brand} {v.model} ({v.plate})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Condutor</label>
                   <input
                     type="text"
-                    value={pricingSim.model}
-                    readOnly
-                    className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white font-medium"
+                    value={newTripForm.driverName}
+                    onChange={(e) => setNewTripForm({ ...newTripForm, driverName: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    required
                   />
-                  <span className="text-[11px] text-slate-500 font-mono">IMEI: {pricingSim.imei}</span>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Finalidade</label>
+                  <input
+                    type="text"
+                    value={newTripForm.purpose}
+                    onChange={(e) => setNewTripForm({ ...newTripForm, purpose: e.target.value })}
+                    placeholder="Ex: Retirada de iPhone em São Paulo"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    required
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-slate-400">Custo de Aquisição (R$)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Cidade Origem</label>
                     <input
-                      type="number"
-                      value={pricingSim.baseCost}
-                      onChange={(e) => setPricingSim({ ...pricingSim, baseCost: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+                      type="text"
+                      value={newTripForm.originCity}
+                      onChange={(e) => setNewTripForm({ ...newTripForm, originCity: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                      required
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-400">Frete Alocado (R$)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Cidade Destino</label>
                     <input
-                      type="number"
-                      value={pricingSim.freightAllocated}
-                      onChange={(e) => setPricingSim({ ...pricingSim, freightAllocated: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400">Desc. Compra Usado (%)</label>
-                    <input
-                      type="number"
-                      value={pricingSim.targetAcquisitionDiscountPct}
-                      onChange={(e) => setPricingSim({ ...pricingSim, targetAcquisitionDiscountPct: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-cyan-300"
-                      title="Desconto-alvo para negociar a compra com o vendedor"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400">Markup Revenda (%)</label>
-                    <input
-                      type="number"
-                      value={pricingSim.targetMarkupPct}
-                      onChange={(e) => setPricingSim({ ...pricingSim, targetMarkupPct: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-emerald-400 font-bold"
-                      title="Markup de revenda sobre o custo total"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400">Desc. Máx. Balcão (%)</label>
-                    <input
-                      type="number"
-                      value={pricingSim.maxCounterDiscountPct}
-                      onChange={(e) => setPricingSim({ ...pricingSim, maxCounterDiscountPct: Number(e.target.value) })}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-amber-300"
-                      title="Desconto comercial máximo permitido no balcão/PDV"
+                      type="text"
+                      value={newTripForm.destinationCity}
+                      onChange={(e) => setNewTripForm({ ...newTripForm, destinationCity: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                      required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-400">Regra de Arredondamento Comercial</label>
-                  <select
-                    value={pricingSim.rounding}
-                    onChange={(e) => setPricingSim({ ...pricingSim, rounding: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-sm text-white"
+                  <label className="font-bold text-slate-700 block mb-1">Hodômetro Inicial (km)</label>
+                  <input
+                    type="number"
+                    value={newTripForm.startOdometerKm}
+                    onChange={(e) => setNewTripForm({ ...newTripForm, startOdometerKm: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewTripModal(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
                   >
-                    <option value="EndingIn90">Terminação Comercial em ,90 (Ex: R$ 4.999,90)</option>
-                    <option value="EndingIn99">Terminação Comercial em ,99 (Ex: R$ 4.999,99)</option>
-                    <option value="Exact">Exato sem Arredondamento</option>
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                  >
+                    Registrar Saída
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Concluir Viagem */}
+        {showCloseTripModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Concluir Viagem {showCloseTripModal.tripNumber}</h3>
+                <button onClick={() => setShowCloseTripModal(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 space-y-1">
+                  <div>Veículo: <strong className="text-slate-900">{showCloseTripModal.vehiclePlate}</strong></div>
+                  <div>Hodômetro Inicial: <strong className="text-slate-900">{showCloseTripModal.startOdometerKm.toLocaleString()} km</strong></div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Hodômetro Final (km)</label>
+                  <input
+                    type="number"
+                    value={closeTripEndKm}
+                    onChange={(e) => setCloseTripEndKm(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-mono text-slate-900 font-bold"
+                    min={showCloseTripModal.startOdometerKm}
+                  />
+                </div>
+
+                <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-center">
+                  <div className="text-[11px] font-bold text-purple-700">Distância Calculada</div>
+                  <div className="text-2xl font-black text-slate-900">
+                    {Math.max(0, closeTripEndKm - showCloseTripModal.startOdometerKm)} km
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCloseTripModal(null)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCloseTrip(showCloseTripModal)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Finalizar & Gravar Km
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Abastecimento Rápido */}
+        {showFuelingModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <Fuel className="w-4 h-4 text-amber-600" />
+                  Lançamento Rápido de Combustível
+                </h3>
+                <button onClick={() => setShowFuelingModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleCreateFueling} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Veículo</label>
+                  <select
+                    value={fuelingForm.vehicleId}
+                    onChange={(e) => setFuelingForm({ ...fuelingForm, vehicleId: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  >
+                    {vehicles.map(v => (
+                      <option key={v.id} value={v.id}>{v.brand} {v.model} ({v.plate})</option>
+                    ))}
                   </select>
                 </div>
-              </div>
-            </div>
 
-            {/* Memória de Cálculo & Preço Sugerido */}
-            <div className="p-5 rounded-2xl bg-gradient-to-b from-white/[0.04] to-white/[0.01] border border-white/10 flex flex-col justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white mb-4">Memória de Cálculo Auditável</h3>
-                
-                <div className="space-y-2.5 text-sm">
-                  <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">Custo Base de Compra:</span>
-                    <span className="font-mono text-white">R$ {pricingSim.baseCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">(+) Frete Rateado (Viagem SP):</span>
-                    <span className="font-mono text-cyan-400">R$ {pricingSim.freightAllocated.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-white/5 font-semibold">
-                    <span className="text-white">(=) Custo Contábil de Estoque:</span>
-                    <span className="font-mono text-emerald-400">R$ {totalBaseCost.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">(+) Markup de Revenda ({pricingSim.targetMarkupPct}%):</span>
-                    <span className="font-mono text-white">R$ {(finalSuggestedPrice - totalBaseCost).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-white/5">
-                    <span className="text-slate-400">(-) Desconto Máx. Balcão ({pricingSim.maxCounterDiscountPct}%):</span>
-                    <span className="font-mono text-amber-300">- R$ {counterDiscountAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-white/5 text-xs text-slate-400">
-                    <span>Rentabilidade no Pior Cenário de Balcão:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{marginPctAtMaxDiscount.toFixed(1)}% líquida</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 rounded-xl bg-purple-600/10 border border-purple-500/30 text-center">
-                <span className="text-xs uppercase font-semibold text-purple-300 tracking-wider">
-                  Preço Sugerido de Vitrine (PDV / Catálogo)
-                </span>
-                <div className="text-3xl font-extrabold text-white mt-1">
-                  R$ {finalSuggestedPrice.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Preço piso no balcão: <strong className="text-amber-300">R$ {maxDiscountedPrice.toFixed(2)}</strong>.
-                  Mesmo com o desconto máximo permitido de {pricingSim.maxCounterDiscountPct}%, a empresa retém <strong className="text-emerald-400">R$ {profitAtMaxDiscount.toFixed(2)} ({marginPctAtMaxDiscount.toFixed(1)}%)</strong> de lucro líquido!
-                </p>
-                <button
-                  onClick={() => alert("Preço aprovado pelo sócio! Atualizado oficialmente no Catálogo e PDV Balcão sem expor custos ao cliente.")}
-                  className="mt-4 w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition-all shadow-md shadow-purple-600/30"
-                >
-                  Aprovar & Publicar no Catálogo / PDV
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Iniciar Viagem */}
-      {showNewTripModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-white/10 p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">Iniciar Viagem de Campo</h3>
-            <form onSubmit={handleCreateTrip} className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Veículo</label>
-                <select
-                  value={newTripForm.vehicleId}
-                  onChange={(e) => setNewTripForm({ ...newTripForm, vehicleId: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                >
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.brand} {v.model} ({v.plate})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Condutor</label>
-                <input
-                  type="text"
-                  value={newTripForm.driverName}
-                  onChange={(e) => setNewTripForm({ ...newTripForm, driverName: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Finalidade</label>
-                <input
-                  type="text"
-                  value={newTripForm.purpose}
-                  onChange={(e) => setNewTripForm({ ...newTripForm, purpose: e.target.value })}
-                  placeholder="Ex: Retirada de iPhone em São Paulo"
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-300">Cidade Origem</label>
+                  <label className="font-bold text-slate-700 block mb-1">Valor Total Pago (R$)</label>
                   <input
-                    type="text"
-                    value={newTripForm.originCity}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, originCity: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
+                    type="number"
+                    step="0.01"
+                    value={fuelingForm.totalAmount}
+                    onChange={(e) => setFuelingForm({ ...fuelingForm, totalAmount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-base font-black text-emerald-600"
                     required
                   />
                 </div>
+
                 <div>
-                  <label className="text-xs font-semibold text-slate-300">Cidade Destino</label>
+                  <label className="font-bold text-slate-700 block mb-1">Litros Abastecidos (Opcional)</label>
                   <input
-                    type="text"
-                    value={newTripForm.destinationCity}
-                    onChange={(e) => setNewTripForm({ ...newTripForm, destinationCity: e.target.value })}
-                    className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                    required
+                    type="number"
+                    step="0.001"
+                    placeholder="Deixe em branco se abasteceu sem olhar os litros"
+                    value={fuelingForm.liters}
+                    onChange={(e) => setFuelingForm({ ...fuelingForm, liters: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Hodômetro Inicial (km)</label>
-                <input
-                  type="number"
-                  value={newTripForm.startOdometerKm}
-                  onChange={(e) => setNewTripForm({ ...newTripForm, startOdometerKm: Number(e.target.value) })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTripModal(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm text-slate-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm text-white font-semibold"
-                >
-                  Registrar Saída
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Concluir Viagem */}
-      {showCloseTripModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">Concluir Viagem {showCloseTripModal.tripNumber}</h3>
-            <p className="text-xs text-slate-400">
-              Informe o hodômetro final do veículo na chegada para cálculo da distância efetiva percorrida.
-            </p>
-
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-white/5 text-xs text-slate-300 space-y-1">
-                <div>Veículo: <strong className="text-white">{showCloseTripModal.vehiclePlate}</strong></div>
-                <div>Hodômetro Inicial: <strong className="text-white">{showCloseTripModal.startOdometerKm.toLocaleString()} km</strong></div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Hodômetro Final (km)</label>
-                <input
-                  type="number"
-                  value={closeTripEndKm}
-                  onChange={(e) => setCloseTripEndKm(Number(e.target.value))}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                  min={showCloseTripModal.startOdometerKm}
-                />
-              </div>
-
-              <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
-                <div className="text-xs text-purple-300">Distância Calculada</div>
-                <div className="text-xl font-bold text-white">
-                  {Math.max(0, closeTripEndKm - showCloseTripModal.startOdometerKm)} km
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Forma de Pagamento</label>
+                  <select
+                    value={fuelingForm.paymentMethod}
+                    onChange={(e) => setFuelingForm({ ...fuelingForm, paymentMethod: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
+                  >
+                    <option value="CompanyPix">Pix da Empresa (Débito Imediato)</option>
+                    <option value="PartnerReimbursement">Pago pelo Sócio (Reembolso Societário)</option>
+                    <option value="CompanyCreditCard">Cartão Corporativo (Contas a Pagar)</option>
+                    <option value="Cash">Dinheiro Físico do Caixa</option>
+                  </select>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCloseTripModal(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm text-slate-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCloseTrip(showCloseTripModal)}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm text-white font-semibold"
-                >
-                  Finalizar & Gravar Km
-                </button>
-              </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Posto / Local</label>
+                  <input
+                    type="text"
+                    value={fuelingForm.gasStationName}
+                    onChange={(e) => setFuelingForm({ ...fuelingForm, gasStationName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowFuelingModal(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Salvar Abastecimento
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal: Abastecimento Rápido */}
-      {showFuelingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Fuel className="w-5 h-5 text-amber-400" />
-              Lançamento Rápido de Combustível
-            </h3>
-
-            <form onSubmit={handleCreateFueling} className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Veículo</label>
-                <select
-                  value={fuelingForm.vehicleId}
-                  onChange={(e) => setFuelingForm({ ...fuelingForm, vehicleId: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                >
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.brand} {v.model} ({v.plate})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Valor Total Pago (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fuelingForm.totalAmount}
-                  onChange={(e) => setFuelingForm({ ...fuelingForm, totalAmount: Number(e.target.value) })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-lg font-bold text-emerald-400"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Litros Abastecidos (Opcional)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  placeholder="Deixe em branco se abasteceu sem olhar os litros"
-                  value={fuelingForm.liters}
-                  onChange={(e) => setFuelingForm({ ...fuelingForm, liters: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Forma de Pagamento</label>
-                <select
-                  value={fuelingForm.paymentMethod}
-                  onChange={(e) => setFuelingForm({ ...fuelingForm, paymentMethod: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-sm text-white"
-                >
-                  <option value="CompanyPix">Pix da Empresa (Débito Imediato Caixa/Banco)</option>
-                  <option value="PartnerReimbursement">Pago pelo Sócio do Próprio Bolso (Gerar Reembolso)</option>
-                  <option value="CompanyCreditCard">Cartão Corporativo (Contas a Pagar)</option>
-                  <option value="Cash">Dinheiro Físico do Caixa da Loja</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Posto / Local</label>
-                <input
-                  type="text"
-                  value={fuelingForm.gasStationName}
-                  onChange={(e) => setFuelingForm({ ...fuelingForm, gasStationName: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowFuelingModal(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm text-slate-300"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-sm text-white font-semibold"
-                >
-                  Salvar Abastecimento
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </RootShellLayout>
   );
 }
