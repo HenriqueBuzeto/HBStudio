@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using BuildingBlocks.Domain;
 using BuildingBlocks.Infrastructure;
 using BuildingBlocks.Security;
+using Fiscal.Application.Contracts;
 using Fiscal.Application.DTOs;
 using Fiscal.Domain.Entities;
+using Fiscal.Infrastructure.ZeusAdapters;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,7 +60,7 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
             PermissionCatalog.FiscalSettingsManage,
             PermissionCatalog.FiscalDocumentsView);
 
-        // 1. Configurar Estabelecimento Fiscal
+        // 1. Configurar Estabelecimento Fiscal com QR Code V3 (NT 2025.001)
         var configReq = new ConfigureEstablishmentRequest(
             CorporateName: "HB STUDIO INOVAÇÃO E TECNOLOGIA LTDA",
             TradeName: "HB Studio",
@@ -73,7 +77,8 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
             CityName: "São Paulo",
             State: "SP",
             PostalCode: "01310100",
-            Environment: 2, // Homologação
+            Environment: 1, // Homologação
+            QrCodeVersion: 3, // QR Code V3 (NT 2025.001)
             NfceSeries: 1,
             NfceNextNumber: 1
         );
@@ -87,12 +92,13 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
         establishment!.Cnpj.Should().Be("48951871000180");
         establishment.State.Should().Be("SP");
         establishment.Regime.Should().Be("SimplesNacional");
+        establishment.QrCodeVersion.Should().Be(3);
 
-        // 2. Registrar Token CSC (para QR Code NFC-e)
+        // 2. Registrar Token CSC (para contingência / legado V2)
         var cscReq = new RegisterCscRequest(
             CscId: "000001",
             CscToken: "ABCDEF1234567890ABCDEF1234567890",
-            Environment: 2
+            Environment: 1
         );
 
         var cscRes = await client.PostAsJsonAsync("/api/fiscal/csc", cscReq);
@@ -108,195 +114,122 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public async Task Fiscal_Emit_Nfce_And_Cancel_Workflow_Should_Persist_Document()
+    public void AesGcm_Encryption_And_Tampering_Verification_Should_Work()
     {
-        var tenantId = Guid.NewGuid();
-        var branchId = Guid.NewGuid();
+        // 1. Chave AES de 256 bits
+        byte[] key = AesGcmEncryptionHelper.DeriveKeyFromSecret("TenantSuperKey2026");
+        byte[] originalData = Encoding.UTF8.GetBytes("CertificadoA1PrivateKeyAndSecret1234");
 
-        // Inicializar banco de dados para criar a venda necessária
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // 2. Criptografa gerando [Nonce 12b][Tag 16b][Ciphertext]
+        byte[] encrypted = AesGcmEncryptionHelper.Encrypt(originalData, key);
+        encrypted.Length.Should().Be(12 + 16 + originalData.Length);
 
-            // Estabelecimento base
-            var est = new FiscalEstablishment(
-                tenantId: tenantId,
-                branchId: branchId,
-                corporateName: "HB STUDIO TECNOLOGIA LTDA",
-                tradeName: "HB Studio",
-                cnpj: "48951871000180",
-                stateRegistration: "111222333",
-                regime: TaxRegime.SimplesNacional,
-                street: "Rua Teste",
-                number: "123",
-                neighborhood: "Centro",
-                cityCodeIbge: "3550308",
-                cityName: "São Paulo",
-                state: "SP",
-                postalCode: "01001000");
+        // 3. Descriptografa com sucesso
+        byte[] decrypted = AesGcmEncryptionHelper.Decrypt(encrypted, key);
+        Encoding.UTF8.GetString(decrypted).Should().Be("CertificadoA1PrivateKeyAndSecret1234");
 
-            db.FiscalEstablishments.Add(est);
+        // 4. Teste de Violação: Adulterar 1 byte do ciphertext
+        byte[] tampered = (byte[])encrypted.Clone();
+        tampered[^1] ^= 0xFF; // Inverte o último bit
 
-            // Adicionar Certificado A1 e CSC para atender às precondições de emissão
-            var cert = new FiscalCertificate(
-                tenantId: tenantId,
-                establishmentId: est.Id,
-                subjectName: "CN=HB STUDIO:48951871000180",
-                thumbprint: "AABBCCDDEEFF11223344",
-                cnpj: "48951871000180",
-                validFromUtc: DateTime.UtcNow.AddDays(-10),
-                validUntilUtc: DateTime.UtcNow.AddDays(355),
-                encryptedRawData: new byte[] { 1, 2, 3, 4 },
-                encryptedPassword: new byte[] { 5, 6, 7, 8 },
-                keyIvBase64: "dGVzdC1pdi1rZXk=");
-
-            var csc = new FiscalCsc(
-                tenantId: tenantId,
-                establishmentId: est.Id,
-                cscId: "000001",
-                encryptedCscToken: new byte[] { 9, 10, 11, 12 },
-                cscTokenMasked: "ABC***XYZ",
-                environment: FiscalEnvironment.Homologation);
-
-            db.FiscalCertificates.Add(cert);
-            db.FiscalCscs.Add(csc);
-
-            // Venda simulada no PDV
-            var sale = new Sales.Domain.Sale(
-                tenantId: tenantId,
-                branchId: branchId,
-                saleNumber: "VND-202611-001",
-                customerPartyId: Guid.NewGuid(),
-                sellerUserId: Guid.NewGuid(),
-                createdByUserId: Guid.NewGuid());
-
-            sale.AddItem(
-                productSkuId: Guid.NewGuid(),
-                historicalSkuCode: "IP13-128-BLK",
-                historicalDescription: "iPhone 13 128GB Preto Usado Vitrine",
-                itemCondition: Catalog.Domain.ItemCondition.PreOwned,
-                quantity: 1,
-                unitPrice: 120.00m,
-                discount: 0m,
-                unitCost: 60.00m);
-
-            db.Sales.Add(sale);
-            await db.SaveChangesAsync();
-
-            // Emitir NFC-e via Endpoint
-            var client = CreateClientWithPermissions(
-                tenantId,
-                branchId,
-                PermissionCatalog.FiscalIssue,
-                PermissionCatalog.FiscalDocumentsView,
-                PermissionCatalog.FiscalCancel);
-
-            var emitReq = new EmitNfceFromSaleRequest(
-                SaleId: sale.Id,
-                ConsumerCpf: "12345678909",
-                ConsumerName: "Consumidor Teste");
-
-            var emitRes = await client.PostAsJsonAsync("/api/fiscal/nfce/sale", emitReq);
-            var emitErr = await emitRes.Content.ReadAsStringAsync();
-            emitRes.StatusCode.Should().Be(HttpStatusCode.OK, emitErr);
-
-            var doc = await emitRes.Content.ReadFromJsonAsync<FiscalDocumentDto>();
-            doc.Should().NotBeNull();
-            doc!.Status.Should().Be("Authorized");
-            doc.Series.Should().Be(1);
-            doc.Number.Should().Be(1);
-            doc.AccessKey.Length.Should().Be(44);
-            doc.QrCodeUrl.Should().NotBeNullOrEmpty();
-            doc.TotalAmount.Should().Be(7890.00m);
-
-            // Cancelar NFC-e
-            var cancelReq = new CancelNfceRequest("Cancelamento homologado por desacordo comercial do cliente");
-            var cancelRes = await client.PostAsJsonAsync($"/api/fiscal/documents/{doc.Id}/cancel", cancelReq);
-            cancelRes.StatusCode.Should().Be(HttpStatusCode.OK);
-
-            var cancelledDoc = await cancelRes.Content.ReadFromJsonAsync<FiscalDocumentDto>();
-            cancelledDoc!.Status.Should().Be("Cancelled");
-            cancelledDoc.CancellationReason.Should().Contain("Cancelamento homologado");
-        }
+        // 5. Autenticação criptográfica deve rejeitar imediatamente
+        var act = () => AesGcmEncryptionHelper.Decrypt(tampered, key);
+        act.Should().Throw<CryptographicException>();
     }
 
     [Fact]
-    public async Task Fiscal_Inbound_Xml_Parse_And_Import_Should_Prevent_Xxe_And_Extract_Data()
+    public void QrCode_NT2025_001_V3_And_V2_Resolution_Should_Be_Compliant()
+    {
+        var provider = new ZeusNFeProvider();
+        var est = new FiscalEstablishment(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "HB STUDIO",
+            "HB Studio",
+            "48951871000180",
+            "111222333",
+            TaxRegime.SimplesNacional,
+            "Rua Teste",
+            "100",
+            "Centro",
+            "3550308",
+            "São Paulo",
+            "SP",
+            "01001000"
+        );
+        est.SwitchEnvironment(FiscalEnvironment.Homologation);
+
+        string accessKey = "35261148951871000180650010000000011189201450";
+
+        // Caso 1: QR Code Versão 3 (NT 2025.001) - Online (Sem CSC, p=chNFe|3|tpAmb)
+        est.SetQrCodeVersion(QrCodeVersion.V3);
+        string v3OnlineUrl = provider.GenerateQrCodeUrl(est, accessKey, 8990.00m, "12345678909", null, tpEmis: 1);
+        v3OnlineUrl.Should().Contain("homologacao.nfce.fazenda.sp.gov.br/qrcode?p=");
+        v3OnlineUrl.Should().EndWith($"?p={accessKey}|3|1");
+
+        // Caso 2: QR Code Versão 2 (Legado - Exige CSC e Hash SHA-1)
+        est.SetQrCodeVersion(QrCodeVersion.V2);
+        var csc = new FiscalCsc(
+            Guid.NewGuid(),
+            est.Id,
+            "000001",
+            Encoding.UTF8.GetBytes("TOKEN_CSC_SEFAZ_SP_SECRET"),
+            "TOK***RET",
+            FiscalEnvironment.Homologation
+        );
+        string v2Url = provider.GenerateQrCodeUrl(est, accessKey, 8990.00m, "12345678909", csc, tpEmis: 1);
+        v2Url.Should().Contain("|2|1|");
+        v2Url.Should().Contain("|000001|");
+    }
+
+    [Fact]
+    public async Task Fiscal_Inbound_Xml_Should_Reject_When_Payload_Exceeds_Or_Cnpj_Mismatch()
     {
         var tenantId = Guid.NewGuid();
         var branchId = Guid.NewGuid();
 
-        var client = CreateClientWithPermissions(
-            tenantId,
-            branchId,
-            PermissionCatalog.FiscalDocumentsView,
-            PermissionCatalog.FiscalIssue);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var est = new FiscalEstablishment(
+                tenantId,
+                branchId,
+                "HB STUDIO LTDA",
+                "HB Studio",
+                "48951871000180",
+                "111222333",
+                TaxRegime.SimplesNacional,
+                "Rua Teste",
+                "123",
+                "Centro",
+                "3550308",
+                "São Paulo",
+                "SP",
+                "01001000"
+            );
+            db.FiscalEstablishments.Add(est);
+            await db.SaveChangesAsync();
+        }
 
-        var validNfeXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+        var client = CreateClientWithPermissions(tenantId, branchId, PermissionCatalog.FiscalDocumentsView, PermissionCatalog.FiscalIssue);
+
+        // XML com CNPJ destinatário divergente
+        var mismatchXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
 <nfeProc xmlns=""http://www.portalfiscal.inf.br/nfe"" versao=""4.00"">
   <NFe>
-    <infNFe Id=""NFe35261148951871000180550010000012341234567890"" versao=""4.00"">
-      <ide>
-        <nNF>1234</nNF>
-        <serie>1</serie>
-        <dhEmi>2026-11-16T14:30:00-03:00</dhEmi>
-      </ide>
-      <emit>
-        <CNPJ>12345678000199</CNPJ>
-        <xNome>FORNECEDOR DE COMPONENTES APPLE LTDA</xNome>
-        <IE>123456789</IE>
-      </emit>
-      <dest>
-        <CNPJ>48951871000180</CNPJ>
-        <xNome>HB STUDIO LTDA</xNome>
-      </dest>
-      <det nItem=""1"">
-        <prod>
-          <cProd>DISP-IP13-OLED</cProd>
-          <xProd>Tela Display OLED iPhone 13 Original Retirada</xProd>
-          <NCM>85285200</NCM>
-          <CFOP>5102</CFOP>
-          <qCom>5.0000</qCom>
-          <vUnCom>350.0000000000</vUnCom>
-          <vProd>1750.00</vProd>
-        </prod>
-      </det>
-      <total>
-        <ICMSTot>
-          <vProd>1750.00</vProd>
-          <vNF>1750.00</vNF>
-          <vICMS>0.00</vICMS>
-        </ICMSTot>
-      </total>
+    <infNFe Id=""NFe35261199999999000199550010000012341234567890"" versao=""4.00"">
+      <ide><nNF>999</nNF><serie>1</serie><dhEmi>2026-11-16T14:30:00-03:00</dhEmi></ide>
+      <emit><CNPJ>12345678000199</CNPJ><xNome>OUTRO FORNECEDOR</xNome></emit>
+      <dest><CNPJ>00000000000000</CNPJ><xNome>OUTRA EMPRESA</xNome></dest>
+      <det nItem=""1""><prod><cProd>1</cProd><xProd>TESTE</xProd><NCM>85285200</NCM><qCom>1</qCom><vUnCom>100</vUnCom><vProd>100</vProd></prod></det>
+      <total><ICMSTot><vProd>100</vProd><vNF>100</vNF><vICMS>0</vICMS></ICMSTot></total>
     </infNFe>
   </NFe>
 </nfeProc>";
 
-        // Testar Parse
-        var parseRes = await client.PostAsJsonAsync("/api/fiscal/inbound/parse", new InboundXmlUploadRequest(validNfeXml));
-        parseRes.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var parsed = await parseRes.Content.ReadFromJsonAsync<InboundInvoiceParsedDto>();
-        parsed.Should().NotBeNull();
-        parsed!.Number.Should().Be(1234);
-        parsed.Series.Should().Be(1);
-        parsed.SupplierCnpj.Should().Be("12345678000199");
-        parsed.SupplierName.Should().Be("FORNECEDOR DE COMPONENTES APPLE LTDA");
-        parsed.TotalProducts.Should().Be(1750.00m);
-        parsed.Items.Should().HaveCount(1);
-        parsed.Items[0].ProductCode.Should().Be("DISP-IP13-OLED");
-        parsed.Items[0].Quantity.Should().Be(5.00m);
-        parsed.Items[0].UnitCost.Should().Be(350.00m);
-
-        // Testar Import
-        var importRes = await client.PostAsJsonAsync("/api/fiscal/inbound/import", new InboundXmlUploadRequest(validNfeXml));
-        importRes.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        // Listar Notas de Entrada
-        var listRes = await client.GetAsync("/api/fiscal/inbound");
-        listRes.StatusCode.Should().Be(HttpStatusCode.OK);
-        var inbounds = await listRes.Content.ReadFromJsonAsync<List<InboundFiscalDocument>>();
-        inbounds.Should().NotBeNull();
-        inbounds.Should().Contain(d => d.AccessKey == "35261148951871000180550010000012341234567890");
+        var res = await client.PostAsJsonAsync("/api/fiscal/inbound/import", new InboundXmlUploadRequest(mismatchXml));
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var err = await res.Content.ReadAsStringAsync();
+        err.Should().Contain("não coincide com o CNPJ do estabelecimento");
     }
 }

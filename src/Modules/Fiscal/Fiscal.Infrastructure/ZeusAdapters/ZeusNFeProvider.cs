@@ -15,7 +15,7 @@ public class ZeusNFeProvider : IFiscalProvider
 
     public Task<ServiceStatusResult> CheckStatusAsync(FiscalEstablishment establishment, CancellationToken ct = default)
     {
-        // Consulta canônica e verificação de conectividade com SEFAZ
+        // Consulta canônica e verificação de status do serviço
         return Task.FromResult(new ServiceStatusResult(
             IsOnline: true,
             StatusCode: 107,
@@ -48,18 +48,18 @@ public class ZeusNFeProvider : IFiscalProvider
             ));
         }
 
-        // 2. Validação obrigatória do Código de Segurança do Contribuinte (CSC) para NFC-e
-        if (csc == null || !csc.IsActive)
+        // 2. Se a versão for QR Code V2, o CSC é estritamente obrigatório
+        if (establishment.QrVersion == QrCodeVersion.V2 && (csc == null || !csc.IsActive))
         {
             return Task.FromResult(new NfceTransmissionResult(
                 Success: false,
                 AccessKey: string.Empty,
                 StatusCode: 999,
-                StatusReason: "Código de Segurança do Contribuinte (CSC) não configurado.",
+                StatusReason: "Código de Segurança do Contribuinte (CSC) não configurado para QR Code V2.",
                 ProtocolNumber: null,
                 QrCodeUrl: null,
                 SignedXml: null,
-                ErrorMessage: "O CSC da SEFAZ-SP é obrigatório para gerar o QR Code oficial da NFC-e."
+                ErrorMessage: "O CSC da SEFAZ-SP é obrigatório para gerar o QR Code no leiaute V2."
             ));
         }
 
@@ -78,14 +78,8 @@ public class ZeusNFeProvider : IFiscalProvider
         int dv = CalculateMod11(baseKey);
         string accessKey = $"{baseKey}{dv}";
 
-        // 4. Montagem do QR Code V2 conforme Manual de Padrões Técnicos do DANFE NFC-e
-        // URL da SEFAZ-SP para consulta de NFC-e
-        string baseUrl = establishment.Environment == FiscalEnvironment.Production
-            ? "https://www.nfce.fazenda.sp.gov.br/qrcode"
-            : "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode";
-
-        string qrCodeParams = $"chNFe={accessKey}&nVersao=100&tpAmb={(int)establishment.Environment}&cDest={request.RecipientCpf ?? ""}&dhEmi={DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}&vNF={request.TotalAmount:F2}&vICMS=0.00&digVal=4d61737465724842&cIdToken={csc.CscId}";
-        string qrCodeUrl = $"{baseUrl}?p={Uri.EscapeDataString(qrCodeParams)}";
+        // 4. Montagem do QR Code conforme Nota Técnica 2025.001 (V3) ou Padrão V2
+        string qrCodeUrl = GenerateQrCodeUrl(establishment, accessKey, request.TotalAmount, request.RecipientCpf, csc, tpEmis: 1);
 
         // 5. XML assinado no padrão SEFAZ (NFe v4.00)
         string signedXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
@@ -199,47 +193,126 @@ public class ZeusNFeProvider : IFiscalProvider
             ));
         }
 
-        string eventProtocol = "135269998124001";
-        string eventXml = $@"<retEvento versao=""1.00"" xmlns=""http://www.portalfiscal.inf.br/nfe"">
-  <infEvento>
-    <tpAmb>{(int)establishment.Environment}</tpAmb>
-    <verAplic>{ProviderName}</verAplic>
-    <cOrgao>35</cOrgao>
-    <cStat>135</cStat>
-    <xMotivo>Evento registrado e vinculado a NF-e / NFC-e</xMotivo>
-    <chNFe>{request.AccessKey}</chNFe>
-    <tpEvento>110111</tpEvento>
-    <nSeqEvento>1</nSeqEvento>
-    <nProt>{eventProtocol}</nProt>
-  </infEvento>
-</retEvento>";
+        string eventSeq = request.SequentialEventNumber.ToString();
+        string cUf = "35";
+        string cancellationProtocol = $"13526{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+        string eventXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+<procEventoNFe versao=""1.00"" xmlns=""http://www.portalfiscal.inf.br/nfe"">
+  <evento versao=""1.00"">
+    <infEvento Id=""ID110111{request.AccessKey}01"">
+      <cOrgao>{cUf}</cOrgao>
+      <tpAmb>{(int)establishment.Environment}</tpAmb>
+      <CNPJ>{establishment.Cnpj}</CNPJ>
+      <chNFe>{request.AccessKey}</chNFe>
+      <dhEvento>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhEvento>
+      <tpEvento>110111</tpEvento>
+      <nSeqEvento>{eventSeq}</nSeqEvento>
+      <verEvento>1.00</verEvento>
+      <detEvento versao=""1.00"">
+        <descEvento>Cancelamento</descEvento>
+        <nProt>{request.ProtocolNumber}</nProt>
+        <xJust>{request.Justification}</xJust>
+      </detEvento>
+    </infEvento>
+  </evento>
+  <retEvento versao=""1.00"">
+    <infEvento>
+      <tpAmb>{(int)establishment.Environment}</tpAmb>
+      <verAplic>{ProviderName}</verAplic>
+      <cOrgao>{cUf}</cOrgao>
+      <cStat>135</cStat>
+      <xMotivo>Evento registrado e vinculado a NF-e</xMotivo>
+      <chNFe>{request.AccessKey}</chNFe>
+      <tpEvento>110111</tpEvento>
+      <nSeqEvento>{eventSeq}</nSeqEvento>
+      <dhRegEvento>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRegEvento>
+      <nProt>{cancellationProtocol}</nProt>
+    </infEvento>
+  </retEvento>
+</procEventoNFe>";
 
         return Task.FromResult(new NfceCancellationResult(
             Success: true,
             StatusCode: 135,
-            StatusReason: "Evento de Cancelamento homologado com sucesso.",
-            CancellationProtocol: eventProtocol,
+            StatusReason: "Evento registrado e vinculado a NF-e (Cancelamento homologado)",
+            CancellationProtocol: cancellationProtocol,
             EventXml: eventXml,
             ErrorMessage: null
         ));
     }
 
+    public string GenerateQrCodeUrl(
+        FiscalEstablishment establishment,
+        string accessKey,
+        decimal totalAmount,
+        string? recipientCpf,
+        FiscalCsc? csc,
+        int tpEmis = 1)
+    {
+        string baseUrl = establishment.Environment == FiscalEnvironment.Production
+            ? "https://www.nfce.fazenda.sp.gov.br/qrcode"
+            : "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode";
+
+        int amb = (int)establishment.Environment;
+
+        if (establishment.QrVersion == QrCodeVersion.V3)
+        {
+            // Nota Técnica 2025.001 v1.03 - QR Code Versão 3.00
+            // Emissão Normal (Online, tpEmis = 1):
+            // Formato dos parâmetros: p=chNFe|3|tpAmb
+            if (tpEmis == 1)
+            {
+                string pPayload = $"{accessKey}|3|{amb}";
+                return $"{baseUrl}?p={pPayload}";
+            }
+            else
+            {
+                // Emissão em Contingência Offline (tpEmis = 9):
+                // Formato: p=chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
+                string dia = DateTime.UtcNow.ToString("dd");
+                string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                string tpIdDest = string.IsNullOrEmpty(recipientCpf) ? "0" : "1";
+                string idDest = string.IsNullOrEmpty(recipientCpf) ? "" : recipientCpf.Replace(".", "").Replace("-", "");
+                // Placeholder para assinatura RSA-SHA1 em contingência
+                string dummySig = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{accessKey}_V3_CONTINGENCY_SIG"));
+                string pPayload = $"{accessKey}|3|{amb}|{dia}|{vNf}|{tpIdDest}|{idDest}|{dummySig}";
+                return $"{baseUrl}?p={pPayload}";
+            }
+        }
+        else
+        {
+            // QR Code Versão 2.00 (Legado com CSC e cHashQRCode via SHA-1)
+            string cIdToken = csc?.CscId ?? "000001";
+            string rawCsc = csc != null ? Encoding.UTF8.GetString(csc.EncryptedCscToken) : "CSC_PLACEHOLDER";
+            string dhEmiHex = Convert.ToHexString(Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:sszzz")));
+            string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+            string digValHex = Convert.ToHexString(Encoding.UTF8.GetBytes("MasterHB"));
+            string cDest = string.IsNullOrEmpty(recipientCpf) ? "" : recipientCpf.Replace(".", "").Replace("-", "");
+
+            string qrStringWithoutHash = $"{accessKey}|2|{amb}|{cDest}|{dhEmiHex}|{vNf}|0.00|{digValHex}|{cIdToken}";
+            string stringToHash = $"{qrStringWithoutHash}{rawCsc}";
+            string cHash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(stringToHash))).ToLowerInvariant();
+
+            string fullPayload = $"{qrStringWithoutHash}|{cHash}";
+            return $"{baseUrl}?p={fullPayload}";
+        }
+    }
+
     private static int CalculateMod11(string input)
     {
-        int sum = 0;
         int weight = 2;
+        int sum = 0;
 
         for (int i = input.Length - 1; i >= 0; i--)
         {
             sum += (input[i] - '0') * weight;
-            weight = (weight == 9) ? 2 : weight + 1;
+            weight++;
+            if (weight > 9) weight = 2;
         }
 
         int remainder = sum % 11;
-        return remainder switch
-        {
-            0 or 1 => 0,
-            _ => 11 - remainder
-        };
+        int dv = 11 - remainder;
+        return (dv == 0 || dv == 10 || dv == 11) ? 0 : dv;
     }
 }

@@ -10,6 +10,12 @@ public enum FiscalEnvironment
     Production = 2
 }
 
+public enum QrCodeVersion
+{
+    V2 = 2, // QR Code V2 (Legado com CSC e SHA-1)
+    V3 = 3  // QR Code V3 (Nota Técnica 2025.001 - Moderno sem CSC online)
+}
+
 public enum FiscalDocumentType
 {
     NFCe = 65,
@@ -20,12 +26,14 @@ public enum FiscalDocumentStatus
 {
     Draft = 1,
     Signed = 2,
-    Transmitted = 3,
+    Submitting = 3,
     Authorized = 4,
     Rejected = 5,
     Denied = 6,
-    Cancelled = 7,
-    ContingencyOffline = 8
+    CancellationRequested = 7,
+    Cancelled = 8,
+    ContingencyOffline = 9,
+    ManualReviewRequired = 10
 }
 
 public enum TaxRegime
@@ -58,6 +66,7 @@ public class FiscalEstablishment : TenantEntity
 
     // Configurações Operacionais de Emissão
     public FiscalEnvironment Environment { get; private set; } = FiscalEnvironment.Homologation;
+    public QrCodeVersion QrVersion { get; private set; } = QrCodeVersion.V3; // Default NT 2025.001
     public int NfceDefaultSeries { get; private set; } = 1;
     public int NfceNextNumber { get; private set; } = 1;
     public bool IsNfceEnabled { get; private set; } = true;
@@ -106,6 +115,12 @@ public class FiscalEstablishment : TenantEntity
     public void SwitchEnvironment(FiscalEnvironment env)
     {
         Environment = env;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void SetQrCodeVersion(QrCodeVersion version)
+    {
+        QrVersion = version;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
@@ -289,6 +304,29 @@ public class FiscalDocument : TenantEntity
         SefazStatusCode = statusCode;
         SefazStatusReason = statusReason;
         Status = FiscalDocumentStatus.Rejected;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkSubmitting()
+    {
+        Status = FiscalDocumentStatus.Submitting;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void MarkManualReview(string reason)
+    {
+        Status = FiscalDocumentStatus.ManualReviewRequired;
+        SefazStatusReason = reason;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void RequestCancellation(string reason)
+    {
+        if (Status != FiscalDocumentStatus.Authorized)
+            throw new InvalidOperationException("Apenas documentos autorizados podem solicitar cancelamento.");
+
+        Status = FiscalDocumentStatus.CancellationRequested;
+        CancellationReason = reason;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 

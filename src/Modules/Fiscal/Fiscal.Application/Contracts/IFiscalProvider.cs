@@ -48,7 +48,8 @@ public record NfceCancellationRequest(
     string ProtocolNumber,
     string Justification,
     int Series,
-    int Number);
+    int Number,
+    int SequentialEventNumber = 1);
 
 public record NfceCancellationResult(
     bool Success,

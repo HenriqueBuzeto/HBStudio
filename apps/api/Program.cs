@@ -5559,23 +5559,25 @@ fiscalGroup.MapPost("/inbound/parse", async (
 
 
 fiscalGroup.MapPost("/inbound/import", async (
-
     Fiscal.Application.DTOs.InboundXmlUploadRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
-    var tenantId = executionContext.TenantId;
-
-    var imported = await fiscalService.ImportInboundXmlAsync(tenantId, req.RawXml, ct);
-
-    return Results.Ok(imported);
-
+    try
+    {
+        var tenantId = executionContext.TenantId;
+        var imported = await fiscalService.ImportInboundXmlAsync(tenantId, req.RawXml, ct);
+        return Results.Ok(imported);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
 });
 
 #endregion

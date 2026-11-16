@@ -32,6 +32,7 @@ interface FiscalEstablishment {
   cityName: string;
   state: string;
   environment: string;
+  qrCodeVersion: number;
   nfceDefaultSeries: number;
   nfceNextNumber: number;
   isNfceEnabled: boolean;
@@ -408,18 +409,20 @@ export default function FiscalPage() {
 
               <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20">
                 <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>TOKEN CSC (QR CODE)</span>
+                  <span>QR CODE NFC-E (NT 2025.001)</span>
                   <QrCode
                     className={`w-4 h-4 ${
-                      establishment?.hasCsc ? "text-emerald-400" : "text-amber-400"
+                      establishment?.qrCodeVersion === 3 ? "text-emerald-400" : "text-purple-400"
                     }`}
                   />
                 </div>
                 <div className="mt-2 text-lg font-bold text-white">
-                  {establishment?.hasCsc ? "Homologado" : "Não Registrado"}
+                  {establishment?.qrCodeVersion === 3 ? "Versão 3.00 (Ativa)" : "Versão 2.00 (Legado)"}
                 </div>
                 <div className="text-xs text-slate-400 mt-1 truncate">
-                  {establishment?.cscMasked || "Obrigatório para emissão de NFC-e"}
+                  {establishment?.qrCodeVersion === 3
+                    ? "Online sem CSC • Conforme NT 2025.001"
+                    : (establishment?.cscMasked || "Exige CSC registrado")}
                 </div>
               </div>
 

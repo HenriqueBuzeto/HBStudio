@@ -17,6 +17,7 @@ public record FiscalEstablishmentDto(
     string CityName,
     string State,
     string Environment,
+    int QrCodeVersion,
     int NfceDefaultSeries,
     int NfceNextNumber,
     bool IsNfceEnabled,
@@ -42,6 +43,7 @@ public record ConfigureEstablishmentRequest(
     string State,
     string PostalCode,
     int Environment, // 1 = Homologação, 2 = Produção
+    int QrCodeVersion, // 2 = V2, 3 = V3
     int NfceSeries,
     int NfceNextNumber);
 
