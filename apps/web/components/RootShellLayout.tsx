@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -24,6 +24,7 @@ import {
   TrendingUp,
   Receipt,
   ShieldCheck,
+  UserCheck,
   MessageSquare,
   Printer,
   Code2,
@@ -77,6 +78,7 @@ const navSections: NavSection[] = [
       { name: "Caixa & Turnos", href: "/cash", icon: CircleDollarSign },
       { name: "Financeiro & DRE", href: "/financial", icon: TrendingUp },
       { name: "Sócios & Capital", href: "/partners", icon: Building2 },
+      { name: "Usuários & Senhas", href: "/users", icon: UserCheck, badge: "Master" },
     ],
   },
 ];

@@ -1,3 +1,5 @@
+﻿using IdentityAccess.Domain;
+using PartnersCapital.Domain.Entities;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -2455,7 +2457,214 @@ app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso aut
 app.MapGet("/api/secure-inventory-cost", () => Results.Ok(new { sensitiveCost = 1500.50m }))
    .RequireAuthorization(PermissionCatalog.InventoryCostView);
 
+
+#region Identity & Users Management Endpoints (Gestao de Usuarios, Senhas & Socios)
+var usersGroup = app.MapGroup("/api/users").RequireAuthorization();
+
+usersGroup.MapGet("/", async (
+    AppDbContext db,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var currentTenantId = executionContext.TenantId;
+    var users = await db.Users
+        .AsNoTracking()
+        .Where(u => u.TenantId == currentTenantId)
+        .OrderBy(u => u.FullName)
+        .ToListAsync(ct);
+
+    var partners = await db.Partners
+        .AsNoTracking()
+        .Where(p => p.TenantId == currentTenantId && p.Status == PartnerStatus.Active)
+        .ToListAsync(ct);
+
+    var userRoles = await db.UserRoles
+        .AsNoTracking()
+        .Where(ur => ur.TenantId == currentTenantId)
+        .ToListAsync(ct);
+
+    var roles = await db.Roles
+        .AsNoTracking()
+        .Where(r => r.TenantId == currentTenantId)
+        .ToListAsync(ct);
+
+    var result = users.Select(u =>
+    {
+        var partner = partners.FirstOrDefault(p => 
+            p.Email.Equals(u.Email, StringComparison.OrdinalIgnoreCase) || 
+            p.Name.Equals(u.FullName, StringComparison.OrdinalIgnoreCase));
+        
+        var userRoleIds = userRoles.Where(ur => ur.UserId == u.Id).Select(ur => ur.RoleId).ToList();
+        var userRoleNames = roles.Where(r => userRoleIds.Contains(r.Id)).Select(r => r.Name).ToList();
+
+        return new
+        {
+            u.Id,
+            u.FullName,
+            u.Email,
+            u.IsActive,
+            u.SecurityStamp,
+            u.CreatedAtUtc,
+            IsPartner = partner != null && partner.IsErpAccessEnabled,
+            PartnerRole = partner?.Type.ToString(),
+            Roles = userRoleNames
+        };
+    }).ToList();
+
+    return Results.Ok(result);
+});
+
+usersGroup.MapPost("/", async (
+    CreateUserDto req,
+    AppDbContext db,
+    IPasswordHasher passwordHasher,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Nome completo, e-mail e senha inicial sao obrigatorios." });
+    }
+
+    var normalizedEmail = req.Email.Trim().ToLowerInvariant();
+    var currentTenantId = executionContext.TenantId;
+
+    bool exists = await db.Users.AnyAsync(u => u.TenantId == currentTenantId && u.Email == normalizedEmail, ct);
+    if (exists)
+    {
+        return Results.Conflict(new { error = "Ja existe um usuario cadastrado com este e-mail no sistema." });
+    }
+
+    var branch = await db.Branches.FirstOrDefaultAsync(b => b.TenantId == currentTenantId, ct);
+    var branchId = branch?.Id;
+
+    var passwordHash = passwordHasher.HashPassword(req.Password);
+    var newUser = new User(currentTenantId, req.FullName.Trim(), normalizedEmail, passwordHash, branchId);
+    db.Users.Add(newUser);
+
+    if (req.IsPartner)
+    {
+        var role = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == "Sócio Diretor Executivo", ct);
+        if (role == null)
+        {
+            role = new Role(currentTenantId, "Sócio Diretor Executivo", "Acesso Master aos Socios da HB Studio");
+            foreach (var perm in PermissionCatalog.All)
+            {
+                role.AddPermission(perm);
+            }
+            db.Roles.Add(role);
+        }
+        newUser.AssignRole(role);
+
+        var existingPartner = await db.Partners.FirstOrDefaultAsync(p => 
+            p.TenantId == currentTenantId && 
+            (p.Email.ToLower() == normalizedEmail || p.Name.ToLower() == req.FullName.Trim().ToLower()), ct);
+
+        if (existingPartner != null)
+        {
+            existingPartner.SetErpAccess(true);
+        }
+        else
+        {
+            var newPartner = new Partner(
+                currentTenantId,
+                Guid.NewGuid(),
+                req.FullName.Trim(),
+                req.DocumentNumber ?? "00000000000",
+                normalizedEmail,
+                PartnerType.ManagingPartner,
+                DateTime.UtcNow,
+                notes: "Socio cadastrado com Acesso Master via Painel de Usuarios",
+                isErpAccessEnabled: true);
+            db.Partners.Add(newPartner);
+        }
+    }
+    else
+    {
+        var defaultRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == "Operador Geral", ct);
+        if (defaultRole == null)
+        {
+            defaultRole = new Role(currentTenantId, "Operador Geral", "Acesso Operacional ao ERP");
+            defaultRole.AddPermission(PermissionCatalog.CustomersView);
+            defaultRole.AddPermission(PermissionCatalog.CatalogProductsView);
+            defaultRole.AddPermission(PermissionCatalog.InventoryView);
+            defaultRole.AddPermission(PermissionCatalog.SalesPosUse);
+            db.Roles.Add(defaultRole);
+        }
+        newUser.AssignRole(defaultRole);
+    }
+
+    await db.SaveChangesAsync(ct);
+
+    return Results.Created($"/api/users/{newUser.Id}", new
+    {
+        newUser.Id,
+        newUser.FullName,
+        newUser.Email,
+        newUser.IsActive,
+        IsPartner = req.IsPartner
+    });
+});
+
+usersGroup.MapPut("/{id:guid}/password", async (
+    Guid id,
+    ResetPasswordDto req,
+    AppDbContext db,
+    IPasswordHasher passwordHasher,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(req.NewPassword))
+    {
+        return Results.BadRequest(new { error = "Nova senha nao pode ser vazia." });
+    }
+
+    var currentTenantId = executionContext.TenantId;
+    var userToUpdate = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
+    if (userToUpdate == null)
+    {
+        return Results.NotFound(new { error = "Usuario nao encontrado." });
+    }
+
+    var newHash = passwordHasher.HashPassword(req.NewPassword);
+    
+    var prop = typeof(User).GetProperty("PasswordHash");
+    prop?.SetValue(userToUpdate, newHash);
+
+    userToUpdate.InvalidateSecurityStamp();
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new { message = "Senha alterada e sessoes anteriores invalidadas com sucesso." });
+});
+
+usersGroup.MapPut("/{id:guid}/toggle-status", async (
+    Guid id,
+    AppDbContext db,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var currentTenantId = executionContext.TenantId;
+    var userToUpdate = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
+    if (userToUpdate == null)
+    {
+        return Results.NotFound(new { error = "Usuario nao encontrado." });
+    }
+
+    var prop = typeof(User).GetProperty("IsActive");
+    bool current = userToUpdate.IsActive;
+    prop?.SetValue(userToUpdate, !current);
+
+    userToUpdate.InvalidateSecurityStamp();
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new { isActive = !current });
+});
+#endregion
+
 app.Run();
 
-// Tornar a classe Program acessível para testes WebApplicationFactory
+public record CreateUserDto(string FullName, string Email, string Password, bool IsPartner, string? DocumentNumber = null);
+public record ResetPasswordDto(string NewPassword);
+
+// Tornar a classe Program acessivel para testes WebApplicationFactory
 public partial class Program { }
