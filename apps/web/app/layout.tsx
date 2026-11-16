@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HB Vision ERP Enterprise | Gestão & Inteligência",
+  title: "HB Studio | Sistema de Gestão & Operação",
   description: "Sistema Integrado de Gestão Comercial, PDV, Assistência Técnica e Governança",
 };
 

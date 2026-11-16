@@ -211,7 +211,7 @@ export default function RepairsPage() {
               <Smartphone className="w-4 h-4 text-purple-600" />
               Ordens de Serviço Registradas
             </h3>
-            <span className="text-xs text-slate-500">Filial Matriz SP</span>
+            <span className="text-xs text-slate-500">Unidade Operacional</span>
           </div>
 
           <table className="w-full text-left text-xs">

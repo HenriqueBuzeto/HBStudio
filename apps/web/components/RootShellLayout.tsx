@@ -87,7 +87,6 @@ export default function RootShellLayout({
 }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentBranch, setCurrentBranch] = useState("Matriz Principal (SP)");
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#f1f5f9] text-[#0f172a] flex flex-col md:flex-row font-sans">
@@ -98,8 +97,8 @@ export default function RootShellLayout({
             HB
           </div>
           <div>
-            <span className="font-bold tracking-tight text-base text-white">HBVisionX</span>
-            <span className="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider">Enterprise ERP</span>
+            <span className="font-bold tracking-tight text-base text-white">HB Studio</span>
+            <span className="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider">Sistema de Gestão</span>
           </div>
         </div>
         <button
@@ -111,7 +110,7 @@ export default function RootShellLayout({
         </button>
       </header>
 
-      {/* Sidebar FIXA HBVisionX Style */}
+      {/* Sidebar FIXA HB Studio Style */}
       <aside
         className={`
           fixed inset-y-0 left-0 z-40 w-64 bg-[#090e1a] text-slate-300 border-r border-[#1a2236] flex flex-col transition-transform duration-300 ease-in-out
@@ -127,32 +126,13 @@ export default function RootShellLayout({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-bold tracking-tight text-white text-base">HBVisionX</span>
+                <span className="font-bold tracking-tight text-white text-base">HB Studio</span>
                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
                   ERP
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Enterprise Retaguarda</p>
+              <p className="text-[10px] text-slate-400 font-medium">Gestão & Inteligência</p>
             </div>
-          </div>
-        </div>
-
-        {/* Branch / Filial Switcher Fixo */}
-        <div className="p-3 mx-3 mt-3 rounded-xl bg-[#0f172a] border border-[#1e293b] flex-shrink-0">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-            <span>Filial de Operação</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-white">
-            <Store className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-            <select
-              value={currentBranch}
-              onChange={(e) => setCurrentBranch(e.target.value)}
-              className="bg-transparent text-xs text-white font-medium focus:outline-none cursor-pointer w-full"
-            >
-              <option value="Matriz Principal (SP)" className="bg-[#0f172a] text-white">Matriz Principal (SP)</option>
-              <option value="Filial Loja 02 (Moema)" className="bg-[#0f172a] text-white">Filial Loja 02 (Moema)</option>
-            </select>
           </div>
         </div>
 
@@ -205,11 +185,11 @@ export default function RootShellLayout({
             </div>
           ))}
 
-          {/* CTA Upgrade / Assistência Banner estilo HBVision */}
+          {/* CTA Banner estilo HB Studio */}
           <div className="p-3 rounded-xl bg-gradient-to-br from-violet-950/60 to-purple-900/40 border border-purple-500/30 space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold text-white">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <span>HBVisionX v2.4</span>
+              <span>HB Studio v2.4</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-tight">
               Motor de matching e estoque serializado sincronizados.
@@ -243,14 +223,14 @@ export default function RootShellLayout({
 
       {/* Main Content Viewport com Scroll Independente */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8fafc]">
-        {/* Top Navbar HBVisionX Style Fixo */}
+        {/* Top Navbar HB Studio Style Fixo */}
         <header className="h-14 bg-white border-b border-slate-200 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
           {/* Breadcrumb & Context */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
               <span className="font-bold text-slate-900">Boa tarde, Henrique</span>
               <span className="text-slate-300">•</span>
-              <span>Sex, 16 de Nov • 21:58</span>
+              <span>Sex, 16 de Nov • 22:00</span>
             </div>
 
             {/* Status do Caixa Pill */}

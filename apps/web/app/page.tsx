@@ -41,7 +41,7 @@ export default function Home() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                HBVisionX Enterprise Retaguarda
+                HB Studio Retaguarda
               </span>
               <span className="text-[10px] font-bold text-slate-400">Build v2.4.0</span>
             </div>

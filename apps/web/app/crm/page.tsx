@@ -144,7 +144,7 @@ const mockLeads: LeadView[] = [
     channel: "Balcão / Presencial",
     convertedPartyId: "party-bruno-88",
     lgpdMarketingOptIn: false,
-    notes: "Veio presencialmente na filial Moema avaliar um iPhone 13 128GB.",
+    notes: "Veio presencialmente na loja avaliar um iPhone 13 128GB.",
     createdAt: "2026-11-15 17:40"
   }
 ];
