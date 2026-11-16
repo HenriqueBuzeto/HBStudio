@@ -177,20 +177,7 @@ export default function RootShellLayout({
             </div>
           ))}
 
-          {/* CTA Banner */}
-          <div className="p-3 rounded-xl bg-gradient-to-br from-violet-950/60 to-purple-900/40 border border-purple-500/30 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-white">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <span>HB Studio v2.4</span>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              Motor de matching e estoque serializado sincronizados.
-            </p>
-            <button className="w-full py-1.5 px-3 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Auditoria Ativa
-            </button>
-          </div>
+          {/* Navigation Menu */}
         </nav>
 
         {/* User Session Footer */}
