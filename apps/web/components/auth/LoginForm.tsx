@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { PasswordField } from "./PasswordField";
 import { AuthFeedback } from "./AuthFeedback";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2, Mail, ArrowRight, ShieldCheck } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export function LoginForm() {
         router.push("/");
       } else if (res.status === 401 || res.status === 403) {
         // Mensagem genérica padronizada: segurança contra enumeração de contas
-        setFeedback("Credenciais inválidas ou usuário administrativo inativo.");
+        setFeedback("Credenciais inválidas ou acesso corporativo suspenso.");
       } else {
         setFeedback("Não foi possível conectar ao servidor. Tente novamente.");
       }
@@ -82,8 +82,8 @@ export function LoginForm() {
         >
           E-mail Corporativo
         </label>
-        <div className="relative">
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+        <div className="relative group">
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-400 pointer-events-none transition-colors">
             <Mail className="w-4 h-4" />
           </div>
           <input
@@ -96,11 +96,11 @@ export function LoginForm() {
             }}
             disabled={loading}
             autoComplete="email"
-            placeholder="hbdevstudio@gmail.com"
-            className={`w-full pl-10 pr-4 py-3 text-sm bg-slate-900/90 hover:bg-slate-900 focus:bg-slate-950 border ${
+            placeholder="usuario@hbstudio.com"
+            className={`w-full pl-10 pr-4 py-3 text-sm bg-[#080d1a]/95 hover:bg-[#0b1224] focus:bg-[#070b16] border ${
               fieldErrors.email
                 ? "border-rose-500/80 focus:ring-rose-500/30"
-                : "border-slate-800 focus:border-cyan-500 focus:ring-cyan-500/20"
+                : "border-white/10 focus:border-purple-500 focus:ring-purple-500/25"
             } rounded-xl focus:outline-none focus:ring-2 text-white transition-all placeholder:text-slate-500 shadow-inner`}
           />
         </div>
@@ -114,7 +114,7 @@ export function LoginForm() {
       {/* Campo Senha */}
       <PasswordField
         id="password-input"
-        label="Senha Master ou Suporte"
+        label="Senha de Acesso"
         value={password}
         onChange={(e) => {
           setPassword(e.target.value);
@@ -122,16 +122,16 @@ export function LoginForm() {
         }}
         disabled={loading}
         autoComplete="current-password"
-        placeholder="••••••••"
+        placeholder="••••••••••••"
         error={fieldErrors.password}
       />
 
-      {/* Botão de Ação com gradiente ciano / azul conforme a imagem de referência */}
+      {/* Botão de Ação Primário com Gradiente Púrpura HB Studio */}
       <div className="pt-2">
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:from-cyan-600 active:to-blue-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-cyan-500/20 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full py-3.5 px-4 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:via-purple-500 hover:to-indigo-500 active:from-violet-700 active:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed group"
         >
           {loading ? (
             <>
@@ -139,7 +139,10 @@ export function LoginForm() {
               <span>Autenticando...</span>
             </>
           ) : (
-            <span>Continuar para Desafio MFA</span>
+            <>
+              <span>Acessar Painel HB Studio</span>
+              <ArrowRight className="w-4 h-4 text-purple-200 group-hover:translate-x-0.5 transition-transform" />
+            </>
           )}
         </button>
       </div>
