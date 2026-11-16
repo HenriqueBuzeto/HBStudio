@@ -55,6 +55,9 @@ builder.Services.AddHostedService<Messaging.Infrastructure.Workers.MessagingWork
 // Modulo Manufacturing 3D (MOD-10)
 builder.Services.AddScoped<Manufacturing3D.Application.Services.Manufacturing3DAppService>();
 
+// Modulo Digital Projects (MOD-11)
+builder.Services.AddScoped<DigitalProjects.Application.Services.DigitalProjectsAppService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -1981,6 +1984,82 @@ app.MapPost("/api/manufacturing/orders/{id:guid}/quality-and-receive", async (Gu
     var order = await svc.CompleteQualityAndReceiveFinishedGoodAsync(id, req, ct);
     return Results.Ok(order);
 }).RequireAuthorization(PermissionCatalog.ManufacturingQualityApprove);
+
+#endregion
+
+#region Modulo Digital Projects (MOD-11) - Endpoints REST
+
+app.MapGet("/api/projects", async (DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var list = await svc.ListProjectsAsync(ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.ProjectsView);
+
+app.MapPost("/api/projects", async (DigitalProjects.Application.DTOs.CreateDigitalProjectRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var created = await svc.CreateProjectAsync(req, ct);
+    return Results.Created($"/api/projects/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapGet("/api/projects/{id:guid}", async (Guid id, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var details = await svc.GetProjectDetailsAsync(id, ct);
+    return Results.Ok(details);
+}).RequireAuthorization(PermissionCatalog.ProjectsView);
+
+app.MapPost("/api/projects/{id:guid}/milestones", async (Guid id, DigitalProjects.Application.DTOs.CreateMilestoneRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var milestone = await svc.AddMilestoneAsync(id, req, ct);
+    return Results.Created($"/api/projects/{id}/milestones/{milestone.Id}", milestone);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/milestones/{milestoneId:guid}/approve", async (Guid id, Guid milestoneId, string? approvalNotes, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    await svc.ApproveMilestoneAsync(id, milestoneId, approvalNotes ?? "Aprovado pelo cliente", ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/tasks", async (Guid id, DigitalProjects.Application.DTOs.CreateProjectTaskRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var task = await svc.AddTaskAsync(id, req, ct);
+    return Results.Created($"/api/projects/{id}/tasks/{task.Id}", task);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPut("/api/projects/{id:guid}/tasks/{taskId:guid}/status", async (Guid id, Guid taskId, int status, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    await svc.UpdateTaskStatusAsync(id, taskId, status, ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/time-entries", async (Guid id, DigitalProjects.Application.DTOs.CreateTimeEntryRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var entry = await svc.RecordTimeEntryAsync(id, req, ct);
+    return Results.Created($"/api/projects/{id}/time-entries/{entry.Id}", entry);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/deliverables", async (Guid id, DigitalProjects.Application.DTOs.CreateDeliverableRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var deliverable = await svc.AddDeliverableAsync(id, req, ct);
+    return Results.Created($"/api/projects/{id}/deliverables/{deliverable.Id}", deliverable);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/deliverables/{deliverableId:guid}/accept", async (Guid id, Guid deliverableId, string? notes, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    await svc.AcceptDeliverableAsync(id, deliverableId, notes ?? "Aceito formalmente pelo cliente", ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/change-requests", async (Guid id, DigitalProjects.Application.DTOs.CreateChangeRequestRequest req, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    var cr = await svc.AddChangeRequestAsync(id, req, ct);
+    return Results.Created($"/api/projects/{id}/change-requests/{cr.Id}", cr);
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
+
+app.MapPost("/api/projects/{id:guid}/change-requests/{crId:guid}/approve", async (Guid id, Guid crId, string? notes, DigitalProjects.Application.Services.DigitalProjectsAppService svc, CancellationToken ct) =>
+{
+    await svc.ApproveChangeRequestAsync(id, crId, notes ?? "Aprovado aditivo contratual", ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ProjectsManage);
 
 #endregion
 

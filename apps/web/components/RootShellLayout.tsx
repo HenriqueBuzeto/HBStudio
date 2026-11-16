@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   MessageSquare,
   Printer,
+  Code2,
   Moon,
   Clock,
   ArrowRightLeft
@@ -57,6 +58,7 @@ const navSections: NavSection[] = [
       { name: "Compras & Entrada", href: "/procurement", icon: Receipt },
       { name: "Assistência Técnica (OS)", href: "/repairs", icon: Wrench, badge: "OS" },
       { name: "Fábrica 3D & Custos", href: "/manufacturing", icon: Printer, badge: "3D" },
+      { name: "Projetos Digitais & Dev", href: "/projects", icon: Code2, badge: "Dev" },
     ],
   },
   {

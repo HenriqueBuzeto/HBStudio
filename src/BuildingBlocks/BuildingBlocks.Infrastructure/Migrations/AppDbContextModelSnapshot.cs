@@ -1189,6 +1189,535 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.ToTable("product_skus", (string)null);
                 });
 
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ActualCompletionDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ActualStartDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ContractedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CrmOpportunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CustomerPartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("EstimatedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("IntellectualPropertyPolicy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("InvoicedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("LeadTechnicianName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("LeadTechnicianUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LgpdProcessingRole")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("PlannedDeliveryDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PlannedStartDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PricingModel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProjectCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("SalesOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalActualLaborCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalExpensesCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalThirdPartyCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CustomerPartyId");
+
+                    b.HasIndex("TenantId", "ProjectCode")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("digital_projects", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectChangeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CrNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DecisionNotes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ImpactCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("ImpactDays")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ImpactHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ImpactPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("ProposedScopeChanges")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequesterName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId", "CrNumber")
+                        .IsUnique();
+
+                    b.ToTable("digital_project_change_requests", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectContractVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContractTitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentUri")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegisteredByUserName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sha256Hash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TermsSummary")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("digital_project_contract_versions", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectDeliverable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AcceptanceNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ArtifactVersion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MilestoneId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256Hash")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageUriOrUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("SubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId");
+
+                    b.ToTable("digital_project_deliverables", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectMilestone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ApprovedByNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("HasBeenBilled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsBillable")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MilestonePrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("SequenceOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("TargetDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId", "SequenceOrder");
+
+                    b.ToTable("digital_project_milestones", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssignedUserName")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DueDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("EstimatedHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("MilestoneId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId", "Status");
+
+                    b.ToTable("digital_project_tasks", (string)null);
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectTimeEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActivityType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DigitalProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DigitalProjectTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DurationHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("HistoricalHourlyCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsBillable")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTime>("WorkDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DigitalProjectId");
+
+                    b.HasIndex("TenantId", "UserId");
+
+                    b.HasIndex("TenantId", "DigitalProjectId", "WorkDateUtc");
+
+                    b.ToTable("digital_project_time_entries", (string)null);
+                });
+
             modelBuilder.Entity("Financial.Domain.AccountPayable", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6222,6 +6751,60 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.Navigation("ProductModel");
                 });
 
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectChangeRequest", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("ChangeRequests")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectContractVersion", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("ContractVersions")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectDeliverable", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("Deliverables")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectMilestone", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("Milestones")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectTask", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("Tasks")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProjectTimeEntry", b =>
+                {
+                    b.HasOne("DigitalProjects.Domain.Entities.DigitalProject", null)
+                        .WithMany("TimeEntries")
+                        .HasForeignKey("DigitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Financial.Domain.FinancialJournalLine", b =>
                 {
                     b.HasOne("Financial.Domain.FinancialJournalEntry", null)
@@ -6716,6 +7299,21 @@ namespace BuildingBlocks.Infrastructure.Migrations
             modelBuilder.Entity("Catalog.Domain.ProductSku", b =>
                 {
                     b.Navigation("InventoryUnits");
+                });
+
+            modelBuilder.Entity("DigitalProjects.Domain.Entities.DigitalProject", b =>
+                {
+                    b.Navigation("ChangeRequests");
+
+                    b.Navigation("ContractVersions");
+
+                    b.Navigation("Deliverables");
+
+                    b.Navigation("Milestones");
+
+                    b.Navigation("Tasks");
+
+                    b.Navigation("TimeEntries");
                 });
 
             modelBuilder.Entity("Financial.Domain.AccountPayable", b =>

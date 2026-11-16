@@ -214,6 +214,11 @@ public class Manufacturing3DModuleIntegrationTests : IClassFixture<WebApplicatio
         );
 
         var orderRes = await client.PostAsJsonAsync("/api/manufacturing/orders", createOrderReq);
+        if (orderRes.StatusCode != HttpStatusCode.Created)
+        {
+            var err = await orderRes.Content.ReadAsStringAsync();
+            throw new Exception($"Create order failed: {orderRes.StatusCode} - {err}");
+        }
         orderRes.StatusCode.Should().Be(HttpStatusCode.Created);
         var order = await orderRes.Content.ReadFromJsonAsync<ManufacturingOrderDto>();
         order.Should().NotBeNull();

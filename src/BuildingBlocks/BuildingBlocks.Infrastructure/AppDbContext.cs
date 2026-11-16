@@ -15,6 +15,7 @@ using RepairService.Domain.Entities;
 using CRM.Domain.Entities;
 using Messaging.Domain.Entities;
 using Manufacturing3D.Domain.Entities;
+using DigitalProjects.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -144,6 +145,15 @@ public class AppDbContext : DbContext
     public DbSet<Manufacturing3D.Domain.Entities.ManufacturingQuote> ManufacturingQuotes => Set<Manufacturing3D.Domain.Entities.ManufacturingQuote>();
     public DbSet<Manufacturing3D.Domain.Entities.ManufacturingOrder> ManufacturingOrders => Set<Manufacturing3D.Domain.Entities.ManufacturingOrder>();
     public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt> ManufacturingPrintAttempts => Set<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>();
+
+    // Modulo Digital Projects (MOD-11) - Projetos Digitais, Contratos, Tarefas, Horas e Rentabilidade
+    public DbSet<DigitalProject> DigitalProjects => Set<DigitalProject>();
+    public DbSet<DigitalProjectMilestone> DigitalProjectMilestones => Set<DigitalProjectMilestone>();
+    public DbSet<DigitalProjectTask> DigitalProjectTasks => Set<DigitalProjectTask>();
+    public DbSet<DigitalProjectTimeEntry> DigitalProjectTimeEntries => Set<DigitalProjectTimeEntry>();
+    public DbSet<DigitalProjectDeliverable> DigitalProjectDeliverables => Set<DigitalProjectDeliverable>();
+    public DbSet<DigitalProjectChangeRequest> DigitalProjectChangeRequests => Set<DigitalProjectChangeRequest>();
+    public DbSet<DigitalProjectContractVersion> DigitalProjectContractVersions => Set<DigitalProjectContractVersion>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1562,6 +1572,7 @@ public class AppDbContext : DbContext
         {
             b.ToTable("manufacturing_orders");
             b.HasKey(o => o.Id);
+            b.Ignore(o => o.AbnormalWasteCost);
             b.Property(o => o.Version).IsRowVersion();
             b.HasMany(o => o.Attempts)
              .WithOne()
@@ -1615,6 +1626,90 @@ public class AppDbContext : DbContext
             b.Property(s => s.Version).IsRowVersion();
         });
 
+        // Configuração Digital Projects (MOD-11)
+        modelBuilder.Entity<DigitalProject>(b =>
+        {
+            b.ToTable("digital_projects");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();
+            b.Property(p => p.ProjectCode).HasMaxLength(50).IsRequired();
+            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            b.Property(p => p.ContractedPrice).HasPrecision(18, 2);
+            b.Property(p => p.EstimatedHours).HasPrecision(18, 2);
+            b.Property(p => p.TotalActualLaborCost).HasPrecision(18, 2);
+            b.Property(p => p.TotalThirdPartyCost).HasPrecision(18, 2);
+            b.Property(p => p.TotalExpensesCost).HasPrecision(18, 2);
+            b.Property(p => p.InvoicedAmount).HasPrecision(18, 2);
+            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
+
+            b.HasMany(p => p.Milestones).WithOne().HasForeignKey(m => m.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(p => p.Tasks).WithOne().HasForeignKey(t => t.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(p => p.TimeEntries).WithOne().HasForeignKey(e => e.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(p => p.Deliverables).WithOne().HasForeignKey(d => d.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(p => p.ChangeRequests).WithOne().HasForeignKey(c => c.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(p => p.ContractVersions).WithOne().HasForeignKey(v => v.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasIndex(p => new { p.TenantId, p.ProjectCode }).IsUnique();
+            b.HasIndex(p => new { p.TenantId, p.CustomerPartyId });
+            b.HasIndex(p => new { p.TenantId, p.Status });
+        });
+
+        modelBuilder.Entity<DigitalProjectMilestone>(b =>
+        {
+            b.ToTable("digital_project_milestones");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Version).IsRowVersion();
+            b.Property(m => m.MilestonePrice).HasPrecision(18, 2);
+            b.HasIndex(m => new { m.TenantId, m.DigitalProjectId, m.SequenceOrder });
+        });
+
+        modelBuilder.Entity<DigitalProjectTask>(b =>
+        {
+            b.ToTable("digital_project_tasks");
+            b.HasKey(t => t.Id);
+            b.Property(t => t.Version).IsRowVersion();
+            b.Property(t => t.EstimatedHours).HasPrecision(18, 2);
+            b.HasIndex(t => new { t.TenantId, t.DigitalProjectId, t.Status });
+        });
+
+        modelBuilder.Entity<DigitalProjectTimeEntry>(b =>
+        {
+            b.ToTable("digital_project_time_entries");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Version).IsRowVersion();
+            b.Property(e => e.DurationHours).HasPrecision(18, 2);
+            b.Property(e => e.HistoricalHourlyCost).HasPrecision(18, 2);
+            b.HasIndex(e => new { e.TenantId, e.DigitalProjectId, e.WorkDateUtc });
+            b.HasIndex(e => new { e.TenantId, e.UserId });
+        });
+
+        modelBuilder.Entity<DigitalProjectDeliverable>(b =>
+        {
+            b.ToTable("digital_project_deliverables");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Version).IsRowVersion();
+            b.HasIndex(d => new { d.TenantId, d.DigitalProjectId });
+        });
+
+        modelBuilder.Entity<DigitalProjectChangeRequest>(b =>
+        {
+            b.ToTable("digital_project_change_requests");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Version).IsRowVersion();
+            b.Property(c => c.ImpactHours).HasPrecision(18, 2);
+            b.Property(c => c.ImpactCost).HasPrecision(18, 2);
+            b.Property(c => c.ImpactPrice).HasPrecision(18, 2);
+            b.HasIndex(c => new { c.TenantId, c.DigitalProjectId, c.CrNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<DigitalProjectContractVersion>(b =>
+        {
+            b.ToTable("digital_project_contract_versions");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Version).IsRowVersion();
+            b.HasIndex(v => new { v.TenantId, v.DigitalProjectId, v.VersionNumber }).IsUnique();
+        });
+
         // Configurar Filtros Globais Multi-Tenant Automaticos
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -1643,7 +1738,8 @@ public class AppDbContext : DbContext
         foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
         {
             if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
-                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage or ManufacturingPrintAttempt)
+                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage or ManufacturingPrintAttempt
+                or DigitalProjectMilestone or DigitalProjectTask or DigitalProjectTimeEntry or DigitalProjectDeliverable or DigitalProjectChangeRequest or DigitalProjectContractVersion)
             {
                 var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
                 if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))

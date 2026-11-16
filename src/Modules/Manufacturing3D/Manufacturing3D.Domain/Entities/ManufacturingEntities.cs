@@ -413,10 +413,14 @@ public class ManufacturingOrder : BranchEntity
     public decimal ActualMachineCost { get; private set; }
     public decimal ActualLaborCost { get; private set; }
     public decimal ActualWasteCost { get; private set; }
+    public decimal AbnormalWasteCost { get; private set; } // Perdas anormais (CPC 16 item 16): reconhecidas em despesa do período, NÃO incorporadas ao estoque
     public decimal TotalActualCost => ActualMaterialCost + ActualEnergyCost + ActualMachineCost + ActualLaborCost + ActualWasteCost;
 
-    // Custo Unitário da Peça Aprovada
-    public decimal ActualUnitCost => ApprovedQuantity > 0 ? Math.Round(TotalActualCost / ApprovedQuantity, 2) : 0m;
+    // Custo Capitalizável Normal no Estoque (CPC 16 R1): exclui perdas anormais
+    public decimal CapitalizableProductionCost => Math.Max(0m, TotalActualCost - AbnormalWasteCost);
+
+    // Custo Unitário Contábil da Peça Aprovada (registrado no Kardex)
+    public decimal ActualUnitCost => ApprovedQuantity > 0 ? Math.Round(CapitalizableProductionCost / ApprovedQuantity, 2) : 0m;
 
     public string? FailureReason { get; private set; }
     public DateTime? StartedAtUtc { get; private set; }
@@ -486,13 +490,18 @@ public class ManufacturingOrder : BranchEntity
         decimal energyCost,
         decimal machineCost,
         decimal laborCost,
-        decimal wasteCost)
+        decimal wasteCost,
+        bool isAbnormalWaste = false)
     {
         ActualMaterialCost += materialCost;
         ActualEnergyCost += energyCost;
         ActualMachineCost += machineCost;
         ActualLaborCost += laborCost;
         ActualWasteCost += wasteCost;
+        if (isAbnormalWaste)
+        {
+            AbnormalWasteCost += wasteCost;
+        }
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
