@@ -86,17 +86,17 @@ export default function RootShellLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, token, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Redireciona para o login se não houver usuário ou token na sessão
-    if (!isLoading && !token) {
+    // Redireciona para o login se a sessão não for confirmada
+    if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isLoading, token, router]);
+  }, [isLoading, isAuthenticated, router]);
 
-  if (isLoading || !token) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[#070b14] text-slate-400 font-medium text-xs">
         <div className="flex flex-col items-center gap-3">

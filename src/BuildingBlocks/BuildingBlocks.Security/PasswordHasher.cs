@@ -12,7 +12,7 @@ public class Pbkdf2PasswordHasher : IPasswordHasher
 {
     private const int SaltSize = 16; // 128 bits
     private const int KeySize = 32;  // 256 bits
-    private const int Iterations = 100_000;
+    public const int DefaultIterations = 600_000; // Padrão atualizado OWASP para PBKDF2-HMAC-SHA256
     private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
 
     public string HashPassword(string password)
@@ -24,12 +24,12 @@ public class Pbkdf2PasswordHasher : IPasswordHasher
         byte[] hash = Rfc2898DeriveBytes.Pbkdf2(
             password,
             salt,
-            Iterations,
+            DefaultIterations,
             Algorithm,
             KeySize);
 
-        // Formato seguro: {iterations}.{saltBase64}.{hashBase64}
-        return $"{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
+        // Formato seguro com versão: v1.{iterations}.{saltBase64}.{hashBase64}
+        return $"v1.{DefaultIterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 
     public bool VerifyPassword(string password, string passwordHash)
@@ -38,16 +38,31 @@ public class Pbkdf2PasswordHasher : IPasswordHasher
             return false;
 
         var parts = passwordHash.Split('.');
-        if (parts.Length != 3)
-            return false;
+        int iterations;
+        string saltStr;
+        string hashStr;
 
-        if (!int.TryParse(parts[0], out int iterations) || iterations <= 0)
+        if (parts.Length == 4 && parts[0] == "v1")
+        {
+            if (!int.TryParse(parts[1], out iterations) || iterations <= 0) return false;
+            saltStr = parts[2];
+            hashStr = parts[3];
+        }
+        else if (parts.Length == 3) // Formato anterior sem prefixo v1
+        {
+            if (!int.TryParse(parts[0], out iterations) || iterations <= 0) return false;
+            saltStr = parts[1];
+            hashStr = parts[2];
+        }
+        else
+        {
             return false;
+        }
 
         try
         {
-            byte[] salt = Convert.FromBase64String(parts[1]);
-            byte[] expectedHash = Convert.FromBase64String(parts[2]);
+            byte[] salt = Convert.FromBase64String(saltStr);
+            byte[] expectedHash = Convert.FromBase64String(hashStr);
 
             byte[] actualHash = Rfc2898DeriveBytes.Pbkdf2(
                 password,

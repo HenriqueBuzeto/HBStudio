@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 export interface UserProfile {
@@ -16,72 +16,72 @@ export interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
-  token: string | null;
+  isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: UserProfile) => void;
-  logout: () => void;
+  login: (user: UserProfile) => void;
+  logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  token: null,
+  isAuthenticated: false,
   isLoading: true,
   login: () => {},
-  logout: () => {},
+  logout: async () => {},
   hasPermission: () => false,
+  refreshSession: async () => {},
 });
-
-export const AUTH_TOKEN_KEY = "hb_erp_access_token";
-export const AUTH_USER_KEY = "hb_erp_user_profile";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    // Carrega a sessão local se existir
+  const refreshSession = useCallback(async () => {
     try {
-      const storedToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
-      const storedUser = sessionStorage.getItem(AUTH_USER_KEY);
+      // Validação server-side via BFF (o token JWT fica protegido em Cookie HttpOnly)
+      const res = await fetch("/api/auth/me", {
+        method: "GET",
+        headers: { "Cache-Control": "no-store" },
+      });
 
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      } else {
+        setUser(null);
+        if (pathname !== "/login") {
+          router.push("/login");
+        }
       }
     } catch {
-      // Ignora falhas de parse e limpa sessão corrompida
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(AUTH_USER_KEY);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [pathname, router]);
 
-  const login = (newToken: string, newUser: UserProfile) => {
-    setToken(newToken);
+  useEffect(() => {
+    refreshSession();
+  }, [refreshSession]);
+
+  const login = (newUser: UserProfile) => {
     setUser(newUser);
-    try {
-      sessionStorage.setItem(AUTH_TOKEN_KEY, newToken);
-      sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
-    } catch {
-      // Falha ao persistir em sessionStorage
-    }
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
     try {
-      sessionStorage.removeItem(AUTH_TOKEN_KEY);
-      sessionStorage.removeItem(AUTH_USER_KEY);
+      // Notifica o endpoint de logout para expirar cookie e revogar sessão no servidor
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      // Ignora erro
+      // Ignora erro de rede
+    } finally {
+      setUser(null);
+      router.push("/login");
     }
-    router.push("/login");
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -93,11 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        token,
+        isAuthenticated: !!user,
         isLoading,
         login,
         logout,
         hasPermission,
+        refreshSession,
       }}
     >
       {children}

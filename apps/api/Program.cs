@@ -60,6 +60,7 @@ builder.Services.AddScoped<DigitalProjects.Application.Services.DigitalProjectsA
 
 // Modulo IdentityAccess & Segurança dos Sócios
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+builder.Services.AddSingleton<ISessionRevocationManager, MemorySessionRevocationManager>();
 builder.Services.AddScoped<IdentityAccess.Application.Services.IIdentityDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 builder.Services.AddScoped<IdentityAccess.Application.Services.IAuthenticationService, IdentityAccess.Application.Services.AuthenticationService>();
 
@@ -144,7 +145,11 @@ authGroup.MapGet("/me", async (
         return Results.Unauthorized();
     }
 
-    var profile = await authService.GetCurrentUserProfileAsync(userId, ct);
+    var sessionId = user.FindFirst("session_id")?.Value;
+    var securityStampClaim = user.FindFirst("security_stamp")?.Value;
+    uint tokenSecurityStamp = uint.TryParse(securityStampClaim, out var s) ? s : 1;
+
+    var profile = await authService.GetCurrentUserProfileAsync(userId, sessionId, tokenSecurityStamp, ct);
     if (profile == null)
     {
         return Results.Unauthorized();
@@ -153,10 +158,21 @@ authGroup.MapGet("/me", async (
     return Results.Ok(profile);
 }).RequireAuthorization();
 
-authGroup.MapPost("/logout", () =>
+authGroup.MapPost("/logout", async (
+    ClaimsPrincipal user,
+    IdentityAccess.Application.Services.IAuthenticationService authService,
+    CancellationToken ct) =>
 {
-    // Emissão de logout: invalidação no cliente e auditoria
-    return Results.Ok(new { message = "Sessão encerrada com sucesso." });
+    var sessionId = user.FindFirst("session_id")?.Value;
+    var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    Guid? userId = Guid.TryParse(userIdClaim, out var uid) ? uid : null;
+
+    if (!string.IsNullOrEmpty(sessionId))
+    {
+        await authService.LogoutAsync(sessionId, userId, ct);
+    }
+
+    return Results.Ok(new { message = "Sessão encerrada e revogada com sucesso no servidor." });
 }).RequireAuthorization();
 #endregion
 

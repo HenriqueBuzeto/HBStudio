@@ -46,6 +46,17 @@ public class HttpExecutionContextAccessor : IExecutionContext
 
     public string UserEmail => User?.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
 
+    public string? SessionId => User?.FindFirst("session_id")?.Value;
+
+    public uint TokenSecurityStamp
+    {
+        get
+        {
+            var claim = User?.FindFirst("security_stamp")?.Value;
+            return uint.TryParse(claim, out var stamp) ? stamp : 1;
+        }
+    }
+
     public string? CorrelationId => _httpContextAccessor.HttpContext?.TraceIdentifier;
 
     public IReadOnlySet<string> Permissions

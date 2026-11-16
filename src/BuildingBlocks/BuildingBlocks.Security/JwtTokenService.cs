@@ -5,11 +5,11 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace BuildingBlocks.Security;
 
-public record TokenResponse(string AccessToken, DateTime ExpiresAtUtc, Guid UserId, string Email, IReadOnlyList<string> Permissions);
+public record TokenResponse(string AccessToken, DateTime ExpiresAtUtc, Guid UserId, string Email, IReadOnlyList<string> Permissions, string SessionId);
 
 public interface ITokenService
 {
-    TokenResponse GenerateToken(Guid tenantId, Guid? branchId, Guid userId, string email, IEnumerable<string> permissions);
+    TokenResponse GenerateToken(Guid tenantId, Guid? branchId, Guid userId, string email, IEnumerable<string> permissions, string? sessionId = null, uint securityStamp = 1);
 }
 
 public class JwtTokenService : ITokenService
@@ -28,17 +28,20 @@ public class JwtTokenService : ITokenService
         _audience = audience;
     }
 
-    public TokenResponse GenerateToken(Guid tenantId, Guid? branchId, Guid userId, string email, IEnumerable<string> permissions)
+    public TokenResponse GenerateToken(Guid tenantId, Guid? branchId, Guid userId, string email, IEnumerable<string> permissions, string? sessionId = null, uint securityStamp = 1)
     {
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(_signingKey);
         var expiresAt = DateTime.UtcNow.AddHours(8);
+        var actualSessionId = sessionId ?? Guid.NewGuid().ToString("N");
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(ClaimTypes.Email, email),
             new("tenant_id", tenantId.ToString()),
+            new("session_id", actualSessionId),
+            new("security_stamp", securityStamp.ToString()),
         };
 
         if (branchId.HasValue)
@@ -61,6 +64,6 @@ public class JwtTokenService : ITokenService
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        return new TokenResponse(tokenHandler.WriteToken(token), expiresAt, userId, email, permissions.ToList());
+        return new TokenResponse(tokenHandler.WriteToken(token), expiresAt, userId, email, permissions.ToList(), actualSessionId);
     }
 }

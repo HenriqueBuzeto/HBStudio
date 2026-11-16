@@ -57,6 +57,7 @@ public class User : TenantEntity
     public string PasswordHash { get; private set; }
     public bool IsActive { get; private set; } = true;
     public Guid? DefaultBranchId { get; private set; }
+    public uint SecurityStamp { get; private set; } = 1; // Incrementado a cada revogação/alteração de permissão
 
     private readonly List<UserRole> _userRoles = [];
     public IReadOnlyCollection<UserRole> UserRoles => _userRoles.AsReadOnly();
@@ -73,6 +74,19 @@ public class User : TenantEntity
         Email = email.Trim().ToLowerInvariant();
         PasswordHash = passwordHash;
         DefaultBranchId = defaultBranchId;
+        SecurityStamp = 1;
+    }
+
+    public void InvalidateSecurityStamp()
+    {
+        SecurityStamp++;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+        InvalidateSecurityStamp();
     }
 
     public void AssignRole(Role role)
@@ -83,6 +97,7 @@ public class User : TenantEntity
         if (!_userRoles.Any(ur => ur.RoleId == role.Id))
         {
             _userRoles.Add(new UserRole(TenantId, Id, role.Id));
+            InvalidateSecurityStamp();
         }
     }
 }

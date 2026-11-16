@@ -43,8 +43,8 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      // Chamada à API de autenticação do backend oficial
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      // Chamada à rota interna BFF do Next.js (grava Cookie HttpOnly no navegador)
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -55,7 +55,7 @@ export function LoginForm() {
 
       if (res.ok) {
         const data = await res.json();
-        login(data.accessToken, data.user);
+        login(data.user);
         router.push("/");
       } else if (res.status === 401 || res.status === 403) {
         // Mensagem genérica padronizada: segurança contra enumeração de contas

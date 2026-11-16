@@ -29,6 +29,7 @@ public class Partner : TenantEntity
     public DateTime AdmissionDate { get; private set; }
     public DateTime? ExitDate { get; private set; }
     public decimal MonthlyCompensationCap { get; private set; } // Teto aprovado para pró-labore
+    public bool IsErpAccessEnabled { get; private set; } = true; // Habilitação explícita de acesso ao ERP
     public string? Notes { get; private set; }
 
     private Partner() { }
@@ -42,7 +43,8 @@ public class Partner : TenantEntity
         PartnerType type,
         DateTime admissionDate,
         decimal monthlyCompensationCap = 0,
-        string? notes = null) : base(tenantId)
+        string? notes = null,
+        bool isErpAccessEnabled = true) : base(tenantId)
     {
         if (partyId == Guid.Empty) throw new ArgumentException("PartyId is required.", nameof(partyId));
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Partner name is required.", nameof(name));
@@ -57,6 +59,13 @@ public class Partner : TenantEntity
         AdmissionDate = admissionDate;
         MonthlyCompensationCap = monthlyCompensationCap >= 0 ? monthlyCompensationCap : 0;
         Notes = notes;
+        IsErpAccessEnabled = isErpAccessEnabled;
+    }
+
+    public void SetErpAccess(bool isEnabled)
+    {
+        IsErpAccessEnabled = isEnabled;
+        UpdatedAtUtc = DateTime.UtcNow;
     }
 
     public void UpdateCompensationCap(decimal cap)

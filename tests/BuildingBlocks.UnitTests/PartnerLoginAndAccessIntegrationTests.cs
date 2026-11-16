@@ -170,4 +170,104 @@ public class PartnerLoginAndAccessIntegrationTests : IClassFixture<WebApplicatio
         var content = await response.Content.ReadAsStringAsync();
         Assert.Contains("Não foi possível entrar", content);
     }
+
+    [Fact]
+    public async Task PartnerLogin_PartnerWithErpAccessDisabled_IsRejectedWith401()
+    {
+        // Arrange: Sócio ativo, mas com IsErpAccessEnabled = false (sem habilitação explícita ao ERP)
+        var client = _factory.CreateClient();
+        var hasher = new Pbkdf2PasswordHasher();
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var email = $"socio_bloqueado_{unique}@hbstudio.com.br";
+        var password = "SenhaValida@2026";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tenant = new Tenant($"Tenant {unique}", $"T_{unique}");
+            db.Tenants.Add(tenant);
+
+            var user = new User(tenant.Id, $"Sócio Bloqueado {unique}", email, hasher.HashPassword(password));
+            db.Users.Add(user);
+
+            var partner = new Partner(
+                tenant.Id,
+                Guid.NewGuid(),
+                user.FullName,
+                "111.222.333-44",
+                email,
+                PartnerType.SilentPartner,
+                DateTime.UtcNow,
+                isErpAccessEnabled: false); // Não habilitado ao ERP
+            db.Partners.Add(partner);
+
+            await db.SaveChangesAsync();
+        }
+
+        // Act
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Não foi possível entrar", content);
+    }
+
+    [Fact]
+    public async Task PartnerLogout_ServerSideRevocation_RejectsSubsequentApiCalls()
+    {
+        // Arrange
+        var client = _factory.CreateClient();
+        var hasher = new Pbkdf2PasswordHasher();
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var email = $"socio_logout_{unique}@hbstudio.com.br";
+        var password = "SenhaValida@2026";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tenant = new Tenant($"Tenant {unique}", $"T_{unique}");
+            var branch = tenant.AddBranch($"Matriz {unique}", "HQ", true);
+            db.Tenants.Add(tenant);
+            db.Branches.Add(branch);
+
+            var user = new User(tenant.Id, $"Sócio Logout {unique}", email, hasher.HashPassword(password), branch.Id);
+            db.Users.Add(user);
+
+            var role = new Role(tenant.Id, "Diretor", "Diretoria");
+            role.AddPermission(PermissionCatalog.PartnersView);
+            db.Roles.Add(role);
+            user.AssignRole(role);
+
+            var partner = new Partner(tenant.Id, Guid.NewGuid(), user.FullName, "999.888.777-66", email, PartnerType.ManagingPartner, DateTime.UtcNow);
+            db.Partners.Add(partner);
+
+            await db.SaveChangesAsync();
+        }
+
+        // 1. Efetua Login
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var authData = await loginRes.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(authData);
+
+        // 2. Comprova que a API /api/auth/me responde 200 OK
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authData.AccessToken);
+        var meBefore = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meBefore.StatusCode);
+
+        // 3. Efetua Logout no servidor
+        var logoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logoutRes.StatusCode);
+
+        // 4. Teste Crucial: Tenta REUTILIZAR o mesmo JWT após logout
+        // O servidor deve rejeitar a requisição porque a sessão foi revogada no ISessionRevocationManager
+        var meAfter = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, meAfter.StatusCode);
+
+        // 5. Tenta acessar endpoint operacional protegido por PermissionKey
+        // Com a sessão revogada, a validação de permissão falha (403 Forbidden ou 401)
+        var opAfter = await client.GetAsync("/api/partners");
+        Assert.True(opAfter.StatusCode == HttpStatusCode.Forbidden || opAfter.StatusCode == HttpStatusCode.Unauthorized);
+    }
 }

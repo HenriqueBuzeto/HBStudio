@@ -10,7 +10,8 @@ namespace IdentityAccess.Application.Services;
 public interface IAuthenticationService
 {
     Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken ct = default);
-    Task<UserProfileDto?> GetCurrentUserProfileAsync(Guid userId, CancellationToken ct = default);
+    Task<UserProfileDto?> GetCurrentUserProfileAsync(Guid userId, string? sessionId = null, uint tokenSecurityStamp = 1, CancellationToken ct = default);
+    Task LogoutAsync(string sessionId, Guid? userId, CancellationToken ct = default);
 }
 
 public interface IIdentityDbContext
@@ -29,6 +30,7 @@ public class AuthenticationService : IAuthenticationService
     private readonly IIdentityDbContext _db;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly ISessionRevocationManager _revocationManager;
 
     // Rate Limiting em memória (mitigação contra força bruta)
     private static readonly ConcurrentDictionary<string, (int Attempts, DateTime LockedUntilUtc)> FailedAttempts = new();
@@ -38,11 +40,13 @@ public class AuthenticationService : IAuthenticationService
     public AuthenticationService(
         IIdentityDbContext db,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        ISessionRevocationManager revocationManager)
     {
         _db = db;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _revocationManager = revocationManager;
     }
 
     public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -85,18 +89,19 @@ public class AuthenticationService : IAuthenticationService
         }
 
         // 4. REGRA CENTRAL ENTERPRISE: ACESSO INTERATIVO RESTRITO EXCLUSIVAMENTE AOS SÓCIOS AUTORIZADOS
-        // O usuário autenticável deve possuir um vínculo societário ativo e vigente em PartnersCapital (MOD-13)
+        // O usuário autenticável deve possuir vínculo societário ativo e vigente com habilitação explícita de acesso ao ERP
         var partner = await _db.Partners
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.TenantId == user.TenantId 
                                    && (p.Email.ToLower() == normalizedEmail || p.Name.ToLower() == user.FullName.ToLower())
-                                   && p.Status == PartnerStatus.Active, ct);
+                                   && p.Status == PartnerStatus.Active
+                                   && p.IsErpAccessEnabled, ct);
 
         if (partner == null)
         {
-            // Usuário tem senha válida, mas NÃO é sócio ativo/autorizado da HB Studio
+            // Usuário tem senha válida, mas NÃO é sócio ativo/habilitado ao ERP da HB Studio
             RecordFailedAttempt(normalizedEmail);
-            await LogAuditEventAsync(user.TenantId, user.DefaultBranchId, "UserLoginRejectedNotPartner", user.Id, normalizedEmail, "Usuário sem vínculo societário ativo em PartnersCapital.", ct);
+            await LogAuditEventAsync(user.TenantId, user.DefaultBranchId, "UserLoginRejectedNotPartner", user.Id, normalizedEmail, "Usuário sem vínculo societário ativo e habilitado ao ERP.", ct);
             return null;
         }
 
@@ -117,13 +122,16 @@ public class AuthenticationService : IAuthenticationService
             .Distinct()
             .ToListAsync(ct);
 
-        // 6. Geração de Token JWT
+        // 6. Geração de Token JWT com SessionId e SecurityStamp
+        var sessionId = Guid.NewGuid().ToString("N");
         var tokenResult = _tokenService.GenerateToken(
             user.TenantId,
             user.DefaultBranchId,
             user.Id,
             user.Email,
-            permissions);
+            permissions,
+            sessionId,
+            user.SecurityStamp);
 
         // 7. Auditoria de Acesso Autorizado
         await LogAuditEventAsync(
@@ -132,7 +140,7 @@ public class AuthenticationService : IAuthenticationService
             "PartnerLoginSuccess",
             user.Id,
             user.Email,
-            $"Login efetuado com sucesso pelo sócio {partner.Name} ({partner.Type}).",
+            $"Login efetuado com sucesso pelo sócio {partner.Name} ({partner.Type}). Sessão: {sessionId}",
             ct);
 
         var profile = new UserProfileDto(
@@ -148,19 +156,33 @@ public class AuthenticationService : IAuthenticationService
         return new LoginResponse(tokenResult.AccessToken, tokenResult.ExpiresAtUtc, profile);
     }
 
-    public async Task<UserProfileDto?> GetCurrentUserProfileAsync(Guid userId, CancellationToken ct = default)
+    public async Task<UserProfileDto?> GetCurrentUserProfileAsync(Guid userId, string? sessionId = null, uint tokenSecurityStamp = 1, CancellationToken ct = default)
     {
+        // 1. Verificação de revogação de sessão
+        if (!string.IsNullOrEmpty(sessionId) && _revocationManager.IsSessionRevoked(sessionId))
+        {
+            return null;
+        }
+
         var user = await _db.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive, ct);
 
         if (user == null) return null;
 
+        // 2. Verificação de invalidação de SecurityStamp (revogação de permissões ou suspensão)
+        if (_revocationManager.IsUserRevoked(user.Id, user.SecurityStamp, tokenSecurityStamp))
+        {
+            return null;
+        }
+
+        // 3. Verificação de elegibilidade societária em tempo real
         var partner = await _db.Partners
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.TenantId == user.TenantId 
                                    && (p.Email.ToLower() == user.Email.ToLower() || p.Name.ToLower() == user.FullName.ToLower())
-                                   && p.Status == PartnerStatus.Active, ct);
+                                   && p.Status == PartnerStatus.Active
+                                   && p.IsErpAccessEnabled, ct);
 
         if (partner == null) return null;
 
@@ -186,6 +208,23 @@ public class AuthenticationService : IAuthenticationService
             IsPartner: true,
             PartnerRole: partner.Type.ToString(),
             permissions);
+    }
+
+    public async Task LogoutAsync(string sessionId, Guid? userId, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            _revocationManager.RevokeSession(sessionId);
+        }
+
+        await LogAuditEventAsync(
+            null,
+            null,
+            "UserLogout",
+            userId,
+            userId?.ToString() ?? "Anonymous",
+            $"Sessão {sessionId} revogada no servidor.",
+            ct);
     }
 
     private static void RecordFailedAttempt(string email)

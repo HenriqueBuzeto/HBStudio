@@ -2513,6 +2513,9 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<long>("SecurityStamp")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
@@ -4676,6 +4679,9 @@ namespace BuildingBlocks.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ExitDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsErpAccessEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("MonthlyCompensationCap")
                         .HasPrecision(18, 2)
