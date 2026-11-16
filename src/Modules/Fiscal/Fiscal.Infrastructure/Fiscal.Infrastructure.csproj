@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Zeus.Net.NFe.NFCe" Version="2026.9.24.1416" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fiscal.Domain\Fiscal.Domain.csproj" />
+    <ProjectReference Include="..\Fiscal.Application\Fiscal.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Infrastructure\BuildingBlocks.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

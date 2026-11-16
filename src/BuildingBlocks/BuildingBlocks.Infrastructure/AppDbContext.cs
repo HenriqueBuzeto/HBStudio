@@ -1,1974 +1,4041 @@
-using Microsoft.EntityFrameworkCore;
-using BuildingBlocks.Domain;
-using BuildingBlocks.Application;
-using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
-using IdentityAccess.Domain;
-using IdentityAccess.Application.Services;
-using Parties.Domain;
-using Catalog.Domain;
-using Inventory.Domain;
-using Procurement.Domain;
-using Sales.Domain;
-using CashManagement.Domain;
-using Financial.Domain;
-using PartnersCapital.Domain.Entities;
-using RepairService.Domain.Entities;
-using CRM.Domain.Entities;
-using Messaging.Domain.Entities;
-using Manufacturing3D.Domain.Entities;
-using DigitalProjects.Domain.Entities;
-
-namespace BuildingBlocks.Infrastructure;
-
-public class AppDbContext : DbContext, IIdentityDbContext
-{
-    private readonly IExecutionContext? _executionContext;
-
-    public DbSet<Tenant> Tenants => Set<Tenant>();
-    public DbSet<Branch> Branches => Set<Branch>();
-    public DbSet<User> Users => Set<User>();
-    public DbSet<Role> Roles => Set<Role>();
-    public DbSet<UserRole> UserRoles => Set<UserRole>();
-    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
-    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
-    public DbSet<RevokedSession> RevokedSessions => Set<RevokedSession>();
-
-    // Modulo Parties
-    public DbSet<Party> Parties => Set<Party>();
-    public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
-    public DbSet<SupplierProfile> SupplierProfiles => Set<SupplierProfile>();
-    public DbSet<PartyContact> PartyContacts => Set<PartyContact>();
-    public DbSet<PartyAddress> PartyAddresses => Set<PartyAddress>();
-    public DbSet<CustomerEquipment> CustomerEquipments => Set<CustomerEquipment>();
-    public DbSet<PartyConsentRecord> PartyConsentRecords => Set<PartyConsentRecord>();
-
-    // Modulo Catalog
-    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
-    public DbSet<ProductBrand> ProductBrands => Set<ProductBrand>();
-    public DbSet<ProductModel> ProductModels => Set<ProductModel>();
-    public DbSet<ProductSku> ProductSkus => Set<ProductSku>();
-    public DbSet<InventoryUnit> InventoryUnits => Set<InventoryUnit>();
-    public DbSet<InventoryUnitIdentifier> InventoryUnitIdentifiers => Set<InventoryUnitIdentifier>();
-
-    // Modulo Inventory & Kardex
-    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
-    public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
-    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
-    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
-    public DbSet<SerialStockPosition> SerialStockPositions => Set<SerialStockPosition>();
-    public DbSet<StockReservation> StockReservations => Set<StockReservation>();
-    public DbSet<StockReservationItem> StockReservationItems => Set<StockReservationItem>();
-    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
-    public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
-    public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
-    public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
-
-    // Modulo Procurement (Compras, Recebimento e Aquisição de Usados)
-    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
-    public DbSet<PurchaseRequestItem> PurchaseRequestItems => Set<PurchaseRequestItem>();
-    public DbSet<SupplierQuotation> SupplierQuotations => Set<SupplierQuotation>();
-    public DbSet<SupplierQuotationItem> SupplierQuotationItems => Set<SupplierQuotationItem>();
-    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
-    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
-    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
-    public DbSet<GoodsReceiptItem> GoodsReceiptItems => Set<GoodsReceiptItem>();
-    public DbSet<UsedDeviceAcquisition> UsedDeviceAcquisitions => Set<UsedDeviceAcquisition>();
-    public DbSet<SupplierReturn> SupplierReturns => Set<SupplierReturn>();
-    public DbSet<SupplierReturnItem> SupplierReturnItems => Set<SupplierReturnItem>();
-
-    // Modulo Sales (MOD-05) - Orçamentos, PDV, Vendas e Pagamentos
-    public DbSet<SalesQuote> SalesQuotes => Set<SalesQuote>();
-    public DbSet<SalesQuoteItem> SalesQuoteItems => Set<SalesQuoteItem>();
-    public DbSet<Sale> Sales => Set<Sale>();
-    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
-    public DbSet<SalePaymentIntent> SalePaymentIntents => Set<SalePaymentIntent>();
-    public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
-    public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
-
-    // Modulo CashManagement (MOD-06) - Caixa, Turnos, Sangrias, Suprimentos e Fechamento
-    public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
-    public DbSet<CashShift> CashShifts => Set<CashShift>();
-    public DbSet<CashMovement> CashMovements => Set<CashMovement>();
-    public DbSet<CashCountDenomination> CashCountDenominations => Set<CashCountDenomination>();
-    public DbSet<CashDiscrepancy> CashDiscrepancies => Set<CashDiscrepancy>();
-
-    // Modulo Financial (MOD-12) - Financeiro, Razão Contábil, Contas a Pagar/Receber, Bancos e DRE
-    public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
-    public DbSet<FinancialCostCenter> FinancialCostCenters => Set<FinancialCostCenter>();
-    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
-    public DbSet<FinancialJournalEntry> FinancialJournalEntries => Set<FinancialJournalEntry>();
-    public DbSet<FinancialJournalLine> FinancialJournalLines => Set<FinancialJournalLine>();
-    public DbSet<AccountPayable> AccountsPayable => Set<AccountPayable>();
-    public DbSet<AccountReceivable> AccountsReceivable => Set<AccountReceivable>();
-    public DbSet<FinancialSettlement> FinancialSettlements => Set<FinancialSettlement>();
-    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
-
-    // Modulo PartnersCapital (MOD-13) - Gestão Societária, Cap Table, Aportes, Mútuos e Distribuição de Resultados
-    public DbSet<Partner> Partners => Set<Partner>();
-    public DbSet<EquityParticipation> EquityParticipations => Set<EquityParticipation>();
-    public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
-    public DbSet<PartnerLoan> PartnerLoans => Set<PartnerLoan>();
-    public DbSet<PartnerCompensation> PartnerCompensations => Set<PartnerCompensation>();
-    public DbSet<ProfitDistributionProposal> ProfitDistributionProposals => Set<ProfitDistributionProposal>();
-    public DbSet<ProfitDistributionItem> ProfitDistributionItems => Set<ProfitDistributionItem>();
-
-    // Modulo RepairService (MOD-07) - Assistência Técnica, OS, Laboratório e Garantias
-    public DbSet<RepairOrder> RepairOrders => Set<RepairOrder>();
-    public DbSet<RepairChecklistItem> RepairChecklistItems => Set<RepairChecklistItem>();
-    public DbSet<RepairEstimateItem> RepairEstimateItems => Set<RepairEstimateItem>();
-    public DbSet<RepairPartUsage> RepairPartUsages => Set<RepairPartUsage>();
-    public DbSet<RepairStatusHistoryEntry> RepairStatusHistoryEntries => Set<RepairStatusHistoryEntry>();
-    public DbSet<RepairEvidenceAttachment> RepairEvidenceAttachments => Set<RepairEvidenceAttachment>();
-    public DbSet<RepairWarrantyClaim> RepairWarrantyClaims => Set<RepairWarrantyClaim>();
-
-    // Modulo CRM (MOD-08) - CRM Inteligente, Leads, Oportunidades, Intenções de Compra e Matching de Estoque
-    public DbSet<CrmLead> CrmLeads => Set<CrmLead>();
-    public DbSet<CrmPipeline> CrmPipelines => Set<CrmPipeline>();
-    public DbSet<CrmPipelineStage> CrmPipelineStages => Set<CrmPipelineStage>();
-    public DbSet<CrmOpportunity> CrmOpportunities => Set<CrmOpportunity>();
-    public DbSet<CrmOpportunityActivity> CrmOpportunityActivities => Set<CrmOpportunityActivity>();
-    public DbSet<CrmPurchaseIntent> CrmPurchaseIntents => Set<CrmPurchaseIntent>();
-    public DbSet<CrmInventoryMatch> CrmInventoryMatches => Set<CrmInventoryMatch>();
-
-    // Modulo Messaging (MOD-09) - Mensageria Multicanal, WhatsApp Cloud API, Automações e Notificações Internas
-    public DbSet<MessagingChannelAccount> MessagingChannelAccounts => Set<MessagingChannelAccount>();
-    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
-    public DbSet<MessageRequest> MessageRequests => Set<MessageRequest>();
-    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
-    public DbSet<MessagingWebhookEvent> MessagingWebhookEvents => Set<MessagingWebhookEvent>();
-    public DbSet<CustomerConversation> CustomerConversations => Set<CustomerConversation>();
-    public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
-
-    // Modulo Manufacturing 3D (MOD-10) - Fábrica 3D, Produção, OPs e Custos Reais
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrinter> ManufacturingPrinters => Set<Manufacturing3D.Domain.Entities.ManufacturingPrinter>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingSpool> ManufacturingSpools => Set<Manufacturing3D.Domain.Entities.ManufacturingSpool>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset> ManufacturingDesignAssets => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion> ManufacturingDesignVersions => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingQuote> ManufacturingQuotes => Set<Manufacturing3D.Domain.Entities.ManufacturingQuote>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingOrder> ManufacturingOrders => Set<Manufacturing3D.Domain.Entities.ManufacturingOrder>();
-    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt> ManufacturingPrintAttempts => Set<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>();
-
-    // Modulo Digital Projects (MOD-11) - Projetos Digitais, Contratos, Tarefas, Horas e Rentabilidade
-    public DbSet<DigitalProject> DigitalProjects => Set<DigitalProject>();
-    public DbSet<DigitalProjectMilestone> DigitalProjectMilestones => Set<DigitalProjectMilestone>();
-    public DbSet<DigitalProjectTask> DigitalProjectTasks => Set<DigitalProjectTask>();
-    public DbSet<DigitalProjectTimeEntry> DigitalProjectTimeEntries => Set<DigitalProjectTimeEntry>();
-    public DbSet<DigitalProjectDeliverable> DigitalProjectDeliverables => Set<DigitalProjectDeliverable>();
-    public DbSet<DigitalProjectChangeRequest> DigitalProjectChangeRequests => Set<DigitalProjectChangeRequest>();
-    public DbSet<DigitalProjectContractVersion> DigitalProjectContractVersions => Set<DigitalProjectContractVersion>();
-
-    // Modulo FleetLogistics & ProductPricingEngine (MOD-16) - Fretes, Frota, Manutenção e Precificação Inteligente
-    public DbSet<FleetLogistics.Domain.Entities.FleetVehicle> FleetVehicles => Set<FleetLogistics.Domain.Entities.FleetVehicle>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetTrip> FleetTrips => Set<FleetLogistics.Domain.Entities.FleetTrip>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetFueling> FleetFuelings => Set<FleetLogistics.Domain.Entities.FleetFueling>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetExpense> FleetExpenses => Set<FleetLogistics.Domain.Entities.FleetExpense>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenancePlan> FleetMaintenancePlans => Set<FleetLogistics.Domain.Entities.FleetMaintenancePlan>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenanceService> FleetMaintenanceServices => Set<FleetLogistics.Domain.Entities.FleetMaintenanceService>();
-    public DbSet<FleetLogistics.Domain.Entities.FleetTripAllocation> FleetTripAllocations => Set<FleetLogistics.Domain.Entities.FleetTripAllocation>();
-    public DbSet<FleetLogistics.Domain.Entities.ProductPricingPolicy> ProductPricingPolicies => Set<FleetLogistics.Domain.Entities.ProductPricingPolicy>();
-    public DbSet<FleetLogistics.Domain.Entities.ProductPriceSuggestion> ProductPriceSuggestions => Set<FleetLogistics.Domain.Entities.ProductPriceSuggestion>();
-
-    public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
-        : base(options)
-    {
-        _executionContext = executionContext;
-    }
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        base.OnModelCreating(modelBuilder);
-
-        // Mapeamento e Chaves
-        modelBuilder.Entity<Tenant>(b =>
-        {
-            b.ToTable("tenants");
-            b.HasKey(t => t.Id);
-            b.Property(t => t.Name).HasMaxLength(150).IsRequired();
-            b.Property(t => t.Code).HasMaxLength(50).IsRequired();
-            b.HasIndex(t => t.Code).IsUnique();
-            b.Property(t => t.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<Branch>(b =>
-        {
-            b.ToTable("branches");
-            b.HasKey(br => br.Id);
-            b.Property(br => br.Name).HasMaxLength(150).IsRequired();
-            b.Property(br => br.Code).HasMaxLength(50).IsRequired();
-            b.HasIndex(br => new { br.TenantId, br.Code }).IsUnique();
-            b.Property(br => br.Version).IsRowVersion();
-
-            // FK composta com Tenant
-            b.HasOne<Tenant>()
-             .WithMany(t => t.Branches)
-             .HasForeignKey(br => br.TenantId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<User>(b =>
-        {
-            b.ToTable("users");
-            b.HasKey(u => u.Id);
-            b.Property(u => u.FullName).HasMaxLength(200).IsRequired();
-            b.Property(u => u.Email).HasMaxLength(250).IsRequired();
-            b.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
-            b.Property(u => u.Version).IsRowVersion();
-
-            b.HasOne<Tenant>()
-             .WithMany()
-             .HasForeignKey(u => u.TenantId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Branch>()
-             .WithMany()
-             .HasForeignKey(u => u.DefaultBranchId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<Role>(b =>
-        {
-            b.ToTable("roles");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.Name).HasMaxLength(100).IsRequired();
-            b.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasOne<Tenant>()
-             .WithMany()
-             .HasForeignKey(r => r.TenantId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<UserRole>(b =>
-        {
-            b.ToTable("user_roles");
-            b.HasKey(ur => new { ur.TenantId, ur.UserId, ur.RoleId });
-
-            b.HasOne<Tenant>()
-             .WithMany()
-             .HasForeignKey(ur => ur.TenantId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<User>()
-             .WithMany(u => u.UserRoles)
-             .HasForeignKey(ur => ur.UserId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasOne<Role>()
-             .WithMany()
-             .HasForeignKey(ur => ur.RoleId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<RevokedSession>(b =>
-        {
-            b.ToTable("revoked_sessions");
-            b.HasKey(rs => rs.Id);
-            b.Property(rs => rs.SessionId).IsRequired().HasMaxLength(128);
-            b.HasIndex(rs => rs.SessionId).IsUnique();
-            b.HasIndex(rs => rs.ExpiresAtUtc);
-        });
-
-        modelBuilder.Entity<RolePermission>(b =>
-        {
-            b.ToTable("role_permissions");
-            b.HasKey(rp => new { rp.TenantId, rp.RoleId, rp.PermissionKey });
-            b.Property(rp => rp.PermissionKey).HasMaxLength(100).IsRequired();
-
-            b.HasOne<Tenant>()
-             .WithMany()
-             .HasForeignKey(rp => rp.TenantId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Role>()
-             .WithMany(r => r.Permissions)
-             .HasForeignKey(rp => rp.RoleId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<AuditEvent>(b =>
-        {
-            b.ToTable("audit_events");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.EntityType).HasMaxLength(100).IsRequired();
-            b.Property(a => a.EntityId).HasMaxLength(100).IsRequired();
-            b.Property(a => a.Action).HasMaxLength(50).IsRequired();
-            b.Property(a => a.ActorEmail).HasMaxLength(250).IsRequired();
-            b.Property(a => a.CorrelationId).HasMaxLength(100);
-            b.Property(a => a.BeforeStateJson).HasColumnType("jsonb");
-            b.Property(a => a.AfterStateJson).HasColumnType("jsonb");
-
-            b.HasIndex(a => new { a.TenantId, a.CreatedAtUtc });
-        });
-
-        // Configuração do Módulo Parties
-        modelBuilder.Entity<Party>(b =>
-        {
-            b.ToTable("parties");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Name).HasMaxLength(250).IsRequired();
-            b.Property(p => p.TradeName).HasMaxLength(250);
-            b.Property(p => p.DocumentNumber).HasMaxLength(20);
-            b.Property(p => p.StateRegistration).HasMaxLength(50);
-            b.Property(p => p.MunicipalRegistration).HasMaxLength(50);
-            b.Property(p => p.Version).IsRowVersion();
-
-            // Índice com unicidade condicional por tenant (quando documento informado)
-            b.HasIndex(p => new { p.TenantId, p.DocumentNumber })
-             .IsUnique()
-             .HasFilter("\"DocumentNumber\" IS NOT NULL");
-
-            b.HasOne(p => p.CustomerProfile)
-             .WithOne()
-             .HasForeignKey<CustomerProfile>(cp => cp.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasOne(p => p.SupplierProfile)
-             .WithOne()
-             .HasForeignKey<SupplierProfile>(sp => sp.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<CustomerProfile>(b =>
-        {
-            b.ToTable("customer_profiles");
-            b.HasKey(cp => cp.Id);
-            b.Property(cp => cp.TotalSalesValue).HasPrecision(18, 2);
-            b.Property(cp => cp.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<SupplierProfile>(b =>
-        {
-            b.ToTable("supplier_profiles");
-            b.HasKey(sp => sp.Id);
-            b.Property(sp => sp.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<PartyContact>(b =>
-        {
-            b.ToTable("party_contacts");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Email).HasMaxLength(250);
-            b.Property(c => c.Phone).HasMaxLength(20);
-            b.Property(c => c.WhatsApp).HasMaxLength(20);
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasOne<Party>()
-             .WithMany(p => p.Contacts)
-             .HasForeignKey(c => c.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<PartyAddress>(b =>
-        {
-            b.ToTable("party_addresses");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Street).HasMaxLength(200).IsRequired();
-            b.Property(a => a.Number).HasMaxLength(50).IsRequired();
-            b.Property(a => a.Complement).HasMaxLength(100);
-            b.Property(a => a.Neighborhood).HasMaxLength(100).IsRequired();
-            b.Property(a => a.City).HasMaxLength(100).IsRequired();
-            b.Property(a => a.State).HasMaxLength(2).IsRequired();
-            b.Property(a => a.PostalCode).HasMaxLength(10).IsRequired();
-            b.Property(a => a.Version).IsRowVersion();
-
-            b.HasOne<Party>()
-             .WithMany(p => p.Addresses)
-             .HasForeignKey(a => a.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<CustomerEquipment>(b =>
-        {
-            b.ToTable("customer_equipments");
-            b.HasKey(e => e.Id);
-            b.Property(e => e.EquipmentType).HasMaxLength(100).IsRequired();
-            b.Property(e => e.Brand).HasMaxLength(100).IsRequired();
-            b.Property(e => e.Model).HasMaxLength(150).IsRequired();
-            b.Property(e => e.SerialNumber).HasMaxLength(100);
-            b.Property(e => e.Imei1).HasMaxLength(20);
-            b.Property(e => e.Imei2).HasMaxLength(20);
-            b.Property(e => e.Color).HasMaxLength(50);
-            b.Property(e => e.Version).IsRowVersion();
-
-            b.HasOne<Party>()
-             .WithMany(p => p.Equipments)
-             .HasForeignKey(e => e.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<PartyConsentRecord>(b =>
-        {
-            b.ToTable("party_consent_records");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Channel).HasMaxLength(50).IsRequired();
-            b.Property(c => c.Purpose).HasMaxLength(100).IsRequired();
-            b.Property(c => c.Origin).HasMaxLength(100).IsRequired();
-            b.Property(c => c.Evidence).HasMaxLength(500);
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasOne<Party>()
-             .WithMany(p => p.Consents)
-             .HasForeignKey(c => c.PartyId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // Configuração do Módulo Catalog & InventoryUnit
-        modelBuilder.Entity<ProductCategory>(b =>
-        {
-            b.ToTable("product_categories");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Slug).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasIndex(c => new { c.TenantId, c.Slug }).IsUnique();
-
-            b.HasOne(c => c.ParentCategory)
-             .WithMany(p => p.SubCategories)
-             .HasForeignKey(c => c.ParentCategoryId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<ProductBrand>(b =>
-        {
-            b.ToTable("product_brands");
-            b.HasKey(brand => brand.Id);
-            b.Property(brand => brand.Name).HasMaxLength(150).IsRequired();
-            b.Property(brand => brand.Description).HasMaxLength(500);
-            b.Property(brand => brand.Version).IsRowVersion();
-
-            b.HasIndex(brand => new { brand.TenantId, brand.Name }).IsUnique();
-        });
-
-        modelBuilder.Entity<ProductModel>(b =>
-        {
-            b.ToTable("product_models");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.Name).HasMaxLength(200).IsRequired();
-            b.Property(m => m.Description).HasMaxLength(1000);
-            b.Property(m => m.Version).IsRowVersion();
-
-            b.HasOne(m => m.Brand)
-             .WithMany()
-             .HasForeignKey(m => m.BrandId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(m => m.Category)
-             .WithMany()
-             .HasForeignKey(m => m.CategoryId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<ProductSku>(b =>
-        {
-            b.ToTable("product_skus");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.SkuCode).HasMaxLength(100).IsRequired();
-            b.Property(s => s.VariantName).HasMaxLength(150).IsRequired();
-            b.Property(s => s.BarcodeEan).HasMaxLength(50);
-            b.Property(s => s.DefaultPrice).HasPrecision(18, 2);
-            b.Property(s => s.TechnicalSpecsJson).HasColumnType("jsonb");
-            b.Property(s => s.Version).IsRowVersion();
-
-            // SKU deve ser estritamente único por tenant
-            b.HasIndex(s => new { s.TenantId, s.SkuCode }).IsUnique();
-
-            b.HasOne(s => s.ProductModel)
-             .WithMany(m => m.Skus)
-             .HasForeignKey(s => s.ProductModelId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<InventoryUnit>(b =>
-        {
-            b.ToTable("inventory_units");
-            b.HasKey(u => u.Id);
-            b.Property(u => u.SerialNumber).HasMaxLength(100);
-            b.Property(u => u.Imei1).HasMaxLength(20);
-            b.Property(u => u.Imei2).HasMaxLength(20);
-            b.Property(u => u.AcquisitionCost).HasPrecision(18, 2);
-            b.Property(u => u.InspectionNotes).HasMaxLength(1000);
-            b.Property(u => u.Version).IsRowVersion();
-
-            // Índices parciais únicos por tenant para IMEI1 e IMEI2 (quando não nulos)
-            b.HasIndex(u => new { u.TenantId, u.Imei1 })
-             .IsUnique()
-             .HasFilter("\"Imei1\" IS NOT NULL");
-
-            b.HasIndex(u => new { u.TenantId, u.Imei2 })
-             .IsUnique()
-             .HasFilter("\"Imei2\" IS NOT NULL");
-
-            b.HasOne(u => u.ProductSku)
-             .WithMany(s => s.InventoryUnits)
-             .HasForeignKey(u => u.ProductSkuId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne<Party>()
-             .WithMany()
-             .HasForeignKey(u => u.SupplierPartyId)
-             .OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<InventoryUnitIdentifier>(b =>
-        {
-            b.ToTable("inventory_unit_identifiers");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.NormalizedValue).HasMaxLength(100).IsRequired();
-            b.Property(i => i.Version).IsRowVersion();
-
-            // Restrição crítica: Unicidade global de qualquer identificador (IMEI ou Serial) por tenant
-            b.HasIndex(i => new { i.TenantId, i.IdentifierType, i.NormalizedValue }).IsUnique();
-
-            b.HasOne(i => i.InventoryUnit)
-             .WithMany(u => u.Identifiers)
-             .HasForeignKey(i => i.InventoryUnitId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // Configuração do Módulo Inventory & Kardex
-        modelBuilder.Entity<Warehouse>(b =>
-        {
-            b.ToTable("warehouses");
-            b.HasKey(w => w.Id);
-            b.Property(w => w.Code).HasMaxLength(50).IsRequired();
-            b.Property(w => w.Name).HasMaxLength(150).IsRequired();
-            b.Property(w => w.Description).HasMaxLength(500);
-            b.Property(w => w.Version).IsRowVersion();
-
-            b.HasIndex(w => new { w.TenantId, w.BranchId, w.Code }).IsUnique();
-
-            b.HasOne<Branch>()
-             .WithMany()
-             .HasForeignKey(w => w.BranchId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<WarehouseLocation>(b =>
-        {
-            b.ToTable("warehouse_locations");
-            b.HasKey(l => l.Id);
-            b.Property(l => l.Code).HasMaxLength(50).IsRequired();
-            b.Property(l => l.Aisle).HasMaxLength(20).IsRequired();
-            b.Property(l => l.Shelf).HasMaxLength(20).IsRequired();
-            b.Property(l => l.Bin).HasMaxLength(20).IsRequired();
-            b.Property(l => l.Description).HasMaxLength(200);
-            b.Property(l => l.Version).IsRowVersion();
-
-            b.HasIndex(l => new { l.TenantId, l.WarehouseId, l.Code }).IsUnique();
-
-            b.HasOne(l => l.Warehouse)
-             .WithMany(w => w.Locations)
-             .HasForeignKey(l => l.WarehouseId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<StockMovement>(b =>
-        {
-            b.ToTable("stock_movements");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.Quantity).HasPrecision(18, 4); // Permite gramas de filamento 3D
-            b.Property(m => m.UnitCost).HasPrecision(18, 4);
-            b.Property(m => m.TotalCost).HasPrecision(18, 2);
-            b.Property(m => m.BalanceAfterQuantity).HasPrecision(18, 4);
-            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
-            b.Property(m => m.Reason).HasMaxLength(250);
-            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
-            b.Property(m => m.Version).IsRowVersion();
-
-            // Kardex imutável: Sem updates, indexado por tenant, data, SKU e serial
-            b.HasIndex(m => new { m.TenantId, m.BranchId, m.CreatedAtUtc });
-            b.HasIndex(m => new { m.TenantId, m.ProductSkuId, m.CreatedAtUtc });
-            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId, m.CreatedAtUtc });
-            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey })
-             .IsUnique()
-             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
-
-            b.HasOne(m => m.Warehouse)
-             .WithMany()
-             .HasForeignKey(m => m.WarehouseId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(m => m.WarehouseLocation)
-             .WithMany()
-             .HasForeignKey(m => m.WarehouseLocationId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(m => m.ProductSku)
-             .WithMany()
-             .HasForeignKey(m => m.ProductSkuId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(m => m.InventoryUnit)
-             .WithMany()
-             .HasForeignKey(m => m.InventoryUnitId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<StockBalance>(b =>
-        {
-            b.ToTable("stock_balances");
-            b.HasKey(b => b.Id);
-            b.Property(b => b.OnHandQuantity).HasPrecision(18, 4);
-            b.Property(b => b.ReservedQuantity).HasPrecision(18, 4);
-            b.Property(b => b.BlockedQuantity).HasPrecision(18, 4);
-            b.Property(b => b.AverageCost).HasPrecision(18, 4);
-            b.Property(b => b.Version).IsRowVersion();
-
-            b.HasIndex(b => new { b.TenantId, b.BranchId, b.WarehouseId, b.WarehouseLocationId, b.ProductSkuId }).IsUnique();
-
-            b.HasOne(b => b.Warehouse)
-             .WithMany()
-             .HasForeignKey(b => b.WarehouseId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(b => b.WarehouseLocation)
-             .WithMany()
-             .HasForeignKey(b => b.WarehouseLocationId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(b => b.ProductSku)
-             .WithMany()
-             .HasForeignKey(b => b.ProductSkuId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<SerialStockPosition>(b =>
-        {
-            b.ToTable("serial_stock_positions");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Version).IsRowVersion();
-
-            // Unidade física serializada só pode ter uma posição no estoque
-            b.HasIndex(p => new { p.TenantId, p.InventoryUnitId }).IsUnique();
-
-            b.HasOne(p => p.InventoryUnit)
-             .WithMany()
-             .HasForeignKey(p => p.InventoryUnitId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasOne(p => p.Warehouse)
-             .WithMany()
-             .HasForeignKey(p => p.WarehouseId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasOne(p => p.WarehouseLocation)
-             .WithMany()
-             .HasForeignKey(p => p.WarehouseLocationId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<StockReservation>(b =>
-        {
-            b.ToTable("stock_reservations");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.ReservationNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Reason).HasMaxLength(250).IsRequired();
-            b.Property(r => r.DocumentReference).HasMaxLength(100);
-            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.ReservationNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey })
-             .IsUnique()
-             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
-        });
-
-        modelBuilder.Entity<StockReservationItem>(b =>
-        {
-            b.ToTable("stock_reservation_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<StockReservation>()
-             .WithMany(r => r.Items)
-             .HasForeignKey(i => i.StockReservationId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<StockTransfer>(b =>
-        {
-            b.ToTable("stock_transfers");
-            b.HasKey(t => t.Id);
-            b.Property(t => t.TransferNumber).HasMaxLength(50).IsRequired();
-            b.Property(t => t.Notes).HasMaxLength(500);
-            b.Property(t => t.Version).IsRowVersion();
-
-            b.HasIndex(t => new { t.TenantId, t.TransferNumber }).IsUnique();
-        });
-
-        modelBuilder.Entity<StockTransferItem>(b =>
-        {
-            b.ToTable("stock_transfer_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<StockTransfer>()
-             .WithMany(t => t.Items)
-             .HasForeignKey(i => i.StockTransferId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<InventoryCount>(b =>
-        {
-            b.ToTable("inventory_counts");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.CountNumber).HasMaxLength(50).IsRequired();
-            b.Property(c => c.Description).HasMaxLength(250).IsRequired();
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasIndex(c => new { c.TenantId, c.CountNumber }).IsUnique();
-
-            b.HasOne(c => c.Warehouse)
-             .WithMany()
-             .HasForeignKey(c => c.WarehouseId)
-             .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<InventoryCountItem>(b =>
-        {
-            b.ToTable("inventory_count_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.SystemSnapshotQuantity).HasPrecision(18, 4);
-            b.Property(i => i.CountedQuantity).HasPrecision(18, 4);
-            b.Property(i => i.Notes).HasMaxLength(250);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<InventoryCount>()
-             .WithMany(c => c.Items)
-             .HasForeignKey(i => i.InventoryCountId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ==========================================
-        // Modulo Procurement (MOD-04)
-        // ==========================================
-        modelBuilder.Entity<PurchaseRequest>(b =>
-        {
-            b.ToTable("purchase_requests");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.RequestNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Justification).HasMaxLength(500).IsRequired();
-            b.Property(r => r.DecisionNotes).HasMaxLength(500);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.RequestNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
-        });
-
-        modelBuilder.Entity<PurchaseRequestItem>(b =>
-        {
-            b.ToTable("purchase_request_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.EstimatedUnitCost).HasPrecision(18, 2);
-            b.Property(i => i.Notes).HasMaxLength(250);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<PurchaseRequest>()
-             .WithMany(r => r.Items)
-             .HasForeignKey(i => i.PurchaseRequestId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<SupplierQuotation>(b =>
-        {
-            b.ToTable("supplier_quotations");
-            b.HasKey(q => q.Id);
-            b.Property(q => q.QuotationNumber).HasMaxLength(50).IsRequired();
-            b.Property(q => q.ShippingFee).HasPrecision(18, 2);
-            b.Property(q => q.PaymentTerms).HasMaxLength(150);
-            b.Property(q => q.Notes).HasMaxLength(500);
-            b.Property(q => q.Version).IsRowVersion();
-
-            b.HasIndex(q => new { q.TenantId, q.QuotationNumber }).IsUnique();
-            b.HasIndex(q => new { q.TenantId, q.SupplierPartyId, q.Status });
-        });
-
-        modelBuilder.Entity<SupplierQuotationItem>(b =>
-        {
-            b.ToTable("supplier_quotation_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
-            b.Property(i => i.DiscountAmount).HasPrecision(18, 2);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<SupplierQuotation>()
-             .WithMany(q => q.Items)
-             .HasForeignKey(i => i.SupplierQuotationId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<PurchaseOrder>(b =>
-        {
-            b.ToTable("purchase_orders");
-            b.HasKey(o => o.Id);
-            b.Property(o => o.OrderNumber).HasMaxLength(50).IsRequired();
-            b.Property(o => o.PaymentTerms).HasMaxLength(150);
-            b.Property(o => o.ShippingCost).HasPrecision(18, 2);
-            b.Property(o => o.OtherExpenses).HasPrecision(18, 2);
-            b.Property(o => o.TotalDiscount).HasPrecision(18, 2);
-            b.Property(o => o.Notes).HasMaxLength(1000);
-            b.Property(o => o.Version).IsRowVersion();
-
-            b.HasIndex(o => new { o.TenantId, o.OrderNumber }).IsUnique();
-            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
-            b.HasIndex(o => new { o.TenantId, o.SupplierPartyId });
-        });
-
-        modelBuilder.Entity<PurchaseOrderItem>(b =>
-        {
-            b.ToTable("purchase_order_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
-            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
-            b.Property(i => i.QuantityOrdered).HasPrecision(18, 4);
-            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
-            b.Property(i => i.UnitCost).HasPrecision(18, 2);
-            b.Property(i => i.Discount).HasPrecision(18, 2);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<PurchaseOrder>()
-             .WithMany(o => o.Items)
-             .HasForeignKey(i => i.PurchaseOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<GoodsReceipt>(b =>
-        {
-            b.ToTable("goods_receipts");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.ReceiptNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.InvoiceOrDocumentNumber).HasMaxLength(100).IsRequired();
-            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
-            b.Property(r => r.Notes).HasMaxLength(1000);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.ReceiptNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-            b.HasIndex(r => new { r.TenantId, r.PurchaseOrderId });
-            b.HasIndex(r => new { r.TenantId, r.WarehouseId });
-        });
-
-        modelBuilder.Entity<GoodsReceiptItem>(b =>
-        {
-            b.ToTable("goods_receipt_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
-            b.Property(i => i.RealUnitCost).HasPrecision(18, 2);
-            b.Property(i => i.SerialOrImei).HasMaxLength(100);
-            b.Property(i => i.Notes).HasMaxLength(300);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<GoodsReceipt>()
-             .WithMany(r => r.Items)
-             .HasForeignKey(i => i.GoodsReceiptId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<UsedDeviceAcquisition>(b =>
-        {
-            b.ToTable("used_device_acquisitions");
-            b.HasKey(u => u.Id);
-            b.Property(u => u.AcquisitionNumber).HasMaxLength(50).IsRequired();
-            b.Property(u => u.SerialNumber).HasMaxLength(100).IsRequired();
-            b.Property(u => u.Imei1).HasMaxLength(20);
-            b.Property(u => u.Imei2).HasMaxLength(20);
-            b.Property(u => u.NegotiatedPrice).HasPrecision(18, 2);
-            b.Property(u => u.AttributableExpenses).HasPrecision(18, 2);
-            b.Property(u => u.ChecklistInspectionJson).HasColumnType("jsonb").IsRequired();
-            b.Property(u => u.Notes).HasMaxLength(1000);
-            b.Property(u => u.Version).IsRowVersion();
-
-            b.HasIndex(u => new { u.TenantId, u.AcquisitionNumber }).IsUnique();
-            b.HasIndex(u => new { u.TenantId, u.BranchId, u.Status });
-            b.HasIndex(u => new { u.TenantId, u.SellerPartyId });
-            b.HasIndex(u => new { u.TenantId, u.SerialNumber });
-            b.HasIndex(u => new { u.TenantId, u.Imei1 });
-        });
-
-        modelBuilder.Entity<SupplierReturn>(b =>
-        {
-            b.ToTable("supplier_returns");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
-            b.Property(r => r.ReturnInvoiceNumber).HasMaxLength(100);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.SupplierPartyId });
-            b.HasIndex(r => new { r.TenantId, r.GoodsReceiptId });
-        });
-
-        modelBuilder.Entity<SupplierReturnItem>(b =>
-        {
-            b.ToTable("supplier_return_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.UnitCost).HasPrecision(18, 2);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<SupplierReturn>()
-             .WithMany(r => r.Items)
-             .HasForeignKey(i => i.SupplierReturnId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ==========================================
-        // Modulo Sales (MOD-05) - Orçamentos e PDV
-        // ==========================================
-        modelBuilder.Entity<SalesQuote>(b =>
-        {
-            b.ToTable("sales_quotes");
-            b.HasKey(q => q.Id);
-            b.Property(q => q.QuoteNumber).HasMaxLength(50).IsRequired();
-            b.Property(q => q.PaymentTermsExpected).HasMaxLength(150);
-            b.Property(q => q.ShippingTotal).HasPrecision(18, 2);
-            b.Property(q => q.DiscountTotal).HasPrecision(18, 2);
-            b.Property(q => q.Notes).HasMaxLength(1000);
-            b.Property(q => q.Version).IsRowVersion();
-
-            b.HasIndex(q => new { q.TenantId, q.QuoteNumber }).IsUnique();
-            b.HasIndex(q => new { q.TenantId, q.BranchId, q.Status });
-            b.HasIndex(q => new { q.TenantId, q.CustomerPartyId });
-        });
-
-        modelBuilder.Entity<SalesQuoteItem>(b =>
-        {
-            b.ToTable("sales_quote_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
-            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
-            b.Property(i => i.Discount).HasPrecision(18, 2);
-            b.Property(i => i.SerialOrImei).HasMaxLength(100);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<SalesQuote>()
-             .WithMany(q => q.Items)
-             .HasForeignKey(i => i.SalesQuoteId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Sale>(b =>
-        {
-            b.ToTable("sales");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.SaleNumber).HasMaxLength(50).IsRequired();
-            b.Property(s => s.ChargesTotal).HasPrecision(18, 2);
-            b.Property(s => s.DiscountTotal).HasPrecision(18, 2);
-            b.Property(s => s.Observations).HasMaxLength(1000);
-            b.Property(s => s.IdempotencyKey).HasMaxLength(100);
-            b.Property(s => s.Version).IsRowVersion();
-
-            b.HasIndex(s => new { s.TenantId, s.SaleNumber }).IsUnique();
-            b.HasIndex(s => new { s.TenantId, s.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-            b.HasIndex(s => new { s.TenantId, s.BranchId, s.Status });
-            b.HasIndex(s => new { s.TenantId, s.CustomerPartyId });
-            b.HasIndex(s => new { s.TenantId, s.SellerUserId });
-        });
-
-        modelBuilder.Entity<SaleItem>(b =>
-        {
-            b.ToTable("sale_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
-            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
-            b.Property(i => i.Discount).HasPrecision(18, 2);
-            b.Property(i => i.HistoricalUnitCost).HasPrecision(18, 2);
-            b.Property(i => i.SerialOrImei).HasMaxLength(100);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<Sale>()
-             .WithMany(s => s.Items)
-             .HasForeignKey(i => i.SaleId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<SalePaymentIntent>(b =>
-        {
-            b.ToTable("sale_payment_intents");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Amount).HasPrecision(18, 2);
-            b.Property(p => p.AuthorizationCode).HasMaxLength(100);
-            b.Property(p => p.TransactionReference).HasMaxLength(200);
-            b.Property(p => p.Notes).HasMaxLength(500);
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasOne<Sale>()
-             .WithMany(s => s.Payments)
-             .HasForeignKey(p => p.SaleId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<SaleReturn>(b =>
-        {
-            b.ToTable("sale_returns");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
-            b.Property(r => r.InspectionNotes).HasMaxLength(500);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.SaleId });
-        });
-
-        modelBuilder.Entity<SaleReturnItem>(b =>
-        {
-            b.ToTable("sale_return_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
-            b.Property(i => i.RefundAmount).HasPrecision(18, 2);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasOne<SaleReturn>()
-             .WithMany(r => r.Items)
-             .HasForeignKey(i => i.SaleReturnId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ==================== CASH MANAGEMENT (MOD-06) ====================
-        modelBuilder.Entity<CashRegister>(b =>
-        {
-            b.ToTable("cash_registers");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.Code).HasMaxLength(50).IsRequired();
-            b.Property(r => r.Name).HasMaxLength(150).IsRequired();
-            b.Property(r => r.Notes).HasMaxLength(500);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Code }).IsUnique();
-        });
-
-        modelBuilder.Entity<CashShift>(b =>
-        {
-            b.ToTable("cash_shifts");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.OpeningFloat).HasPrecision(18, 2);
-            b.Property(s => s.CurrentBalance).HasPrecision(18, 2);
-            b.Property(s => s.TotalCashIn).HasPrecision(18, 2);
-            b.Property(s => s.TotalCashOut).HasPrecision(18, 2);
-            b.Property(s => s.ExpectedCashBalance).HasPrecision(18, 2);
-            b.Property(s => s.CountedCashBalance).HasPrecision(18, 2);
-            b.Property(s => s.DiscrepancyAmount).HasPrecision(18, 2);
-            b.Property(s => s.OpeningSource).HasMaxLength(150);
-            b.Property(s => s.OpeningNotes).HasMaxLength(500);
-            b.Property(s => s.ClosingNotes).HasMaxLength(500);
-            b.Property(s => s.Version).IsRowVersion();
-
-            b.HasIndex(s => new { s.TenantId, s.BranchId, s.CashRegisterId, s.Status });
-        });
-
-        modelBuilder.Entity<CashMovement>(b =>
-        {
-            b.ToTable("cash_movements");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.Amount).HasPrecision(18, 2);
-            b.Property(m => m.SourceType).HasMaxLength(50).IsRequired();
-            b.Property(m => m.SourceId).HasMaxLength(100).IsRequired();
-            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
-            b.Property(m => m.Reason).HasMaxLength(500);
-            b.Property(m => m.CorrelationId).HasMaxLength(100);
-            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
-            b.Property(m => m.Version).IsRowVersion();
-
-            b.HasOne<CashShift>()
-             .WithMany(s => s.Movements)
-             .HasForeignKey(m => m.CashShiftId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(m => new { m.TenantId, m.CashShiftId });
-            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey });
-            b.HasIndex(m => new { m.TenantId, m.MovementType, m.SourceId });
-        });
-
-        modelBuilder.Entity<CashCountDenomination>(b =>
-        {
-            b.ToTable("cash_count_denominations");
-            b.HasKey(d => d.Id);
-            b.Property(d => d.Denomination).HasPrecision(18, 2);
-            b.Property(d => d.Version).IsRowVersion();
-
-            b.HasOne<CashShift>()
-             .WithMany(s => s.Denominations)
-             .HasForeignKey(d => d.CashShiftId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(d => new { d.TenantId, d.CashShiftId });
-        });
-
-        modelBuilder.Entity<CashDiscrepancy>(b =>
-        {
-            b.ToTable("cash_discrepancies");
-            b.HasKey(d => d.Id);
-            b.Property(d => d.Amount).HasPrecision(18, 2);
-            b.Property(d => d.OperatorJustification).HasMaxLength(1000);
-            b.Property(d => d.ResolutionNotes).HasMaxLength(1000);
-            b.Property(d => d.Version).IsRowVersion();
-
-            b.HasIndex(d => new { d.TenantId, d.BranchId, d.CashShiftId });
-            b.HasIndex(d => new { d.TenantId, d.Status });
-        });
-
-        // ==================== FINANCIAL (MOD-12) ====================
-        modelBuilder.Entity<FinancialAccount>(b =>
-        {
-            b.ToTable("financial_accounts");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Code).HasMaxLength(50).IsRequired();
-            b.Property(a => a.Name).HasMaxLength(150).IsRequired();
-            b.Property(a => a.Version).IsRowVersion();
-
-            b.HasIndex(a => new { a.TenantId, a.Code }).IsUnique();
-        });
-
-        modelBuilder.Entity<FinancialCostCenter>(b =>
-        {
-            b.ToTable("financial_cost_centers");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
-            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Description).HasMaxLength(500);
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasIndex(c => new { c.TenantId, c.Code }).IsUnique();
-        });
-
-        modelBuilder.Entity<BankAccount>(b =>
-        {
-            b.ToTable("bank_accounts");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.BankName).HasMaxLength(150).IsRequired();
-            b.Property(a => a.AgencyNumber).HasMaxLength(50);
-            b.Property(a => a.AccountNumber).HasMaxLength(50).IsRequired();
-            b.Property(a => a.CurrentBalance).HasPrecision(18, 2);
-            b.Property(a => a.ReconciledBalance).HasPrecision(18, 2);
-            b.Property(a => a.Version).IsRowVersion();
-
-            b.HasIndex(a => new { a.TenantId, a.BranchId, a.AccountNumber });
-        });
-
-        modelBuilder.Entity<FinancialJournalEntry>(b =>
-        {
-            b.ToTable("financial_journal_entries");
-            b.HasKey(j => j.Id);
-            b.Property(j => j.DocumentNumber).HasMaxLength(100).IsRequired();
-            b.Property(j => j.SourceType).HasMaxLength(50).IsRequired();
-            b.Property(j => j.SourceId).HasMaxLength(100).IsRequired();
-            b.Property(j => j.Description).HasMaxLength(500).IsRequired();
-            b.Property(j => j.TotalAmount).HasPrecision(18, 2);
-            b.Property(j => j.CorrelationId).HasMaxLength(100);
-            b.Property(j => j.IdempotencyKey).HasMaxLength(100);
-            b.Property(j => j.Version).IsRowVersion();
-
-            b.HasIndex(j => new { j.TenantId, j.BranchId, j.CompetenceDateUtc });
-            b.HasIndex(j => new { j.TenantId, j.IdempotencyKey });
-        });
-
-        modelBuilder.Entity<FinancialJournalLine>(b =>
-        {
-            b.ToTable("financial_journal_lines");
-            b.HasKey(l => l.Id);
-            b.Property(l => l.Amount).HasPrecision(18, 2);
-            b.Property(l => l.Memo).HasMaxLength(500);
-            b.Property(l => l.Version).IsRowVersion();
-
-            b.HasOne<FinancialJournalEntry>()
-             .WithMany(j => j.Lines)
-             .HasForeignKey(l => l.FinancialJournalEntryId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(l => new { l.TenantId, l.FinancialJournalEntryId });
-            b.HasIndex(l => new { l.TenantId, l.FinancialAccountId });
-        });
-
-        modelBuilder.Entity<AccountPayable>(b =>
-        {
-            b.ToTable("accounts_payable");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.TitleNumber).HasMaxLength(100).IsRequired();
-            b.Property(p => p.Description).HasMaxLength(500).IsRequired();
-            b.Property(p => p.OriginalAmount).HasPrecision(18, 2);
-            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
-            b.Property(p => p.DocumentReference).HasMaxLength(100);
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasIndex(p => new { p.TenantId, p.BranchId, p.TitleNumber }).IsUnique();
-            b.HasIndex(p => new { p.TenantId, p.Status, p.DueDateUtc });
-        });
-
-        modelBuilder.Entity<AccountReceivable>(b =>
-        {
-            b.ToTable("accounts_receivable");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.TitleNumber).HasMaxLength(100).IsRequired();
-            b.Property(r => r.Description).HasMaxLength(500).IsRequired();
-            b.Property(r => r.OriginalAmount).HasPrecision(18, 2);
-            b.Property(r => r.ReceivedAmount).HasPrecision(18, 2);
-            b.Property(r => r.DocumentReference).HasMaxLength(100);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.BranchId, r.TitleNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.Status, r.DueDateUtc });
-        });
-
-        modelBuilder.Entity<FinancialSettlement>(b =>
-        {
-            b.ToTable("financial_settlements");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Amount).HasPrecision(18, 2);
-            b.Property(s => s.ReferenceNumber).HasMaxLength(100).IsRequired();
-            b.Property(s => s.Version).IsRowVersion();
-
-            b.HasIndex(s => new { s.TenantId, s.TitleId });
-        });
-
-        modelBuilder.Entity<BankTransaction>(b =>
-        {
-            b.ToTable("bank_transactions");
-            b.HasKey(t => t.Id);
-            b.Property(t => t.Amount).HasPrecision(18, 2);
-            b.Property(t => t.FitId).HasMaxLength(100).IsRequired();
-            b.Property(t => t.Memo).HasMaxLength(500).IsRequired();
-            b.Property(t => t.Version).IsRowVersion();
-
-            b.HasIndex(t => new { t.TenantId, t.BankAccountId, t.FitId }).IsUnique();
-            b.HasIndex(t => new { t.TenantId, t.Status });
-        });
-
-        // Modulo PartnersCapital (MOD-13)
-        modelBuilder.Entity<Partner>(b =>
-        {
-            b.ToTable("partners");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
-            b.Property(p => p.DocumentNumber).HasMaxLength(20).IsRequired();
-            b.Property(p => p.Email).HasMaxLength(255).IsRequired();
-            b.Property(p => p.MonthlyCompensationCap).HasPrecision(18, 2);
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasIndex(p => new { p.TenantId, p.PartyId }).IsUnique();
-            b.HasIndex(p => new { p.TenantId, p.DocumentNumber });
-        });
-
-        modelBuilder.Entity<EquityParticipation>(b =>
-        {
-            b.ToTable("equity_participations");
-            b.HasKey(e => e.Id);
-            b.Property(e => e.Quotas).HasPrecision(18, 4);
-            b.Property(e => e.Percentage).HasPrecision(7, 4);
-            b.Property(e => e.NominalValuePerQuota).HasPrecision(18, 4);
-            b.Property(e => e.LegalDocumentReference).HasMaxLength(150).IsRequired();
-            b.Property(e => e.Version).IsRowVersion();
-
-            b.HasIndex(e => new { e.TenantId, e.PartnerId, e.IsCurrent });
-        });
-
-        modelBuilder.Entity<CapitalContribution>(b =>
-        {
-            b.ToTable("capital_contributions");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Amount).HasPrecision(18, 2);
-            b.Property(c => c.Description).HasMaxLength(500).IsRequired();
-            b.Property(c => c.FormalInstrumentReference).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasIndex(c => new { c.TenantId, c.PartnerId });
-            b.HasIndex(c => new { c.TenantId, c.Status });
-        });
-
-        modelBuilder.Entity<PartnerLoan>(b =>
-        {
-            b.ToTable("partner_loans");
-            b.HasKey(l => l.Id);
-            b.Property(l => l.PrincipalAmount).HasPrecision(18, 2);
-            b.Property(l => l.AmortizedAmount).HasPrecision(18, 2);
-            b.Property(l => l.AnnualInterestRate).HasPrecision(7, 4);
-            b.Property(l => l.ContractNumber).HasMaxLength(100).IsRequired();
-            b.Property(l => l.Version).IsRowVersion();
-
-            b.HasIndex(l => new { l.TenantId, l.PartnerId });
-            b.HasIndex(l => new { l.TenantId, l.ContractNumber });
-        });
-
-        modelBuilder.Entity<PartnerCompensation>(b =>
-        {
-            b.ToTable("partner_compensations");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.GrossAmount).HasPrecision(18, 2);
-            b.Property(c => c.InssWithholding).HasPrecision(18, 2);
-            b.Property(c => c.IrrfWithholding).HasPrecision(18, 2);
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasIndex(c => new { c.TenantId, c.PartnerId, c.ReferenceYear, c.ReferenceMonth });
-        });
-
-        modelBuilder.Entity<ProfitDistributionProposal>(b =>
-        {
-            b.ToTable("profit_distribution_proposals");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.ProtocolNumber).HasMaxLength(100).IsRequired();
-            b.Property(p => p.BaseNetProfit).HasPrecision(18, 2);
-            b.Property(p => p.LegalReserveRetention).HasPrecision(18, 2);
-            b.Property(p => p.WorkingCapitalRetention).HasPrecision(18, 2);
-            b.Property(p => p.TotalDistributedAmount).HasPrecision(18, 2);
-            b.Property(p => p.MeetingMinutesReference).HasMaxLength(200).IsRequired();
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasMany(p => p.Items)
-                .WithOne()
-                .HasForeignKey(i => i.ProposalId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(p => new { p.TenantId, p.ProtocolNumber }).IsUnique();
-            b.HasIndex(p => new { p.TenantId, p.FiscalYear });
-        });
-
-        modelBuilder.Entity<ProfitDistributionItem>(b =>
-        {
-            b.ToTable("profit_distribution_items");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.PartnerPercentage).HasPrecision(7, 4);
-            b.Property(i => i.GrossAmount).HasPrecision(18, 2);
-            b.Property(i => i.TaxWithheld).HasPrecision(18, 2);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasIndex(i => new { i.TenantId, i.ProposalId, i.PartnerId });
-        });
-
-        // Modulo RepairService (MOD-07)
-        modelBuilder.Entity<RepairOrder>(b =>
-        {
-            b.ToTable("repair_orders");
-            b.HasKey(r => r.Id);
-            b.Property(r => r.OrderNumber).HasMaxLength(50).IsRequired();
-            b.Property(r => r.ReportedDefect).HasMaxLength(1000).IsRequired();
-            b.Property(r => r.PhysicalConditionNotes).HasMaxLength(2000);
-            b.Property(r => r.AccessoriesIncluded).HasMaxLength(1000);
-            b.Property(r => r.DiagnosticNotes).HasMaxLength(4000);
-            b.Property(r => r.ResolutionNotes).HasMaxLength(4000);
-            b.Property(r => r.DeliveredToPersonName).HasMaxLength(200);
-            b.Property(r => r.DeliveredToDocumentNumber).HasMaxLength(50);
-            b.Property(r => r.DeliveryNotes).HasMaxLength(2000);
-
-            b.Property(r => r.TotalLaborPrice).HasPrecision(18, 2);
-            b.Property(r => r.TotalPartsPrice).HasPrecision(18, 2);
-            b.Property(r => r.TotalDiscount).HasPrecision(18, 2);
-            b.Property(r => r.FinalPrice).HasPrecision(18, 2);
-            b.Property(r => r.TotalPartsCost).HasPrecision(18, 2);
-            b.Property(r => r.TotalLaborCost).HasPrecision(18, 2);
-            b.Property(r => r.Version).IsRowVersion();
-
-            b.HasIndex(r => new { r.TenantId, r.OrderNumber }).IsUnique();
-            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
-            b.HasIndex(r => new { r.TenantId, r.CustomerId });
-            b.HasIndex(r => new { r.TenantId, r.CustomerEquipmentId });
-            b.HasIndex(r => new { r.TenantId, r.OriginalRepairOrderId });
-        });
-
-        modelBuilder.Entity<RepairChecklistItem>(b =>
-        {
-            b.ToTable("repair_checklist_items");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Category).HasMaxLength(100).IsRequired();
-            b.Property(c => c.ItemName).HasMaxLength(150).IsRequired();
-            b.Property(c => c.Notes).HasMaxLength(500);
-            b.Property(c => c.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.ChecklistItems)
-             .HasForeignKey(c => c.RepairOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(c => new { c.TenantId, c.RepairOrderId, c.ItemName, c.IsOutputCheck });
-        });
-
-        modelBuilder.Entity<RepairEstimateItem>(b =>
-        {
-            b.ToTable("repair_estimate_items");
-            b.HasKey(e => e.Id);
-            b.Property(e => e.Description).HasMaxLength(250).IsRequired();
-            b.Property(e => e.Quantity).HasPrecision(18, 4);
-            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
-            b.Property(e => e.UnitCost).HasPrecision(18, 2);
-            b.Property(e => e.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.EstimateItems)
-             .HasForeignKey(e => e.RepairOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(e => new { e.TenantId, e.RepairOrderId });
-        });
-
-        modelBuilder.Entity<RepairPartUsage>(b =>
-        {
-            b.ToTable("repair_part_usages");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.PartDescription).HasMaxLength(250).IsRequired();
-            b.Property(p => p.Quantity).HasPrecision(18, 4);
-            b.Property(p => p.ActualUnitCost).HasPrecision(18, 2);
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.PartUsages)
-             .HasForeignKey(p => p.RepairOrderId)
-             .OnDelete(DeleteBehavior.Restrict);
-
-            b.HasIndex(p => new { p.TenantId, p.RepairOrderId, p.ProductSkuId });
-        });
-
-        modelBuilder.Entity<RepairStatusHistoryEntry>(b =>
-        {
-            b.ToTable("repair_status_history");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Description).HasMaxLength(500).IsRequired();
-            b.Property(s => s.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.StatusHistory)
-             .HasForeignKey(s => s.RepairOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(s => new { s.TenantId, s.RepairOrderId, s.TimestampUtc });
-        });
-
-        modelBuilder.Entity<RepairEvidenceAttachment>(b =>
-        {
-            b.ToTable("repair_evidence_attachments");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.FileName).HasMaxLength(250).IsRequired();
-            b.Property(a => a.StorageUrl).HasMaxLength(1000).IsRequired();
-            b.Property(a => a.FileType).HasMaxLength(100).IsRequired();
-            b.Property(a => a.Category).HasMaxLength(100).IsRequired();
-            b.Property(a => a.Description).HasMaxLength(500);
-            b.Property(a => a.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.Attachments)
-             .HasForeignKey(a => a.RepairOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(a => new { a.TenantId, a.RepairOrderId });
-        });
-
-        modelBuilder.Entity<RepairWarrantyClaim>(b =>
-        {
-            b.ToTable("repair_warranty_claims");
-            b.HasKey(w => w.Id);
-            b.Property(w => w.DefectDescription).HasMaxLength(1000).IsRequired();
-            b.Property(w => w.DecisionRationale).HasMaxLength(1000);
-            b.Property(w => w.Version).IsRowVersion();
-
-            b.HasOne<RepairOrder>()
-             .WithMany(r => r.WarrantyClaims)
-             .HasForeignKey(w => w.RepairOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(w => new { w.TenantId, w.RepairOrderId });
-        });
-
-        // Configuração CRM (MOD-08)
-        modelBuilder.Entity<CrmLead>(b =>
-        {
-            b.ToTable("crm_leads");
-            b.HasKey(l => l.Id);
-            b.Property(l => l.Name).HasMaxLength(150).IsRequired();
-            b.Property(l => l.Phone).HasMaxLength(30);
-            b.Property(l => l.Email).HasMaxLength(150);
-            b.Property(l => l.Source).HasMaxLength(50).IsRequired();
-            b.Property(l => l.MainInterest).HasMaxLength(200);
-            b.Property(l => l.Notes).HasMaxLength(1000);
-            b.Property(l => l.Version).IsRowVersion();
-
-            b.HasIndex(l => new { l.TenantId, l.BranchId });
-            b.HasIndex(l => new { l.TenantId, l.Status });
-        });
-
-        modelBuilder.Entity<CrmPipeline>(b =>
-        {
-            b.ToTable("crm_pipelines");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Name).HasMaxLength(100).IsRequired();
-            b.Property(p => p.Version).IsRowVersion();
-
-            b.HasMany(p => p.Stages)
-             .WithOne()
-             .HasForeignKey(s => s.PipelineId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(p => new { p.TenantId, p.IsActive });
-        });
-
-        modelBuilder.Entity<CrmPipelineStage>(b =>
-        {
-            b.ToTable("crm_pipeline_stages");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Name).HasMaxLength(100).IsRequired();
-            b.Property(s => s.Version).IsRowVersion();
-
-            b.HasIndex(s => new { s.TenantId, s.PipelineId, s.OrderIndex });
-        });
-
-        modelBuilder.Entity<CrmOpportunity>(b =>
-        {
-            b.ToTable("crm_opportunities");
-            b.HasKey(o => o.Id);
-            b.Property(o => o.Title).HasMaxLength(200).IsRequired();
-            b.Property(o => o.Description).HasMaxLength(1000);
-            b.Property(o => o.Origin).HasMaxLength(50).IsRequired();
-            b.Property(o => o.EstimatedValue).HasPrecision(18, 2);
-            b.Property(o => o.LossReason).HasMaxLength(500);
-            b.Property(o => o.Version).IsRowVersion();
-
-            b.HasMany(o => o.Activities)
-             .WithOne()
-             .HasForeignKey(a => a.OpportunityId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
-            b.HasIndex(o => new { o.TenantId, o.PipelineId, o.StageId });
-        });
-
-        modelBuilder.Entity<CrmOpportunityActivity>(b =>
-        {
-            b.ToTable("crm_opportunity_activities");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Title).HasMaxLength(200).IsRequired();
-            b.Property(a => a.Description).HasMaxLength(1000);
-            b.Property(a => a.CompletionNotes).HasMaxLength(1000);
-            b.Property(a => a.Version).IsRowVersion();
-
-            b.HasIndex(a => new { a.TenantId, a.OpportunityId, a.Status });
-        });
-
-        modelBuilder.Entity<CrmPurchaseIntent>(b =>
-        {
-            b.ToTable("crm_purchase_intents");
-            b.HasKey(i => i.Id);
-            b.Property(i => i.Category).HasMaxLength(100).IsRequired();
-            b.Property(i => i.Brand).HasMaxLength(100).IsRequired();
-            b.Property(i => i.ModelName).HasMaxLength(150).IsRequired();
-            b.Property(i => i.DesiredStorageCapacity).HasMaxLength(50);
-            b.Property(i => i.DesiredColor).HasMaxLength(50);
-            b.Property(i => i.MinimumCosmeticGrade).HasMaxLength(20);
-            b.Property(i => i.MaxBudgetPrice).HasPrecision(18, 2);
-            b.Property(i => i.Notes).HasMaxLength(1000);
-            b.Property(i => i.CloseReason).HasMaxLength(500);
-            b.Property(i => i.Version).IsRowVersion();
-
-            b.HasMany(i => i.Matches)
-             .WithOne()
-             .HasForeignKey(m => m.PurchaseIntentId)
-             .OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(i => new { i.TenantId, i.BranchId, i.Status });
-            b.HasIndex(i => new { i.TenantId, i.PartyId });
-        });
-
-        modelBuilder.Entity<CrmInventoryMatch>(b =>
-        {
-            b.ToTable("crm_inventory_matches");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.VerifiedPrice).HasPrecision(18, 2);
-            b.Property(m => m.MatchDetails).HasMaxLength(1000).IsRequired();
-            b.Property(m => m.RejectionReason).HasMaxLength(500);
-            b.Property(m => m.Version).IsRowVersion();
-
-            b.HasIndex(m => new { m.TenantId, m.PurchaseIntentId, m.ProductSkuId });
-            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId });
-        });
-
-        // Configuração Manufacturing 3D (MOD-10)
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingOrder>(b =>
-        {
-            b.ToTable("manufacturing_orders");
-            b.HasKey(o => o.Id);
-            b.Ignore(o => o.AbnormalWasteCost);
-            b.Property(o => o.Version).IsRowVersion();
-            b.HasMany(o => o.Attempts)
-             .WithOne()
-             .HasForeignKey(a => a.ManufacturingOrderId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>(b =>
-        {
-            b.ToTable("manufacturing_print_attempts");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>(b =>
-        {
-            b.ToTable("manufacturing_design_assets");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Version).IsRowVersion();
-            b.HasMany(a => a.Versions)
-             .WithOne()
-             .HasForeignKey(v => v.AssetId)
-             .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>(b =>
-        {
-            b.ToTable("manufacturing_design_versions");
-            b.HasKey(v => v.Id);
-            b.Property(v => v.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrinter>(b =>
-        {
-            b.ToTable("manufacturing_printers");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingQuote>(b =>
-        {
-            b.ToTable("manufacturing_quotes");
-            b.HasKey(q => q.Id);
-            b.Property(q => q.Version).IsRowVersion();
-        });
-
-        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingSpool>(b =>
-        {
-            b.ToTable("manufacturing_spools");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Version).IsRowVersion();
-        });
-
-        // Configuração Digital Projects (MOD-11)
-        modelBuilder.Entity<DigitalProject>(b =>
-        {
-            b.ToTable("digital_projects");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Version).IsRowVersion();
-            b.Property(p => p.ProjectCode).HasMaxLength(50).IsRequired();
-            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
-            b.Property(p => p.ContractedPrice).HasPrecision(18, 2);
-            b.Property(p => p.EstimatedHours).HasPrecision(18, 2);
-            b.Property(p => p.TotalActualLaborCost).HasPrecision(18, 2);
-            b.Property(p => p.TotalThirdPartyCost).HasPrecision(18, 2);
-            b.Property(p => p.TotalExpensesCost).HasPrecision(18, 2);
-            b.Property(p => p.InvoicedAmount).HasPrecision(18, 2);
-            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
-
-            b.HasMany(p => p.Milestones).WithOne().HasForeignKey(m => m.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(p => p.Tasks).WithOne().HasForeignKey(t => t.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(p => p.TimeEntries).WithOne().HasForeignKey(e => e.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(p => p.Deliverables).WithOne().HasForeignKey(d => d.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(p => p.ChangeRequests).WithOne().HasForeignKey(c => c.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-            b.HasMany(p => p.ContractVersions).WithOne().HasForeignKey(v => v.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
-
-            b.HasIndex(p => new { p.TenantId, p.ProjectCode }).IsUnique();
-            b.HasIndex(p => new { p.TenantId, p.CustomerPartyId });
-            b.HasIndex(p => new { p.TenantId, p.Status });
-        });
-
-        modelBuilder.Entity<DigitalProjectMilestone>(b =>
-        {
-            b.ToTable("digital_project_milestones");
-            b.HasKey(m => m.Id);
-            b.Property(m => m.Version).IsRowVersion();
-            b.Property(m => m.MilestonePrice).HasPrecision(18, 2);
-            b.HasIndex(m => new { m.TenantId, m.DigitalProjectId, m.SequenceOrder });
-        });
-
-        modelBuilder.Entity<DigitalProjectTask>(b =>
-        {
-            b.ToTable("digital_project_tasks");
-            b.HasKey(t => t.Id);
-            b.Property(t => t.Version).IsRowVersion();
-            b.Property(t => t.EstimatedHours).HasPrecision(18, 2);
-            b.HasIndex(t => new { t.TenantId, t.DigitalProjectId, t.Status });
-        });
-
-        modelBuilder.Entity<DigitalProjectTimeEntry>(b =>
-        {
-            b.ToTable("digital_project_time_entries");
-            b.HasKey(e => e.Id);
-            b.Property(e => e.Version).IsRowVersion();
-            b.Property(e => e.DurationHours).HasPrecision(18, 2);
-            b.Property(e => e.HistoricalHourlyCost).HasPrecision(18, 2);
-            b.HasIndex(e => new { e.TenantId, e.DigitalProjectId, e.WorkDateUtc });
-            b.HasIndex(e => new { e.TenantId, e.UserId });
-        });
-
-        modelBuilder.Entity<DigitalProjectDeliverable>(b =>
-        {
-            b.ToTable("digital_project_deliverables");
-            b.HasKey(d => d.Id);
-            b.Property(d => d.Version).IsRowVersion();
-            b.HasIndex(d => new { d.TenantId, d.DigitalProjectId });
-        });
-
-        modelBuilder.Entity<DigitalProjectChangeRequest>(b =>
-        {
-            b.ToTable("digital_project_change_requests");
-            b.HasKey(c => c.Id);
-            b.Property(c => c.Version).IsRowVersion();
-            b.Property(c => c.ImpactHours).HasPrecision(18, 2);
-            b.Property(c => c.ImpactCost).HasPrecision(18, 2);
-            b.Property(c => c.ImpactPrice).HasPrecision(18, 2);
-            b.HasIndex(c => new { c.TenantId, c.DigitalProjectId, c.CrNumber }).IsUnique();
-        });
-
-        modelBuilder.Entity<DigitalProjectContractVersion>(b =>
-        {
-            b.ToTable("digital_project_contract_versions");
-            b.HasKey(v => v.Id);
-            b.Property(v => v.Version).IsRowVersion();
-            b.HasIndex(v => new { v.TenantId, v.DigitalProjectId, v.VersionNumber }).IsUnique();
-        });
-
-        // Configuração Módulo FleetLogistics & Precificação Inteligente (MOD-16)
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetVehicle>(b =>
-        {
-            b.ToTable("fleet_vehicles");
-            b.HasKey(v => v.Id);
-            b.Property(v => v.Version).IsRowVersion();
-            b.Property(v => v.TankCapacityLiters).HasPrecision(18, 2);
-            b.Property(v => v.InitialOdometerKm).HasPrecision(18, 2);
-            b.Property(v => v.CurrentOdometerKm).HasPrecision(18, 2);
-            b.Property(v => v.AverageConsumptionKmPerLiter).HasPrecision(18, 2);
-            b.HasIndex(v => new { v.TenantId, v.Plate }).IsUnique();
-            b.HasIndex(v => new { v.TenantId, v.InternalCode }).IsUnique();
-            b.HasIndex(v => new { v.TenantId, v.BranchId, v.Status });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTrip>(b =>
-        {
-            b.ToTable("fleet_trips");
-            b.HasKey(t => t.Id);
-            b.Property(t => t.Version).IsRowVersion();
-            b.Property(t => t.InitialOdometerKm).HasPrecision(18, 2);
-            b.Property(t => t.FinalOdometerKm).HasPrecision(18, 2);
-            b.Property(t => t.DistanceKm).HasPrecision(18, 2);
-            b.Property(t => t.TotalFuelExpenses).HasPrecision(18, 2);
-            b.Property(t => t.TotalOtherExpenses).HasPrecision(18, 2);
-            b.Property(t => t.TotalAllocatedCost).HasPrecision(18, 2);
-            b.HasIndex(t => new { t.TenantId, t.TripNumber }).IsUnique();
-            b.HasIndex(t => new { t.TenantId, t.VehicleId, t.Status });
-            b.HasIndex(t => new { t.TenantId, t.StartTimeUtc });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetFueling>(b =>
-        {
-            b.ToTable("fleet_fuelings");
-            b.HasKey(f => f.Id);
-            b.Property(f => f.Version).IsRowVersion();
-            b.Property(f => f.TotalAmount).HasPrecision(18, 2);
-            b.Property(f => f.Liters).HasPrecision(18, 3);
-            b.Property(f => f.PricePerLiter).HasPrecision(18, 4);
-            b.Property(f => f.OdometerKm).HasPrecision(18, 2);
-            b.HasIndex(f => new { f.TenantId, f.VehicleId, f.FuelingDateUtc });
-            b.HasIndex(f => new { f.TenantId, f.TripId });
-            b.HasIndex(f => new { f.TenantId, f.FinancialStatus });
-            b.HasIndex(f => new { f.TenantId, f.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetExpense>(b =>
-        {
-            b.ToTable("fleet_expenses");
-            b.HasKey(e => e.Id);
-            b.Property(e => e.Version).IsRowVersion();
-            b.Property(e => e.Amount).HasPrecision(18, 2);
-            b.HasIndex(e => new { e.TenantId, e.Category, e.ExpenseDateUtc });
-            b.HasIndex(e => new { e.TenantId, e.TripId });
-            b.HasIndex(e => new { e.TenantId, e.VehicleId });
-            b.HasIndex(e => new { e.TenantId, e.FinancialStatus });
-            b.HasIndex(e => new { e.TenantId, e.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenancePlan>(b =>
-        {
-            b.ToTable("fleet_maintenance_plans");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Version).IsRowVersion();
-            b.Property(p => p.LastServiceOdometerKm).HasPrecision(18, 2);
-            b.Property(p => p.NextServiceOdometerKm).HasPrecision(18, 2);
-            b.HasIndex(p => new { p.TenantId, p.VehicleId, p.IsActive });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenanceService>(b =>
-        {
-            b.ToTable("fleet_maintenance_services");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Version).IsRowVersion();
-            b.Property(s => s.OdometerKm).HasPrecision(18, 2);
-            b.Property(s => s.PartsCost).HasPrecision(18, 2);
-            b.Property(s => s.LaborCost).HasPrecision(18, 2);
-            b.Property(s => s.TotalCost).HasPrecision(18, 2);
-            b.Property(s => s.NextRecommendedOdometerKm).HasPrecision(18, 2);
-            b.HasIndex(s => new { s.TenantId, s.VehicleId, s.ServiceDateUtc });
-            b.HasIndex(s => new { s.TenantId, s.FinancialStatus });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTripAllocation>(b =>
-        {
-            b.ToTable("fleet_trip_allocations");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Version).IsRowVersion();
-            b.Property(a => a.AllocatedAmount).HasPrecision(18, 2);
-            b.Property(a => a.AllocationPercentage).HasPrecision(18, 4);
-            b.HasIndex(a => new { a.TenantId, a.TripId });
-            b.HasIndex(a => new { a.TenantId, a.TargetType, a.TargetId });
-            b.HasIndex(a => new { a.TenantId, a.InventoryUnitId });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPricingPolicy>(b =>
-        {
-            b.ToTable("product_pricing_policies");
-            b.HasKey(p => p.Id);
-            b.Property(p => p.Version).IsRowVersion();
-            b.Property(p => p.TargetAcquisitionDiscountRate).HasPrecision(18, 4);
-            b.Property(p => p.TargetMarkupRate).HasPrecision(18, 4);
-            b.Property(p => p.TargetMinMarginRate).HasPrecision(18, 4);
-            b.Property(p => p.EstimatedPickupLogisticsRate).HasPrecision(18, 4);
-            b.Property(p => p.EstimatedDeliveryLogisticsRate).HasPrecision(18, 4);
-            b.Property(p => p.OtherCommercialCostRate).HasPrecision(18, 4);
-            b.HasIndex(p => new { p.TenantId, p.BranchId, p.IsActive });
-            b.HasIndex(p => new { p.TenantId, p.Scope, p.TargetSkuId });
-        });
-
-        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPriceSuggestion>(b =>
-        {
-            b.ToTable("product_price_suggestions");
-            b.HasKey(s => s.Id);
-            b.Property(s => s.Version).IsRowVersion();
-            b.Property(s => s.ReferencePrice).HasPrecision(18, 2);
-            b.Property(s => s.TargetNegotiationPrice).HasPrecision(18, 2);
-            b.Property(s => s.RealAcquisitionCost).HasPrecision(18, 2);
-            b.Property(s => s.AllocatedLogisticsCost).HasPrecision(18, 2);
-            b.Property(s => s.CommercialProvisions).HasPrecision(18, 2);
-            b.Property(s => s.TotalCostBase).HasPrecision(18, 2);
-            b.Property(s => s.MarkupRateApplied).HasPrecision(18, 4);
-            b.Property(s => s.CalculatedSuggestedPrice).HasPrecision(18, 2);
-            b.Property(s => s.MinimumAllowedPrice).HasPrecision(18, 2);
-            b.Property(s => s.ApprovedFinalPrice).HasPrecision(18, 2);
-            b.HasIndex(s => new { s.TenantId, s.ProductSkuId, s.Status });
-            b.HasIndex(s => new { s.TenantId, s.InventoryUnitId });
-        });
-
-        // Configurar Filtros Globais Multi-Tenant Automaticos
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
-            {
-                var method = typeof(AppDbContext)
-                    .GetMethod(nameof(ConfigureTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                    .MakeGenericMethod(entityType.ClrType);
-
-                method?.Invoke(this, [modelBuilder]);
-            }
-        }
-    }
-
-    public Guid CurrentTenantId => _executionContext?.TenantId ?? Guid.Empty;
-    public bool IsContextAuthenticated => _executionContext?.IsAuthenticated ?? false;
-
-    private void ConfigureTenantFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, ITenantScoped
-    {
-        modelBuilder.Entity<TEntity>().HasQueryFilter(e => !IsContextAuthenticated || e.TenantId == CurrentTenantId);
-    }
-
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        // 0. Corrigir entidades filhas recém-anexadas com Version == 0 marcadas erroneamente como Modified
-        foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
-        {
-            if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
-                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage or ManufacturingPrintAttempt
-                or DigitalProjectMilestone or DigitalProjectTask or DigitalProjectTimeEntry or DigitalProjectDeliverable or DigitalProjectChangeRequest or DigitalProjectContractVersion)
-            {
-                var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
-                if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))
-                {
-                    entry.State = EntityState.Added;
-                }
-            }
-        }
-
-        // 1. Validar e Forçar Isolamento de Tenant
-        var tenantEntries = ChangeTracker.Entries<ITenantScoped>()
-            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)
-            .ToList();
-
-        if (_executionContext != null && _executionContext.IsAuthenticated && _executionContext.TenantId != Guid.Empty)
-        {
-            foreach (var entry in tenantEntries)
-            {
-                if (entry.State == EntityState.Added)
-                {
-                    if (entry.Entity.TenantId == Guid.Empty)
-                    {
-                        entry.Property(nameof(ITenantScoped.TenantId)).CurrentValue = _executionContext.TenantId;
-                    }
-                    else if (entry.Entity.TenantId != _executionContext.TenantId)
-                    {
-                        throw new InvalidOperationException("Tentativa de gravação com TenantId diferente do contexto autenticado.");
-                    }
-                }
-                else if (entry.State == EntityState.Modified)
-                {
-                    var originalTenantId = entry.OriginalValues.GetValue<Guid>(nameof(ITenantScoped.TenantId));
-                    if (originalTenantId != _executionContext.TenantId || entry.Entity.TenantId != _executionContext.TenantId)
-                    {
-                        throw new InvalidOperationException("Violação de segurança: Não é permitido alterar ou transferir TenantId.");
-                    }
-                }
-            }
-        }
-
-        // 2. Gravar Eventos de Auditoria Sanitizada Automaticamente
-        var auditedEntries = ChangeTracker.Entries<BaseEntity>()
-            .Where(e => e.Entity is not AuditEvent && 
-                       (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
-            .ToList();
-
-        var auditList = new List<AuditEvent>();
-        foreach (var entry in auditedEntries)
-        {
-            var action = entry.State switch
-            {
-                EntityState.Added => "INSERT",
-                EntityState.Modified => "UPDATE",
-                EntityState.Deleted => "DELETE",
-                _ => "UNKNOWN"
-            };
-
-            Guid? tenantId = (entry.Entity as ITenantScoped)?.TenantId ?? _executionContext?.TenantId;
-            Guid? branchId = (entry.Entity as IBranchScoped)?.BranchId ?? _executionContext?.BranchId;
-
-            var audit = new AuditEvent(
-                tenantId,
-                branchId,
-                entry.Entity.GetType().Name,
-                entry.Property("Id").CurrentValue?.ToString() ?? Guid.Empty.ToString(),
-                action,
-                _executionContext?.UserId,
-                _executionContext?.UserEmail ?? "system",
-                _executionContext is AppExecutionContext ec ? ec.CorrelationId : null
-            );
-            auditList.Add(audit);
-        }
-
-        if (auditList.Count > 0)
-        {
-            AuditEvents.AddRange(auditList);
-        }
-
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-}
+using Microsoft.EntityFrameworkCore;
+
+using BuildingBlocks.Domain;
+
+using BuildingBlocks.Application;
+
+using AppExecutionContext = BuildingBlocks.Application.ExecutionContext;
+
+using IdentityAccess.Domain;
+
+using IdentityAccess.Application.Services;
+
+using Parties.Domain;
+
+using Catalog.Domain;
+
+using Inventory.Domain;
+
+using Procurement.Domain;
+
+using Sales.Domain;
+
+using CashManagement.Domain;
+
+using Financial.Domain;
+
+using PartnersCapital.Domain.Entities;
+
+using RepairService.Domain.Entities;
+
+using CRM.Domain.Entities;
+
+using Messaging.Domain.Entities;
+
+using Manufacturing3D.Domain.Entities;
+
+using DigitalProjects.Domain.Entities;
+
+using Fiscal.Domain.Entities;
+
+using Fiscal.Application.Services;
+
+
+
+namespace BuildingBlocks.Infrastructure;
+
+
+
+public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
+
+{
+
+    private readonly IExecutionContext? _executionContext;
+
+
+
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    public DbSet<Branch> Branches => Set<Branch>();
+
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    public DbSet<RevokedSession> RevokedSessions => Set<RevokedSession>();
+
+
+
+    // Modulo Parties
+
+    public DbSet<Party> Parties => Set<Party>();
+
+    public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
+
+    public DbSet<SupplierProfile> SupplierProfiles => Set<SupplierProfile>();
+
+    public DbSet<PartyContact> PartyContacts => Set<PartyContact>();
+
+    public DbSet<PartyAddress> PartyAddresses => Set<PartyAddress>();
+
+    public DbSet<CustomerEquipment> CustomerEquipments => Set<CustomerEquipment>();
+
+    public DbSet<PartyConsentRecord> PartyConsentRecords => Set<PartyConsentRecord>();
+
+
+
+    // Modulo Catalog
+
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+
+    public DbSet<ProductBrand> ProductBrands => Set<ProductBrand>();
+
+    public DbSet<ProductModel> ProductModels => Set<ProductModel>();
+
+    public DbSet<ProductSku> ProductSkus => Set<ProductSku>();
+
+    public DbSet<InventoryUnit> InventoryUnits => Set<InventoryUnit>();
+
+    public DbSet<InventoryUnitIdentifier> InventoryUnitIdentifiers => Set<InventoryUnitIdentifier>();
+
+
+
+    // Modulo Inventory & Kardex
+
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+
+    public DbSet<WarehouseLocation> WarehouseLocations => Set<WarehouseLocation>();
+
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+
+    public DbSet<SerialStockPosition> SerialStockPositions => Set<SerialStockPosition>();
+
+    public DbSet<StockReservation> StockReservations => Set<StockReservation>();
+
+    public DbSet<StockReservationItem> StockReservationItems => Set<StockReservationItem>();
+
+    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
+
+    public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
+
+    public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
+
+    public DbSet<InventoryCountItem> InventoryCountItems => Set<InventoryCountItem>();
+
+
+
+    // Modulo Procurement (Compras, Recebimento e Aquisição de Usados)
+
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+
+    public DbSet<PurchaseRequestItem> PurchaseRequestItems => Set<PurchaseRequestItem>();
+
+    public DbSet<SupplierQuotation> SupplierQuotations => Set<SupplierQuotation>();
+
+    public DbSet<SupplierQuotationItem> SupplierQuotationItems => Set<SupplierQuotationItem>();
+
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+
+    public DbSet<GoodsReceiptItem> GoodsReceiptItems => Set<GoodsReceiptItem>();
+
+    public DbSet<UsedDeviceAcquisition> UsedDeviceAcquisitions => Set<UsedDeviceAcquisition>();
+
+    public DbSet<SupplierReturn> SupplierReturns => Set<SupplierReturn>();
+
+    public DbSet<SupplierReturnItem> SupplierReturnItems => Set<SupplierReturnItem>();
+
+
+
+    // Modulo Sales (MOD-05) - Orçamentos, PDV, Vendas e Pagamentos
+
+    public DbSet<SalesQuote> SalesQuotes => Set<SalesQuote>();
+
+    public DbSet<SalesQuoteItem> SalesQuoteItems => Set<SalesQuoteItem>();
+
+    public DbSet<Sale> Sales => Set<Sale>();
+
+    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+
+    public DbSet<SalePaymentIntent> SalePaymentIntents => Set<SalePaymentIntent>();
+
+    public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
+
+    public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
+
+
+
+    // Modulo CashManagement (MOD-06) - Caixa, Turnos, Sangrias, Suprimentos e Fechamento
+
+    public DbSet<CashRegister> CashRegisters => Set<CashRegister>();
+
+    public DbSet<CashShift> CashShifts => Set<CashShift>();
+
+    public DbSet<CashMovement> CashMovements => Set<CashMovement>();
+
+    public DbSet<CashCountDenomination> CashCountDenominations => Set<CashCountDenomination>();
+
+    public DbSet<CashDiscrepancy> CashDiscrepancies => Set<CashDiscrepancy>();
+
+
+
+    // Modulo Financial (MOD-12) - Financeiro, Razão Contábil, Contas a Pagar/Receber, Bancos e DRE
+
+    public DbSet<FinancialAccount> FinancialAccounts => Set<FinancialAccount>();
+
+    public DbSet<FinancialCostCenter> FinancialCostCenters => Set<FinancialCostCenter>();
+
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+
+    public DbSet<FinancialJournalEntry> FinancialJournalEntries => Set<FinancialJournalEntry>();
+
+    public DbSet<FinancialJournalLine> FinancialJournalLines => Set<FinancialJournalLine>();
+
+    public DbSet<AccountPayable> AccountsPayable => Set<AccountPayable>();
+
+    public DbSet<AccountReceivable> AccountsReceivable => Set<AccountReceivable>();
+
+    public DbSet<FinancialSettlement> FinancialSettlements => Set<FinancialSettlement>();
+
+    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
+
+
+
+    // Modulo PartnersCapital (MOD-13) - Gestão Societária, Cap Table, Aportes, Mútuos e Distribuição de Resultados
+
+    public DbSet<Partner> Partners => Set<Partner>();
+
+    public DbSet<EquityParticipation> EquityParticipations => Set<EquityParticipation>();
+
+    public DbSet<CapitalContribution> CapitalContributions => Set<CapitalContribution>();
+
+    public DbSet<PartnerLoan> PartnerLoans => Set<PartnerLoan>();
+
+    public DbSet<PartnerCompensation> PartnerCompensations => Set<PartnerCompensation>();
+
+    public DbSet<ProfitDistributionProposal> ProfitDistributionProposals => Set<ProfitDistributionProposal>();
+
+    public DbSet<ProfitDistributionItem> ProfitDistributionItems => Set<ProfitDistributionItem>();
+
+
+
+    // Modulo RepairService (MOD-07) - Assistência Técnica, OS, Laboratório e Garantias
+
+    public DbSet<RepairOrder> RepairOrders => Set<RepairOrder>();
+
+    public DbSet<RepairChecklistItem> RepairChecklistItems => Set<RepairChecklistItem>();
+
+    public DbSet<RepairEstimateItem> RepairEstimateItems => Set<RepairEstimateItem>();
+
+    public DbSet<RepairPartUsage> RepairPartUsages => Set<RepairPartUsage>();
+
+    public DbSet<RepairStatusHistoryEntry> RepairStatusHistoryEntries => Set<RepairStatusHistoryEntry>();
+
+    public DbSet<RepairEvidenceAttachment> RepairEvidenceAttachments => Set<RepairEvidenceAttachment>();
+
+    public DbSet<RepairWarrantyClaim> RepairWarrantyClaims => Set<RepairWarrantyClaim>();
+
+
+
+    // Modulo CRM (MOD-08) - CRM Inteligente, Leads, Oportunidades, Intenções de Compra e Matching de Estoque
+
+    public DbSet<CrmLead> CrmLeads => Set<CrmLead>();
+
+    public DbSet<CrmPipeline> CrmPipelines => Set<CrmPipeline>();
+
+    public DbSet<CrmPipelineStage> CrmPipelineStages => Set<CrmPipelineStage>();
+
+    public DbSet<CrmOpportunity> CrmOpportunities => Set<CrmOpportunity>();
+
+    public DbSet<CrmOpportunityActivity> CrmOpportunityActivities => Set<CrmOpportunityActivity>();
+
+    public DbSet<CrmPurchaseIntent> CrmPurchaseIntents => Set<CrmPurchaseIntent>();
+
+    public DbSet<CrmInventoryMatch> CrmInventoryMatches => Set<CrmInventoryMatch>();
+
+
+
+    // Modulo Messaging (MOD-09) - Mensageria Multicanal, WhatsApp Cloud API, Automações e Notificações Internas
+
+    public DbSet<MessagingChannelAccount> MessagingChannelAccounts => Set<MessagingChannelAccount>();
+
+    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
+
+    public DbSet<MessageRequest> MessageRequests => Set<MessageRequest>();
+
+    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
+
+    public DbSet<MessagingWebhookEvent> MessagingWebhookEvents => Set<MessagingWebhookEvent>();
+
+    public DbSet<CustomerConversation> CustomerConversations => Set<CustomerConversation>();
+
+    public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
+
+
+
+    // Modulo Manufacturing 3D (MOD-10) - Fábrica 3D, Produção, OPs e Custos Reais
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrinter> ManufacturingPrinters => Set<Manufacturing3D.Domain.Entities.ManufacturingPrinter>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingSpool> ManufacturingSpools => Set<Manufacturing3D.Domain.Entities.ManufacturingSpool>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset> ManufacturingDesignAssets => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion> ManufacturingDesignVersions => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingQuote> ManufacturingQuotes => Set<Manufacturing3D.Domain.Entities.ManufacturingQuote>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingOrder> ManufacturingOrders => Set<Manufacturing3D.Domain.Entities.ManufacturingOrder>();
+
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt> ManufacturingPrintAttempts => Set<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>();
+
+
+
+    // Modulo Digital Projects (MOD-11) - Projetos Digitais, Contratos, Tarefas, Horas e Rentabilidade
+
+    public DbSet<DigitalProject> DigitalProjects => Set<DigitalProject>();
+
+    public DbSet<DigitalProjectMilestone> DigitalProjectMilestones => Set<DigitalProjectMilestone>();
+
+    public DbSet<DigitalProjectTask> DigitalProjectTasks => Set<DigitalProjectTask>();
+
+    public DbSet<DigitalProjectTimeEntry> DigitalProjectTimeEntries => Set<DigitalProjectTimeEntry>();
+
+    public DbSet<DigitalProjectDeliverable> DigitalProjectDeliverables => Set<DigitalProjectDeliverable>();
+
+    public DbSet<DigitalProjectChangeRequest> DigitalProjectChangeRequests => Set<DigitalProjectChangeRequest>();
+
+    public DbSet<DigitalProjectContractVersion> DigitalProjectContractVersions => Set<DigitalProjectContractVersion>();
+
+
+
+    // Modulo FleetLogistics & ProductPricingEngine (MOD-16) - Fretes, Frota, Manutenção e Precificação Inteligente
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetVehicle> FleetVehicles => Set<FleetLogistics.Domain.Entities.FleetVehicle>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetTrip> FleetTrips => Set<FleetLogistics.Domain.Entities.FleetTrip>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetFueling> FleetFuelings => Set<FleetLogistics.Domain.Entities.FleetFueling>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetExpense> FleetExpenses => Set<FleetLogistics.Domain.Entities.FleetExpense>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenancePlan> FleetMaintenancePlans => Set<FleetLogistics.Domain.Entities.FleetMaintenancePlan>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetMaintenanceService> FleetMaintenanceServices => Set<FleetLogistics.Domain.Entities.FleetMaintenanceService>();
+
+    public DbSet<FleetLogistics.Domain.Entities.FleetTripAllocation> FleetTripAllocations => Set<FleetLogistics.Domain.Entities.FleetTripAllocation>();
+
+    public DbSet<FleetLogistics.Domain.Entities.ProductPricingPolicy> ProductPricingPolicies => Set<FleetLogistics.Domain.Entities.ProductPricingPolicy>();
+
+    public DbSet<FleetLogistics.Domain.Entities.ProductPriceSuggestion> ProductPriceSuggestions => Set<FleetLogistics.Domain.Entities.ProductPriceSuggestion>();
+
+
+
+    // Modulo Fiscal (MOD-14) - Fiscal, NFC-e Zeus DFe.NET, Inbound XML, Certificados e CSC
+
+    public DbSet<FiscalEstablishment> FiscalEstablishments => Set<FiscalEstablishment>();
+
+    public DbSet<FiscalCertificate> FiscalCertificates => Set<FiscalCertificate>();
+
+    public DbSet<FiscalCsc> FiscalCscs => Set<FiscalCsc>();
+
+    public DbSet<FiscalDocument> FiscalDocuments => Set<FiscalDocument>();
+
+    public DbSet<FiscalDocumentItem> FiscalDocumentItems => Set<FiscalDocumentItem>();
+
+    public DbSet<InboundFiscalDocument> InboundFiscalDocuments => Set<InboundFiscalDocument>();
+
+    public DbSet<InboundFiscalItem> InboundFiscalItems => Set<InboundFiscalItem>();
+
+
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
+
+        : base(options)
+
+    {
+
+        _executionContext = executionContext;
+
+    }
+
+
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+
+    {
+
+        base.OnModelCreating(modelBuilder);
+
+
+
+        // Mapeamento e Chaves
+
+        modelBuilder.Entity<Tenant>(b =>
+
+        {
+
+            b.ToTable("tenants");
+
+            b.HasKey(t => t.Id);
+
+            b.Property(t => t.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(t => t.Code).HasMaxLength(50).IsRequired();
+
+            b.HasIndex(t => t.Code).IsUnique();
+
+            b.Property(t => t.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<Branch>(b =>
+
+        {
+
+            b.ToTable("branches");
+
+            b.HasKey(br => br.Id);
+
+            b.Property(br => br.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(br => br.Code).HasMaxLength(50).IsRequired();
+
+            b.HasIndex(br => new { br.TenantId, br.Code }).IsUnique();
+
+            b.Property(br => br.Version).IsRowVersion();
+
+
+
+            // FK composta com Tenant
+
+            b.HasOne<Tenant>()
+
+             .WithMany(t => t.Branches)
+
+             .HasForeignKey(br => br.TenantId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<User>(b =>
+
+        {
+
+            b.ToTable("users");
+
+            b.HasKey(u => u.Id);
+
+            b.Property(u => u.FullName).HasMaxLength(200).IsRequired();
+
+            b.Property(u => u.Email).HasMaxLength(250).IsRequired();
+
+            b.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
+
+            b.Property(u => u.Version).IsRowVersion();
+
+
+
+            b.HasOne<Tenant>()
+
+             .WithMany()
+
+             .HasForeignKey(u => u.TenantId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne<Branch>()
+
+             .WithMany()
+
+             .HasForeignKey(u => u.DefaultBranchId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<Role>(b =>
+
+        {
+
+            b.ToTable("roles");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.Name).HasMaxLength(100).IsRequired();
+
+            b.HasIndex(r => new { r.TenantId, r.Name }).IsUnique();
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasOne<Tenant>()
+
+             .WithMany()
+
+             .HasForeignKey(r => r.TenantId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<UserRole>(b =>
+
+        {
+
+            b.ToTable("user_roles");
+
+            b.HasKey(ur => new { ur.TenantId, ur.UserId, ur.RoleId });
+
+
+
+            b.HasOne<Tenant>()
+
+             .WithMany()
+
+             .HasForeignKey(ur => ur.TenantId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne<User>()
+
+             .WithMany(u => u.UserRoles)
+
+             .HasForeignKey(ur => ur.UserId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasOne<Role>()
+
+             .WithMany()
+
+             .HasForeignKey(ur => ur.RoleId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<RevokedSession>(b =>
+
+        {
+
+            b.ToTable("revoked_sessions");
+
+            b.HasKey(rs => rs.Id);
+
+            b.Property(rs => rs.SessionId).IsRequired().HasMaxLength(128);
+
+            b.HasIndex(rs => rs.SessionId).IsUnique();
+
+            b.HasIndex(rs => rs.ExpiresAtUtc);
+
+        });
+
+
+
+        modelBuilder.Entity<RolePermission>(b =>
+
+        {
+
+            b.ToTable("role_permissions");
+
+            b.HasKey(rp => new { rp.TenantId, rp.RoleId, rp.PermissionKey });
+
+            b.Property(rp => rp.PermissionKey).HasMaxLength(100).IsRequired();
+
+
+
+            b.HasOne<Tenant>()
+
+             .WithMany()
+
+             .HasForeignKey(rp => rp.TenantId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne<Role>()
+
+             .WithMany(r => r.Permissions)
+
+             .HasForeignKey(rp => rp.RoleId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<AuditEvent>(b =>
+
+        {
+
+            b.ToTable("audit_events");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.EntityType).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.EntityId).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.Action).HasMaxLength(50).IsRequired();
+
+            b.Property(a => a.ActorEmail).HasMaxLength(250).IsRequired();
+
+            b.Property(a => a.CorrelationId).HasMaxLength(100);
+
+            b.Property(a => a.BeforeStateJson).HasColumnType("jsonb");
+
+            b.Property(a => a.AfterStateJson).HasColumnType("jsonb");
+
+
+
+            b.HasIndex(a => new { a.TenantId, a.CreatedAtUtc });
+
+        });
+
+
+
+        // Configuração do Módulo Parties
+
+        modelBuilder.Entity<Party>(b =>
+
+        {
+
+            b.ToTable("parties");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Name).HasMaxLength(250).IsRequired();
+
+            b.Property(p => p.TradeName).HasMaxLength(250);
+
+            b.Property(p => p.DocumentNumber).HasMaxLength(20);
+
+            b.Property(p => p.StateRegistration).HasMaxLength(50);
+
+            b.Property(p => p.MunicipalRegistration).HasMaxLength(50);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            // Índice com unicidade condicional por tenant (quando documento informado)
+
+            b.HasIndex(p => new { p.TenantId, p.DocumentNumber })
+
+             .IsUnique()
+
+             .HasFilter("\"DocumentNumber\" IS NOT NULL");
+
+
+
+            b.HasOne(p => p.CustomerProfile)
+
+             .WithOne()
+
+             .HasForeignKey<CustomerProfile>(cp => cp.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasOne(p => p.SupplierProfile)
+
+             .WithOne()
+
+             .HasForeignKey<SupplierProfile>(sp => sp.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<CustomerProfile>(b =>
+
+        {
+
+            b.ToTable("customer_profiles");
+
+            b.HasKey(cp => cp.Id);
+
+            b.Property(cp => cp.TotalSalesValue).HasPrecision(18, 2);
+
+            b.Property(cp => cp.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<SupplierProfile>(b =>
+
+        {
+
+            b.ToTable("supplier_profiles");
+
+            b.HasKey(sp => sp.Id);
+
+            b.Property(sp => sp.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<PartyContact>(b =>
+
+        {
+
+            b.ToTable("party_contacts");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Email).HasMaxLength(250);
+
+            b.Property(c => c.Phone).HasMaxLength(20);
+
+            b.Property(c => c.WhatsApp).HasMaxLength(20);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasOne<Party>()
+
+             .WithMany(p => p.Contacts)
+
+             .HasForeignKey(c => c.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<PartyAddress>(b =>
+
+        {
+
+            b.ToTable("party_addresses");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Street).HasMaxLength(200).IsRequired();
+
+            b.Property(a => a.Number).HasMaxLength(50).IsRequired();
+
+            b.Property(a => a.Complement).HasMaxLength(100);
+
+            b.Property(a => a.Neighborhood).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.City).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.State).HasMaxLength(2).IsRequired();
+
+            b.Property(a => a.PostalCode).HasMaxLength(10).IsRequired();
+
+            b.Property(a => a.Version).IsRowVersion();
+
+
+
+            b.HasOne<Party>()
+
+             .WithMany(p => p.Addresses)
+
+             .HasForeignKey(a => a.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<CustomerEquipment>(b =>
+
+        {
+
+            b.ToTable("customer_equipments");
+
+            b.HasKey(e => e.Id);
+
+            b.Property(e => e.EquipmentType).HasMaxLength(100).IsRequired();
+
+            b.Property(e => e.Brand).HasMaxLength(100).IsRequired();
+
+            b.Property(e => e.Model).HasMaxLength(150).IsRequired();
+
+            b.Property(e => e.SerialNumber).HasMaxLength(100);
+
+            b.Property(e => e.Imei1).HasMaxLength(20);
+
+            b.Property(e => e.Imei2).HasMaxLength(20);
+
+            b.Property(e => e.Color).HasMaxLength(50);
+
+            b.Property(e => e.Version).IsRowVersion();
+
+
+
+            b.HasOne<Party>()
+
+             .WithMany(p => p.Equipments)
+
+             .HasForeignKey(e => e.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<PartyConsentRecord>(b =>
+
+        {
+
+            b.ToTable("party_consent_records");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Channel).HasMaxLength(50).IsRequired();
+
+            b.Property(c => c.Purpose).HasMaxLength(100).IsRequired();
+
+            b.Property(c => c.Origin).HasMaxLength(100).IsRequired();
+
+            b.Property(c => c.Evidence).HasMaxLength(500);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasOne<Party>()
+
+             .WithMany(p => p.Consents)
+
+             .HasForeignKey(c => c.PartyId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        // Configuração do Módulo Catalog & InventoryUnit
+
+        modelBuilder.Entity<ProductCategory>(b =>
+
+        {
+
+            b.ToTable("product_categories");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Slug).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.Slug }).IsUnique();
+
+
+
+            b.HasOne(c => c.ParentCategory)
+
+             .WithMany(p => p.SubCategories)
+
+             .HasForeignKey(c => c.ParentCategoryId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<ProductBrand>(b =>
+
+        {
+
+            b.ToTable("product_brands");
+
+            b.HasKey(brand => brand.Id);
+
+            b.Property(brand => brand.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(brand => brand.Description).HasMaxLength(500);
+
+            b.Property(brand => brand.Version).IsRowVersion();
+
+
+
+            b.HasIndex(brand => new { brand.TenantId, brand.Name }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<ProductModel>(b =>
+
+        {
+
+            b.ToTable("product_models");
+
+            b.HasKey(m => m.Id);
+
+            b.Property(m => m.Name).HasMaxLength(200).IsRequired();
+
+            b.Property(m => m.Description).HasMaxLength(1000);
+
+            b.Property(m => m.Version).IsRowVersion();
+
+
+
+            b.HasOne(m => m.Brand)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.BrandId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(m => m.Category)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.CategoryId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<ProductSku>(b =>
+
+        {
+
+            b.ToTable("product_skus");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.SkuCode).HasMaxLength(100).IsRequired();
+
+            b.Property(s => s.VariantName).HasMaxLength(150).IsRequired();
+
+            b.Property(s => s.BarcodeEan).HasMaxLength(50);
+
+            b.Property(s => s.DefaultPrice).HasPrecision(18, 2);
+
+            b.Property(s => s.TechnicalSpecsJson).HasColumnType("jsonb");
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            // SKU deve ser estritamente único por tenant
+
+            b.HasIndex(s => new { s.TenantId, s.SkuCode }).IsUnique();
+
+
+
+            b.HasOne(s => s.ProductModel)
+
+             .WithMany(m => m.Skus)
+
+             .HasForeignKey(s => s.ProductModelId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<InventoryUnit>(b =>
+
+        {
+
+            b.ToTable("inventory_units");
+
+            b.HasKey(u => u.Id);
+
+            b.Property(u => u.SerialNumber).HasMaxLength(100);
+
+            b.Property(u => u.Imei1).HasMaxLength(20);
+
+            b.Property(u => u.Imei2).HasMaxLength(20);
+
+            b.Property(u => u.AcquisitionCost).HasPrecision(18, 2);
+
+            b.Property(u => u.InspectionNotes).HasMaxLength(1000);
+
+            b.Property(u => u.Version).IsRowVersion();
+
+
+
+            // Índices parciais únicos por tenant para IMEI1 e IMEI2 (quando não nulos)
+
+            b.HasIndex(u => new { u.TenantId, u.Imei1 })
+
+             .IsUnique()
+
+             .HasFilter("\"Imei1\" IS NOT NULL");
+
+
+
+            b.HasIndex(u => new { u.TenantId, u.Imei2 })
+
+             .IsUnique()
+
+             .HasFilter("\"Imei2\" IS NOT NULL");
+
+
+
+            b.HasOne(u => u.ProductSku)
+
+             .WithMany(s => s.InventoryUnits)
+
+             .HasForeignKey(u => u.ProductSkuId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne<Party>()
+
+             .WithMany()
+
+             .HasForeignKey(u => u.SupplierPartyId)
+
+             .OnDelete(DeleteBehavior.SetNull);
+
+        });
+
+
+
+        modelBuilder.Entity<InventoryUnitIdentifier>(b =>
+
+        {
+
+            b.ToTable("inventory_unit_identifiers");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.NormalizedValue).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            // Restrição crítica: Unicidade global de qualquer identificador (IMEI ou Serial) por tenant
+
+            b.HasIndex(i => new { i.TenantId, i.IdentifierType, i.NormalizedValue }).IsUnique();
+
+
+
+            b.HasOne(i => i.InventoryUnit)
+
+             .WithMany(u => u.Identifiers)
+
+             .HasForeignKey(i => i.InventoryUnitId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        // Configuração do Módulo Inventory & Kardex
+
+        modelBuilder.Entity<Warehouse>(b =>
+
+        {
+
+            b.ToTable("warehouses");
+
+            b.HasKey(w => w.Id);
+
+            b.Property(w => w.Code).HasMaxLength(50).IsRequired();
+
+            b.Property(w => w.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(w => w.Description).HasMaxLength(500);
+
+            b.Property(w => w.Version).IsRowVersion();
+
+
+
+            b.HasIndex(w => new { w.TenantId, w.BranchId, w.Code }).IsUnique();
+
+
+
+            b.HasOne<Branch>()
+
+             .WithMany()
+
+             .HasForeignKey(w => w.BranchId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<WarehouseLocation>(b =>
+
+        {
+
+            b.ToTable("warehouse_locations");
+
+            b.HasKey(l => l.Id);
+
+            b.Property(l => l.Code).HasMaxLength(50).IsRequired();
+
+            b.Property(l => l.Aisle).HasMaxLength(20).IsRequired();
+
+            b.Property(l => l.Shelf).HasMaxLength(20).IsRequired();
+
+            b.Property(l => l.Bin).HasMaxLength(20).IsRequired();
+
+            b.Property(l => l.Description).HasMaxLength(200);
+
+            b.Property(l => l.Version).IsRowVersion();
+
+
+
+            b.HasIndex(l => new { l.TenantId, l.WarehouseId, l.Code }).IsUnique();
+
+
+
+            b.HasOne(l => l.Warehouse)
+
+             .WithMany(w => w.Locations)
+
+             .HasForeignKey(l => l.WarehouseId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<StockMovement>(b =>
+
+        {
+
+            b.ToTable("stock_movements");
+
+            b.HasKey(m => m.Id);
+
+            b.Property(m => m.Quantity).HasPrecision(18, 4); // Permite gramas de filamento 3D
+
+            b.Property(m => m.UnitCost).HasPrecision(18, 4);
+
+            b.Property(m => m.TotalCost).HasPrecision(18, 2);
+
+            b.Property(m => m.BalanceAfterQuantity).HasPrecision(18, 4);
+
+            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
+
+            b.Property(m => m.Reason).HasMaxLength(250);
+
+            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(m => m.Version).IsRowVersion();
+
+
+
+            // Kardex imutável: Sem updates, indexado por tenant, data, SKU e serial
+
+            b.HasIndex(m => new { m.TenantId, m.BranchId, m.CreatedAtUtc });
+
+            b.HasIndex(m => new { m.TenantId, m.ProductSkuId, m.CreatedAtUtc });
+
+            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId, m.CreatedAtUtc });
+
+            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey })
+
+             .IsUnique()
+
+             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+
+
+            b.HasOne(m => m.Warehouse)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.WarehouseId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(m => m.WarehouseLocation)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.WarehouseLocationId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(m => m.ProductSku)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.ProductSkuId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(m => m.InventoryUnit)
+
+             .WithMany()
+
+             .HasForeignKey(m => m.InventoryUnitId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<StockBalance>(b =>
+
+        {
+
+            b.ToTable("stock_balances");
+
+            b.HasKey(b => b.Id);
+
+            b.Property(b => b.OnHandQuantity).HasPrecision(18, 4);
+
+            b.Property(b => b.ReservedQuantity).HasPrecision(18, 4);
+
+            b.Property(b => b.BlockedQuantity).HasPrecision(18, 4);
+
+            b.Property(b => b.AverageCost).HasPrecision(18, 4);
+
+            b.Property(b => b.Version).IsRowVersion();
+
+
+
+            b.HasIndex(b => new { b.TenantId, b.BranchId, b.WarehouseId, b.WarehouseLocationId, b.ProductSkuId }).IsUnique();
+
+
+
+            b.HasOne(b => b.Warehouse)
+
+             .WithMany()
+
+             .HasForeignKey(b => b.WarehouseId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(b => b.WarehouseLocation)
+
+             .WithMany()
+
+             .HasForeignKey(b => b.WarehouseLocationId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(b => b.ProductSku)
+
+             .WithMany()
+
+             .HasForeignKey(b => b.ProductSkuId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<SerialStockPosition>(b =>
+
+        {
+
+            b.ToTable("serial_stock_positions");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            // Unidade física serializada só pode ter uma posição no estoque
+
+            b.HasIndex(p => new { p.TenantId, p.InventoryUnitId }).IsUnique();
+
+
+
+            b.HasOne(p => p.InventoryUnit)
+
+             .WithMany()
+
+             .HasForeignKey(p => p.InventoryUnitId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasOne(p => p.Warehouse)
+
+             .WithMany()
+
+             .HasForeignKey(p => p.WarehouseId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasOne(p => p.WarehouseLocation)
+
+             .WithMany()
+
+             .HasForeignKey(p => p.WarehouseLocationId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<StockReservation>(b =>
+
+        {
+
+            b.ToTable("stock_reservations");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.ReservationNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.Reason).HasMaxLength(250).IsRequired();
+
+            b.Property(r => r.DocumentReference).HasMaxLength(100);
+
+            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.ReservationNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey })
+
+             .IsUnique()
+
+             .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+        });
+
+
+
+        modelBuilder.Entity<StockReservationItem>(b =>
+
+        {
+
+            b.ToTable("stock_reservation_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<StockReservation>()
+
+             .WithMany(r => r.Items)
+
+             .HasForeignKey(i => i.StockReservationId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<StockTransfer>(b =>
+
+        {
+
+            b.ToTable("stock_transfers");
+
+            b.HasKey(t => t.Id);
+
+            b.Property(t => t.TransferNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(t => t.Notes).HasMaxLength(500);
+
+            b.Property(t => t.Version).IsRowVersion();
+
+
+
+            b.HasIndex(t => new { t.TenantId, t.TransferNumber }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<StockTransferItem>(b =>
+
+        {
+
+            b.ToTable("stock_transfer_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<StockTransfer>()
+
+             .WithMany(t => t.Items)
+
+             .HasForeignKey(i => i.StockTransferId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<InventoryCount>(b =>
+
+        {
+
+            b.ToTable("inventory_counts");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.CountNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(c => c.Description).HasMaxLength(250).IsRequired();
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.CountNumber }).IsUnique();
+
+
+
+            b.HasOne(c => c.Warehouse)
+
+             .WithMany()
+
+             .HasForeignKey(c => c.WarehouseId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+        });
+
+
+
+        modelBuilder.Entity<InventoryCountItem>(b =>
+
+        {
+
+            b.ToTable("inventory_count_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.SystemSnapshotQuantity).HasPrecision(18, 4);
+
+            b.Property(i => i.CountedQuantity).HasPrecision(18, 4);
+
+            b.Property(i => i.Notes).HasMaxLength(250);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<InventoryCount>()
+
+             .WithMany(c => c.Items)
+
+             .HasForeignKey(i => i.InventoryCountId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        // ==========================================
+
+        // Modulo Procurement (MOD-04)
+
+        // ==========================================
+
+        modelBuilder.Entity<PurchaseRequest>(b =>
+
+        {
+
+            b.ToTable("purchase_requests");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.RequestNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.Justification).HasMaxLength(500).IsRequired();
+
+            b.Property(r => r.DecisionNotes).HasMaxLength(500);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.RequestNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<PurchaseRequestItem>(b =>
+
+        {
+
+            b.ToTable("purchase_request_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.EstimatedUnitCost).HasPrecision(18, 2);
+
+            b.Property(i => i.Notes).HasMaxLength(250);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<PurchaseRequest>()
+
+             .WithMany(r => r.Items)
+
+             .HasForeignKey(i => i.PurchaseRequestId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<SupplierQuotation>(b =>
+
+        {
+
+            b.ToTable("supplier_quotations");
+
+            b.HasKey(q => q.Id);
+
+            b.Property(q => q.QuotationNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(q => q.ShippingFee).HasPrecision(18, 2);
+
+            b.Property(q => q.PaymentTerms).HasMaxLength(150);
+
+            b.Property(q => q.Notes).HasMaxLength(500);
+
+            b.Property(q => q.Version).IsRowVersion();
+
+
+
+            b.HasIndex(q => new { q.TenantId, q.QuotationNumber }).IsUnique();
+
+            b.HasIndex(q => new { q.TenantId, q.SupplierPartyId, q.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<SupplierQuotationItem>(b =>
+
+        {
+
+            b.ToTable("supplier_quotation_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+
+            b.Property(i => i.DiscountAmount).HasPrecision(18, 2);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<SupplierQuotation>()
+
+             .WithMany(q => q.Items)
+
+             .HasForeignKey(i => i.SupplierQuotationId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<PurchaseOrder>(b =>
+
+        {
+
+            b.ToTable("purchase_orders");
+
+            b.HasKey(o => o.Id);
+
+            b.Property(o => o.OrderNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(o => o.PaymentTerms).HasMaxLength(150);
+
+            b.Property(o => o.ShippingCost).HasPrecision(18, 2);
+
+            b.Property(o => o.OtherExpenses).HasPrecision(18, 2);
+
+            b.Property(o => o.TotalDiscount).HasPrecision(18, 2);
+
+            b.Property(o => o.Notes).HasMaxLength(1000);
+
+            b.Property(o => o.Version).IsRowVersion();
+
+
+
+            b.HasIndex(o => new { o.TenantId, o.OrderNumber }).IsUnique();
+
+            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
+
+            b.HasIndex(o => new { o.TenantId, o.SupplierPartyId });
+
+        });
+
+
+
+        modelBuilder.Entity<PurchaseOrderItem>(b =>
+
+        {
+
+            b.ToTable("purchase_order_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+
+            b.Property(i => i.QuantityOrdered).HasPrecision(18, 4);
+
+            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
+
+            b.Property(i => i.UnitCost).HasPrecision(18, 2);
+
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<PurchaseOrder>()
+
+             .WithMany(o => o.Items)
+
+             .HasForeignKey(i => i.PurchaseOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<GoodsReceipt>(b =>
+
+        {
+
+            b.ToTable("goods_receipts");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.ReceiptNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.InvoiceOrDocumentNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(r => r.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(r => r.Notes).HasMaxLength(1000);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.ReceiptNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+            b.HasIndex(r => new { r.TenantId, r.PurchaseOrderId });
+
+            b.HasIndex(r => new { r.TenantId, r.WarehouseId });
+
+        });
+
+
+
+        modelBuilder.Entity<GoodsReceiptItem>(b =>
+
+        {
+
+            b.ToTable("goods_receipt_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.QuantityReceived).HasPrecision(18, 4);
+
+            b.Property(i => i.RealUnitCost).HasPrecision(18, 2);
+
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+
+            b.Property(i => i.Notes).HasMaxLength(300);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<GoodsReceipt>()
+
+             .WithMany(r => r.Items)
+
+             .HasForeignKey(i => i.GoodsReceiptId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<UsedDeviceAcquisition>(b =>
+
+        {
+
+            b.ToTable("used_device_acquisitions");
+
+            b.HasKey(u => u.Id);
+
+            b.Property(u => u.AcquisitionNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(u => u.SerialNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(u => u.Imei1).HasMaxLength(20);
+
+            b.Property(u => u.Imei2).HasMaxLength(20);
+
+            b.Property(u => u.NegotiatedPrice).HasPrecision(18, 2);
+
+            b.Property(u => u.AttributableExpenses).HasPrecision(18, 2);
+
+            b.Property(u => u.ChecklistInspectionJson).HasColumnType("jsonb").IsRequired();
+
+            b.Property(u => u.Notes).HasMaxLength(1000);
+
+            b.Property(u => u.Version).IsRowVersion();
+
+
+
+            b.HasIndex(u => new { u.TenantId, u.AcquisitionNumber }).IsUnique();
+
+            b.HasIndex(u => new { u.TenantId, u.BranchId, u.Status });
+
+            b.HasIndex(u => new { u.TenantId, u.SellerPartyId });
+
+            b.HasIndex(u => new { u.TenantId, u.SerialNumber });
+
+            b.HasIndex(u => new { u.TenantId, u.Imei1 });
+
+        });
+
+
+
+        modelBuilder.Entity<SupplierReturn>(b =>
+
+        {
+
+            b.ToTable("supplier_returns");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
+
+            b.Property(r => r.ReturnInvoiceNumber).HasMaxLength(100);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.SupplierPartyId });
+
+            b.HasIndex(r => new { r.TenantId, r.GoodsReceiptId });
+
+        });
+
+
+
+        modelBuilder.Entity<SupplierReturnItem>(b =>
+
+        {
+
+            b.ToTable("supplier_return_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.UnitCost).HasPrecision(18, 2);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<SupplierReturn>()
+
+             .WithMany(r => r.Items)
+
+             .HasForeignKey(i => i.SupplierReturnId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        // ==========================================
+
+        // Modulo Sales (MOD-05) - Orçamentos e PDV
+
+        // ==========================================
+
+        modelBuilder.Entity<SalesQuote>(b =>
+
+        {
+
+            b.ToTable("sales_quotes");
+
+            b.HasKey(q => q.Id);
+
+            b.Property(q => q.QuoteNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(q => q.PaymentTermsExpected).HasMaxLength(150);
+
+            b.Property(q => q.ShippingTotal).HasPrecision(18, 2);
+
+            b.Property(q => q.DiscountTotal).HasPrecision(18, 2);
+
+            b.Property(q => q.Notes).HasMaxLength(1000);
+
+            b.Property(q => q.Version).IsRowVersion();
+
+
+
+            b.HasIndex(q => new { q.TenantId, q.QuoteNumber }).IsUnique();
+
+            b.HasIndex(q => new { q.TenantId, q.BranchId, q.Status });
+
+            b.HasIndex(q => new { q.TenantId, q.CustomerPartyId });
+
+        });
+
+
+
+        modelBuilder.Entity<SalesQuoteItem>(b =>
+
+        {
+
+            b.ToTable("sales_quote_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<SalesQuote>()
+
+             .WithMany(q => q.Items)
+
+             .HasForeignKey(i => i.SalesQuoteId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<Sale>(b =>
+
+        {
+
+            b.ToTable("sales");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.SaleNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(s => s.ChargesTotal).HasPrecision(18, 2);
+
+            b.Property(s => s.DiscountTotal).HasPrecision(18, 2);
+
+            b.Property(s => s.Observations).HasMaxLength(1000);
+
+            b.Property(s => s.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            b.HasIndex(s => new { s.TenantId, s.SaleNumber }).IsUnique();
+
+            b.HasIndex(s => new { s.TenantId, s.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+            b.HasIndex(s => new { s.TenantId, s.BranchId, s.Status });
+
+            b.HasIndex(s => new { s.TenantId, s.CustomerPartyId });
+
+            b.HasIndex(s => new { s.TenantId, s.SellerUserId });
+
+        });
+
+
+
+        modelBuilder.Entity<SaleItem>(b =>
+
+        {
+
+            b.ToTable("sale_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.HistoricalSkuCode).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.HistoricalDescription).HasMaxLength(300).IsRequired();
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.UnitPrice).HasPrecision(18, 2);
+
+            b.Property(i => i.Discount).HasPrecision(18, 2);
+
+            b.Property(i => i.HistoricalUnitCost).HasPrecision(18, 2);
+
+            b.Property(i => i.SerialOrImei).HasMaxLength(100);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<Sale>()
+
+             .WithMany(s => s.Items)
+
+             .HasForeignKey(i => i.SaleId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<SalePaymentIntent>(b =>
+
+        {
+
+            b.ToTable("sale_payment_intents");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Amount).HasPrecision(18, 2);
+
+            b.Property(p => p.AuthorizationCode).HasMaxLength(100);
+
+            b.Property(p => p.TransactionReference).HasMaxLength(200);
+
+            b.Property(p => p.Notes).HasMaxLength(500);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasOne<Sale>()
+
+             .WithMany(s => s.Payments)
+
+             .HasForeignKey(p => p.SaleId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<SaleReturn>(b =>
+
+        {
+
+            b.ToTable("sale_returns");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.ReturnNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.Reason).HasMaxLength(500).IsRequired();
+
+            b.Property(r => r.InspectionNotes).HasMaxLength(500);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.ReturnNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.SaleId });
+
+        });
+
+
+
+        modelBuilder.Entity<SaleReturnItem>(b =>
+
+        {
+
+            b.ToTable("sale_return_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+
+            b.Property(i => i.RefundAmount).HasPrecision(18, 2);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasOne<SaleReturn>()
+
+             .WithMany(r => r.Items)
+
+             .HasForeignKey(i => i.SaleReturnId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        // ==================== CASH MANAGEMENT (MOD-06) ====================
+
+        modelBuilder.Entity<CashRegister>(b =>
+
+        {
+
+            b.ToTable("cash_registers");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.Code).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(r => r.Notes).HasMaxLength(500);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Code }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<CashShift>(b =>
+
+        {
+
+            b.ToTable("cash_shifts");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.OpeningFloat).HasPrecision(18, 2);
+
+            b.Property(s => s.CurrentBalance).HasPrecision(18, 2);
+
+            b.Property(s => s.TotalCashIn).HasPrecision(18, 2);
+
+            b.Property(s => s.TotalCashOut).HasPrecision(18, 2);
+
+            b.Property(s => s.ExpectedCashBalance).HasPrecision(18, 2);
+
+            b.Property(s => s.CountedCashBalance).HasPrecision(18, 2);
+
+            b.Property(s => s.DiscrepancyAmount).HasPrecision(18, 2);
+
+            b.Property(s => s.OpeningSource).HasMaxLength(150);
+
+            b.Property(s => s.OpeningNotes).HasMaxLength(500);
+
+            b.Property(s => s.ClosingNotes).HasMaxLength(500);
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            b.HasIndex(s => new { s.TenantId, s.BranchId, s.CashRegisterId, s.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<CashMovement>(b =>
+
+        {
+
+            b.ToTable("cash_movements");
+
+            b.HasKey(m => m.Id);
+
+            b.Property(m => m.Amount).HasPrecision(18, 2);
+
+            b.Property(m => m.SourceType).HasMaxLength(50).IsRequired();
+
+            b.Property(m => m.SourceId).HasMaxLength(100).IsRequired();
+
+            b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
+
+            b.Property(m => m.Reason).HasMaxLength(500);
+
+            b.Property(m => m.CorrelationId).HasMaxLength(100);
+
+            b.Property(m => m.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(m => m.Version).IsRowVersion();
+
+
+
+            b.HasOne<CashShift>()
+
+             .WithMany(s => s.Movements)
+
+             .HasForeignKey(m => m.CashShiftId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(m => new { m.TenantId, m.CashShiftId });
+
+            b.HasIndex(m => new { m.TenantId, m.IdempotencyKey });
+
+            b.HasIndex(m => new { m.TenantId, m.MovementType, m.SourceId });
+
+        });
+
+
+
+        modelBuilder.Entity<CashCountDenomination>(b =>
+
+        {
+
+            b.ToTable("cash_count_denominations");
+
+            b.HasKey(d => d.Id);
+
+            b.Property(d => d.Denomination).HasPrecision(18, 2);
+
+            b.Property(d => d.Version).IsRowVersion();
+
+
+
+            b.HasOne<CashShift>()
+
+             .WithMany(s => s.Denominations)
+
+             .HasForeignKey(d => d.CashShiftId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(d => new { d.TenantId, d.CashShiftId });
+
+        });
+
+
+
+        modelBuilder.Entity<CashDiscrepancy>(b =>
+
+        {
+
+            b.ToTable("cash_discrepancies");
+
+            b.HasKey(d => d.Id);
+
+            b.Property(d => d.Amount).HasPrecision(18, 2);
+
+            b.Property(d => d.OperatorJustification).HasMaxLength(1000);
+
+            b.Property(d => d.ResolutionNotes).HasMaxLength(1000);
+
+            b.Property(d => d.Version).IsRowVersion();
+
+
+
+            b.HasIndex(d => new { d.TenantId, d.BranchId, d.CashShiftId });
+
+            b.HasIndex(d => new { d.TenantId, d.Status });
+
+        });
+
+
+
+        // ==================== FINANCIAL (MOD-12) ====================
+
+        modelBuilder.Entity<FinancialAccount>(b =>
+
+        {
+
+            b.ToTable("financial_accounts");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Code).HasMaxLength(50).IsRequired();
+
+            b.Property(a => a.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(a => a.Version).IsRowVersion();
+
+
+
+            b.HasIndex(a => new { a.TenantId, a.Code }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<FinancialCostCenter>(b =>
+
+        {
+
+            b.ToTable("financial_cost_centers");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Code).HasMaxLength(50).IsRequired();
+
+            b.Property(c => c.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Description).HasMaxLength(500);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.Code }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<BankAccount>(b =>
+
+        {
+
+            b.ToTable("bank_accounts");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.BankName).HasMaxLength(150).IsRequired();
+
+            b.Property(a => a.AgencyNumber).HasMaxLength(50);
+
+            b.Property(a => a.AccountNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(a => a.CurrentBalance).HasPrecision(18, 2);
+
+            b.Property(a => a.ReconciledBalance).HasPrecision(18, 2);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+
+
+            b.HasIndex(a => new { a.TenantId, a.BranchId, a.AccountNumber });
+
+        });
+
+
+
+        modelBuilder.Entity<FinancialJournalEntry>(b =>
+
+        {
+
+            b.ToTable("financial_journal_entries");
+
+            b.HasKey(j => j.Id);
+
+            b.Property(j => j.DocumentNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(j => j.SourceType).HasMaxLength(50).IsRequired();
+
+            b.Property(j => j.SourceId).HasMaxLength(100).IsRequired();
+
+            b.Property(j => j.Description).HasMaxLength(500).IsRequired();
+
+            b.Property(j => j.TotalAmount).HasPrecision(18, 2);
+
+            b.Property(j => j.CorrelationId).HasMaxLength(100);
+
+            b.Property(j => j.IdempotencyKey).HasMaxLength(100);
+
+            b.Property(j => j.Version).IsRowVersion();
+
+
+
+            b.HasIndex(j => new { j.TenantId, j.BranchId, j.CompetenceDateUtc });
+
+            b.HasIndex(j => new { j.TenantId, j.IdempotencyKey });
+
+        });
+
+
+
+        modelBuilder.Entity<FinancialJournalLine>(b =>
+
+        {
+
+            b.ToTable("financial_journal_lines");
+
+            b.HasKey(l => l.Id);
+
+            b.Property(l => l.Amount).HasPrecision(18, 2);
+
+            b.Property(l => l.Memo).HasMaxLength(500);
+
+            b.Property(l => l.Version).IsRowVersion();
+
+
+
+            b.HasOne<FinancialJournalEntry>()
+
+             .WithMany(j => j.Lines)
+
+             .HasForeignKey(l => l.FinancialJournalEntryId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(l => new { l.TenantId, l.FinancialJournalEntryId });
+
+            b.HasIndex(l => new { l.TenantId, l.FinancialAccountId });
+
+        });
+
+
+
+        modelBuilder.Entity<AccountPayable>(b =>
+
+        {
+
+            b.ToTable("accounts_payable");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.TitleNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(p => p.Description).HasMaxLength(500).IsRequired();
+
+            b.Property(p => p.OriginalAmount).HasPrecision(18, 2);
+
+            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
+
+            b.Property(p => p.DocumentReference).HasMaxLength(100);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.BranchId, p.TitleNumber }).IsUnique();
+
+            b.HasIndex(p => new { p.TenantId, p.Status, p.DueDateUtc });
+
+        });
+
+
+
+        modelBuilder.Entity<AccountReceivable>(b =>
+
+        {
+
+            b.ToTable("accounts_receivable");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.TitleNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(r => r.Description).HasMaxLength(500).IsRequired();
+
+            b.Property(r => r.OriginalAmount).HasPrecision(18, 2);
+
+            b.Property(r => r.ReceivedAmount).HasPrecision(18, 2);
+
+            b.Property(r => r.DocumentReference).HasMaxLength(100);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.TitleNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.Status, r.DueDateUtc });
+
+        });
+
+
+
+        modelBuilder.Entity<FinancialSettlement>(b =>
+
+        {
+
+            b.ToTable("financial_settlements");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Amount).HasPrecision(18, 2);
+
+            b.Property(s => s.ReferenceNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            b.HasIndex(s => new { s.TenantId, s.TitleId });
+
+        });
+
+
+
+        modelBuilder.Entity<BankTransaction>(b =>
+
+        {
+
+            b.ToTable("bank_transactions");
+
+            b.HasKey(t => t.Id);
+
+            b.Property(t => t.Amount).HasPrecision(18, 2);
+
+            b.Property(t => t.FitId).HasMaxLength(100).IsRequired();
+
+            b.Property(t => t.Memo).HasMaxLength(500).IsRequired();
+
+            b.Property(t => t.Version).IsRowVersion();
+
+
+
+            b.HasIndex(t => new { t.TenantId, t.BankAccountId, t.FitId }).IsUnique();
+
+            b.HasIndex(t => new { t.TenantId, t.Status });
+
+        });
+
+
+
+        // Modulo PartnersCapital (MOD-13)
+
+        modelBuilder.Entity<Partner>(b =>
+
+        {
+
+            b.ToTable("partners");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
+
+            b.Property(p => p.DocumentNumber).HasMaxLength(20).IsRequired();
+
+            b.Property(p => p.Email).HasMaxLength(255).IsRequired();
+
+            b.Property(p => p.MonthlyCompensationCap).HasPrecision(18, 2);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.PartyId }).IsUnique();
+
+            b.HasIndex(p => new { p.TenantId, p.DocumentNumber });
+
+        });
+
+
+
+        modelBuilder.Entity<EquityParticipation>(b =>
+
+        {
+
+            b.ToTable("equity_participations");
+
+            b.HasKey(e => e.Id);
+
+            b.Property(e => e.Quotas).HasPrecision(18, 4);
+
+            b.Property(e => e.Percentage).HasPrecision(7, 4);
+
+            b.Property(e => e.NominalValuePerQuota).HasPrecision(18, 4);
+
+            b.Property(e => e.LegalDocumentReference).HasMaxLength(150).IsRequired();
+
+            b.Property(e => e.Version).IsRowVersion();
+
+
+
+            b.HasIndex(e => new { e.TenantId, e.PartnerId, e.IsCurrent });
+
+        });
+
+
+
+        modelBuilder.Entity<CapitalContribution>(b =>
+
+        {
+
+            b.ToTable("capital_contributions");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Amount).HasPrecision(18, 2);
+
+            b.Property(c => c.Description).HasMaxLength(500).IsRequired();
+
+            b.Property(c => c.FormalInstrumentReference).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.PartnerId });
+
+            b.HasIndex(c => new { c.TenantId, c.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<PartnerLoan>(b =>
+
+        {
+
+            b.ToTable("partner_loans");
+
+            b.HasKey(l => l.Id);
+
+            b.Property(l => l.PrincipalAmount).HasPrecision(18, 2);
+
+            b.Property(l => l.AmortizedAmount).HasPrecision(18, 2);
+
+            b.Property(l => l.AnnualInterestRate).HasPrecision(7, 4);
+
+            b.Property(l => l.ContractNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(l => l.Version).IsRowVersion();
+
+
+
+            b.HasIndex(l => new { l.TenantId, l.PartnerId });
+
+            b.HasIndex(l => new { l.TenantId, l.ContractNumber });
+
+        });
+
+
+
+        modelBuilder.Entity<PartnerCompensation>(b =>
+
+        {
+
+            b.ToTable("partner_compensations");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.GrossAmount).HasPrecision(18, 2);
+
+            b.Property(c => c.InssWithholding).HasPrecision(18, 2);
+
+            b.Property(c => c.IrrfWithholding).HasPrecision(18, 2);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.PartnerId, c.ReferenceYear, c.ReferenceMonth });
+
+        });
+
+
+
+        modelBuilder.Entity<ProfitDistributionProposal>(b =>
+
+        {
+
+            b.ToTable("profit_distribution_proposals");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.ProtocolNumber).HasMaxLength(100).IsRequired();
+
+            b.Property(p => p.BaseNetProfit).HasPrecision(18, 2);
+
+            b.Property(p => p.LegalReserveRetention).HasPrecision(18, 2);
+
+            b.Property(p => p.WorkingCapitalRetention).HasPrecision(18, 2);
+
+            b.Property(p => p.TotalDistributedAmount).HasPrecision(18, 2);
+
+            b.Property(p => p.MeetingMinutesReference).HasMaxLength(200).IsRequired();
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasMany(p => p.Items)
+
+                .WithOne()
+
+                .HasForeignKey(i => i.ProposalId)
+
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.ProtocolNumber }).IsUnique();
+
+            b.HasIndex(p => new { p.TenantId, p.FiscalYear });
+
+        });
+
+
+
+        modelBuilder.Entity<ProfitDistributionItem>(b =>
+
+        {
+
+            b.ToTable("profit_distribution_items");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.PartnerPercentage).HasPrecision(7, 4);
+
+            b.Property(i => i.GrossAmount).HasPrecision(18, 2);
+
+            b.Property(i => i.TaxWithheld).HasPrecision(18, 2);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasIndex(i => new { i.TenantId, i.ProposalId, i.PartnerId });
+
+        });
+
+
+
+        // Modulo RepairService (MOD-07)
+
+        modelBuilder.Entity<RepairOrder>(b =>
+
+        {
+
+            b.ToTable("repair_orders");
+
+            b.HasKey(r => r.Id);
+
+            b.Property(r => r.OrderNumber).HasMaxLength(50).IsRequired();
+
+            b.Property(r => r.ReportedDefect).HasMaxLength(1000).IsRequired();
+
+            b.Property(r => r.PhysicalConditionNotes).HasMaxLength(2000);
+
+            b.Property(r => r.AccessoriesIncluded).HasMaxLength(1000);
+
+            b.Property(r => r.DiagnosticNotes).HasMaxLength(4000);
+
+            b.Property(r => r.ResolutionNotes).HasMaxLength(4000);
+
+            b.Property(r => r.DeliveredToPersonName).HasMaxLength(200);
+
+            b.Property(r => r.DeliveredToDocumentNumber).HasMaxLength(50);
+
+            b.Property(r => r.DeliveryNotes).HasMaxLength(2000);
+
+
+
+            b.Property(r => r.TotalLaborPrice).HasPrecision(18, 2);
+
+            b.Property(r => r.TotalPartsPrice).HasPrecision(18, 2);
+
+            b.Property(r => r.TotalDiscount).HasPrecision(18, 2);
+
+            b.Property(r => r.FinalPrice).HasPrecision(18, 2);
+
+            b.Property(r => r.TotalPartsCost).HasPrecision(18, 2);
+
+            b.Property(r => r.TotalLaborCost).HasPrecision(18, 2);
+
+            b.Property(r => r.Version).IsRowVersion();
+
+
+
+            b.HasIndex(r => new { r.TenantId, r.OrderNumber }).IsUnique();
+
+            b.HasIndex(r => new { r.TenantId, r.BranchId, r.Status });
+
+            b.HasIndex(r => new { r.TenantId, r.CustomerId });
+
+            b.HasIndex(r => new { r.TenantId, r.CustomerEquipmentId });
+
+            b.HasIndex(r => new { r.TenantId, r.OriginalRepairOrderId });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairChecklistItem>(b =>
+
+        {
+
+            b.ToTable("repair_checklist_items");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Category).HasMaxLength(100).IsRequired();
+
+            b.Property(c => c.ItemName).HasMaxLength(150).IsRequired();
+
+            b.Property(c => c.Notes).HasMaxLength(500);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.ChecklistItems)
+
+             .HasForeignKey(c => c.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(c => new { c.TenantId, c.RepairOrderId, c.ItemName, c.IsOutputCheck });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairEstimateItem>(b =>
+
+        {
+
+            b.ToTable("repair_estimate_items");
+
+            b.HasKey(e => e.Id);
+
+            b.Property(e => e.Description).HasMaxLength(250).IsRequired();
+
+            b.Property(e => e.Quantity).HasPrecision(18, 4);
+
+            b.Property(e => e.UnitPrice).HasPrecision(18, 2);
+
+            b.Property(e => e.UnitCost).HasPrecision(18, 2);
+
+            b.Property(e => e.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.EstimateItems)
+
+             .HasForeignKey(e => e.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(e => new { e.TenantId, e.RepairOrderId });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairPartUsage>(b =>
+
+        {
+
+            b.ToTable("repair_part_usages");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.PartDescription).HasMaxLength(250).IsRequired();
+
+            b.Property(p => p.Quantity).HasPrecision(18, 4);
+
+            b.Property(p => p.ActualUnitCost).HasPrecision(18, 2);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.PartUsages)
+
+             .HasForeignKey(p => p.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Restrict);
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.RepairOrderId, p.ProductSkuId });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairStatusHistoryEntry>(b =>
+
+        {
+
+            b.ToTable("repair_status_history");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Description).HasMaxLength(500).IsRequired();
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.StatusHistory)
+
+             .HasForeignKey(s => s.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(s => new { s.TenantId, s.RepairOrderId, s.TimestampUtc });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairEvidenceAttachment>(b =>
+
+        {
+
+            b.ToTable("repair_evidence_attachments");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.FileName).HasMaxLength(250).IsRequired();
+
+            b.Property(a => a.StorageUrl).HasMaxLength(1000).IsRequired();
+
+            b.Property(a => a.FileType).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.Category).HasMaxLength(100).IsRequired();
+
+            b.Property(a => a.Description).HasMaxLength(500);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.Attachments)
+
+             .HasForeignKey(a => a.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(a => new { a.TenantId, a.RepairOrderId });
+
+        });
+
+
+
+        modelBuilder.Entity<RepairWarrantyClaim>(b =>
+
+        {
+
+            b.ToTable("repair_warranty_claims");
+
+            b.HasKey(w => w.Id);
+
+            b.Property(w => w.DefectDescription).HasMaxLength(1000).IsRequired();
+
+            b.Property(w => w.DecisionRationale).HasMaxLength(1000);
+
+            b.Property(w => w.Version).IsRowVersion();
+
+
+
+            b.HasOne<RepairOrder>()
+
+             .WithMany(r => r.WarrantyClaims)
+
+             .HasForeignKey(w => w.RepairOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(w => new { w.TenantId, w.RepairOrderId });
+
+        });
+
+
+
+        // Configuração CRM (MOD-08)
+
+        modelBuilder.Entity<CrmLead>(b =>
+
+        {
+
+            b.ToTable("crm_leads");
+
+            b.HasKey(l => l.Id);
+
+            b.Property(l => l.Name).HasMaxLength(150).IsRequired();
+
+            b.Property(l => l.Phone).HasMaxLength(30);
+
+            b.Property(l => l.Email).HasMaxLength(150);
+
+            b.Property(l => l.Source).HasMaxLength(50).IsRequired();
+
+            b.Property(l => l.MainInterest).HasMaxLength(200);
+
+            b.Property(l => l.Notes).HasMaxLength(1000);
+
+            b.Property(l => l.Version).IsRowVersion();
+
+
+
+            b.HasIndex(l => new { l.TenantId, l.BranchId });
+
+            b.HasIndex(l => new { l.TenantId, l.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmPipeline>(b =>
+
+        {
+
+            b.ToTable("crm_pipelines");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Name).HasMaxLength(100).IsRequired();
+
+            b.Property(p => p.Version).IsRowVersion();
+
+
+
+            b.HasMany(p => p.Stages)
+
+             .WithOne()
+
+             .HasForeignKey(s => s.PipelineId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.IsActive });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmPipelineStage>(b =>
+
+        {
+
+            b.ToTable("crm_pipeline_stages");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Name).HasMaxLength(100).IsRequired();
+
+            b.Property(s => s.Version).IsRowVersion();
+
+
+
+            b.HasIndex(s => new { s.TenantId, s.PipelineId, s.OrderIndex });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmOpportunity>(b =>
+
+        {
+
+            b.ToTable("crm_opportunities");
+
+            b.HasKey(o => o.Id);
+
+            b.Property(o => o.Title).HasMaxLength(200).IsRequired();
+
+            b.Property(o => o.Description).HasMaxLength(1000);
+
+            b.Property(o => o.Origin).HasMaxLength(50).IsRequired();
+
+            b.Property(o => o.EstimatedValue).HasPrecision(18, 2);
+
+            b.Property(o => o.LossReason).HasMaxLength(500);
+
+            b.Property(o => o.Version).IsRowVersion();
+
+
+
+            b.HasMany(o => o.Activities)
+
+             .WithOne()
+
+             .HasForeignKey(a => a.OpportunityId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(o => new { o.TenantId, o.BranchId, o.Status });
+
+            b.HasIndex(o => new { o.TenantId, o.PipelineId, o.StageId });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmOpportunityActivity>(b =>
+
+        {
+
+            b.ToTable("crm_opportunity_activities");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Title).HasMaxLength(200).IsRequired();
+
+            b.Property(a => a.Description).HasMaxLength(1000);
+
+            b.Property(a => a.CompletionNotes).HasMaxLength(1000);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+
+
+            b.HasIndex(a => new { a.TenantId, a.OpportunityId, a.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmPurchaseIntent>(b =>
+
+        {
+
+            b.ToTable("crm_purchase_intents");
+
+            b.HasKey(i => i.Id);
+
+            b.Property(i => i.Category).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.Brand).HasMaxLength(100).IsRequired();
+
+            b.Property(i => i.ModelName).HasMaxLength(150).IsRequired();
+
+            b.Property(i => i.DesiredStorageCapacity).HasMaxLength(50);
+
+            b.Property(i => i.DesiredColor).HasMaxLength(50);
+
+            b.Property(i => i.MinimumCosmeticGrade).HasMaxLength(20);
+
+            b.Property(i => i.MaxBudgetPrice).HasPrecision(18, 2);
+
+            b.Property(i => i.Notes).HasMaxLength(1000);
+
+            b.Property(i => i.CloseReason).HasMaxLength(500);
+
+            b.Property(i => i.Version).IsRowVersion();
+
+
+
+            b.HasMany(i => i.Matches)
+
+             .WithOne()
+
+             .HasForeignKey(m => m.PurchaseIntentId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(i => new { i.TenantId, i.BranchId, i.Status });
+
+            b.HasIndex(i => new { i.TenantId, i.PartyId });
+
+        });
+
+
+
+        modelBuilder.Entity<CrmInventoryMatch>(b =>
+
+        {
+
+            b.ToTable("crm_inventory_matches");
+
+            b.HasKey(m => m.Id);
+
+            b.Property(m => m.VerifiedPrice).HasPrecision(18, 2);
+
+            b.Property(m => m.MatchDetails).HasMaxLength(1000).IsRequired();
+
+            b.Property(m => m.RejectionReason).HasMaxLength(500);
+
+            b.Property(m => m.Version).IsRowVersion();
+
+
+
+            b.HasIndex(m => new { m.TenantId, m.PurchaseIntentId, m.ProductSkuId });
+
+            b.HasIndex(m => new { m.TenantId, m.InventoryUnitId });
+
+        });
+
+
+
+        // Configuração Manufacturing 3D (MOD-10)
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingOrder>(b =>
+
+        {
+
+            b.ToTable("manufacturing_orders");
+
+            b.HasKey(o => o.Id);
+
+            b.Ignore(o => o.AbnormalWasteCost);
+
+            b.Property(o => o.Version).IsRowVersion();
+
+            b.HasMany(o => o.Attempts)
+
+             .WithOne()
+
+             .HasForeignKey(a => a.ManufacturingOrderId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>(b =>
+
+        {
+
+            b.ToTable("manufacturing_print_attempts");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>(b =>
+
+        {
+
+            b.ToTable("manufacturing_design_assets");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.HasMany(a => a.Versions)
+
+             .WithOne()
+
+             .HasForeignKey(v => v.AssetId)
+
+             .OnDelete(DeleteBehavior.Cascade);
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>(b =>
+
+        {
+
+            b.ToTable("manufacturing_design_versions");
+
+            b.HasKey(v => v.Id);
+
+            b.Property(v => v.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrinter>(b =>
+
+        {
+
+            b.ToTable("manufacturing_printers");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingQuote>(b =>
+
+        {
+
+            b.ToTable("manufacturing_quotes");
+
+            b.HasKey(q => q.Id);
+
+            b.Property(q => q.Version).IsRowVersion();
+
+        });
+
+
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingSpool>(b =>
+
+        {
+
+            b.ToTable("manufacturing_spools");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Version).IsRowVersion();
+
+        });
+
+
+
+        // Configuração Digital Projects (MOD-11)
+
+        modelBuilder.Entity<DigitalProject>(b =>
+
+        {
+
+            b.ToTable("digital_projects");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.Property(p => p.ProjectCode).HasMaxLength(50).IsRequired();
+
+            b.Property(p => p.Name).HasMaxLength(200).IsRequired();
+
+            b.Property(p => p.ContractedPrice).HasPrecision(18, 2);
+
+            b.Property(p => p.EstimatedHours).HasPrecision(18, 2);
+
+            b.Property(p => p.TotalActualLaborCost).HasPrecision(18, 2);
+
+            b.Property(p => p.TotalThirdPartyCost).HasPrecision(18, 2);
+
+            b.Property(p => p.TotalExpensesCost).HasPrecision(18, 2);
+
+            b.Property(p => p.InvoicedAmount).HasPrecision(18, 2);
+
+            b.Property(p => p.PaidAmount).HasPrecision(18, 2);
+
+
+
+            b.HasMany(p => p.Milestones).WithOne().HasForeignKey(m => m.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(p => p.Tasks).WithOne().HasForeignKey(t => t.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(p => p.TimeEntries).WithOne().HasForeignKey(e => e.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(p => p.Deliverables).WithOne().HasForeignKey(d => d.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(p => p.ChangeRequests).WithOne().HasForeignKey(c => c.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+            b.HasMany(p => p.ContractVersions).WithOne().HasForeignKey(v => v.DigitalProjectId).OnDelete(DeleteBehavior.Cascade);
+
+
+
+            b.HasIndex(p => new { p.TenantId, p.ProjectCode }).IsUnique();
+
+            b.HasIndex(p => new { p.TenantId, p.CustomerPartyId });
+
+            b.HasIndex(p => new { p.TenantId, p.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectMilestone>(b =>
+
+        {
+
+            b.ToTable("digital_project_milestones");
+
+            b.HasKey(m => m.Id);
+
+            b.Property(m => m.Version).IsRowVersion();
+
+            b.Property(m => m.MilestonePrice).HasPrecision(18, 2);
+
+            b.HasIndex(m => new { m.TenantId, m.DigitalProjectId, m.SequenceOrder });
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectTask>(b =>
+
+        {
+
+            b.ToTable("digital_project_tasks");
+
+            b.HasKey(t => t.Id);
+
+            b.Property(t => t.Version).IsRowVersion();
+
+            b.Property(t => t.EstimatedHours).HasPrecision(18, 2);
+
+            b.HasIndex(t => new { t.TenantId, t.DigitalProjectId, t.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectTimeEntry>(b =>
+
+        {
+
+            b.ToTable("digital_project_time_entries");
+
+            b.HasKey(e => e.Id);
+
+            b.Property(e => e.Version).IsRowVersion();
+
+            b.Property(e => e.DurationHours).HasPrecision(18, 2);
+
+            b.Property(e => e.HistoricalHourlyCost).HasPrecision(18, 2);
+
+            b.HasIndex(e => new { e.TenantId, e.DigitalProjectId, e.WorkDateUtc });
+
+            b.HasIndex(e => new { e.TenantId, e.UserId });
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectDeliverable>(b =>
+
+        {
+
+            b.ToTable("digital_project_deliverables");
+
+            b.HasKey(d => d.Id);
+
+            b.Property(d => d.Version).IsRowVersion();
+
+            b.HasIndex(d => new { d.TenantId, d.DigitalProjectId });
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectChangeRequest>(b =>
+
+        {
+
+            b.ToTable("digital_project_change_requests");
+
+            b.HasKey(c => c.Id);
+
+            b.Property(c => c.Version).IsRowVersion();
+
+            b.Property(c => c.ImpactHours).HasPrecision(18, 2);
+
+            b.Property(c => c.ImpactCost).HasPrecision(18, 2);
+
+            b.Property(c => c.ImpactPrice).HasPrecision(18, 2);
+
+            b.HasIndex(c => new { c.TenantId, c.DigitalProjectId, c.CrNumber }).IsUnique();
+
+        });
+
+
+
+        modelBuilder.Entity<DigitalProjectContractVersion>(b =>
+
+        {
+
+            b.ToTable("digital_project_contract_versions");
+
+            b.HasKey(v => v.Id);
+
+            b.Property(v => v.Version).IsRowVersion();
+
+            b.HasIndex(v => new { v.TenantId, v.DigitalProjectId, v.VersionNumber }).IsUnique();
+
+        });
+
+
+
+        // Configuração Módulo FleetLogistics & Precificação Inteligente (MOD-16)
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetVehicle>(b =>
+
+        {
+
+            b.ToTable("fleet_vehicles");
+
+            b.HasKey(v => v.Id);
+
+            b.Property(v => v.Version).IsRowVersion();
+
+            b.Property(v => v.TankCapacityLiters).HasPrecision(18, 2);
+
+            b.Property(v => v.InitialOdometerKm).HasPrecision(18, 2);
+
+            b.Property(v => v.CurrentOdometerKm).HasPrecision(18, 2);
+
+            b.Property(v => v.AverageConsumptionKmPerLiter).HasPrecision(18, 2);
+
+            b.HasIndex(v => new { v.TenantId, v.Plate }).IsUnique();
+
+            b.HasIndex(v => new { v.TenantId, v.InternalCode }).IsUnique();
+
+            b.HasIndex(v => new { v.TenantId, v.BranchId, v.Status });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTrip>(b =>
+
+        {
+
+            b.ToTable("fleet_trips");
+
+            b.HasKey(t => t.Id);
+
+            b.Property(t => t.Version).IsRowVersion();
+
+            b.Property(t => t.InitialOdometerKm).HasPrecision(18, 2);
+
+            b.Property(t => t.FinalOdometerKm).HasPrecision(18, 2);
+
+            b.Property(t => t.DistanceKm).HasPrecision(18, 2);
+
+            b.Property(t => t.TotalFuelExpenses).HasPrecision(18, 2);
+
+            b.Property(t => t.TotalOtherExpenses).HasPrecision(18, 2);
+
+            b.Property(t => t.TotalAllocatedCost).HasPrecision(18, 2);
+
+            b.HasIndex(t => new { t.TenantId, t.TripNumber }).IsUnique();
+
+            b.HasIndex(t => new { t.TenantId, t.VehicleId, t.Status });
+
+            b.HasIndex(t => new { t.TenantId, t.StartTimeUtc });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetFueling>(b =>
+
+        {
+
+            b.ToTable("fleet_fuelings");
+
+            b.HasKey(f => f.Id);
+
+            b.Property(f => f.Version).IsRowVersion();
+
+            b.Property(f => f.TotalAmount).HasPrecision(18, 2);
+
+            b.Property(f => f.Liters).HasPrecision(18, 3);
+
+            b.Property(f => f.PricePerLiter).HasPrecision(18, 4);
+
+            b.Property(f => f.OdometerKm).HasPrecision(18, 2);
+
+            b.HasIndex(f => new { f.TenantId, f.VehicleId, f.FuelingDateUtc });
+
+            b.HasIndex(f => new { f.TenantId, f.TripId });
+
+            b.HasIndex(f => new { f.TenantId, f.FinancialStatus });
+
+            b.HasIndex(f => new { f.TenantId, f.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetExpense>(b =>
+
+        {
+
+            b.ToTable("fleet_expenses");
+
+            b.HasKey(e => e.Id);
+
+            b.Property(e => e.Version).IsRowVersion();
+
+            b.Property(e => e.Amount).HasPrecision(18, 2);
+
+            b.HasIndex(e => new { e.TenantId, e.Category, e.ExpenseDateUtc });
+
+            b.HasIndex(e => new { e.TenantId, e.TripId });
+
+            b.HasIndex(e => new { e.TenantId, e.VehicleId });
+
+            b.HasIndex(e => new { e.TenantId, e.FinancialStatus });
+
+            b.HasIndex(e => new { e.TenantId, e.IdempotencyKey }).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenancePlan>(b =>
+
+        {
+
+            b.ToTable("fleet_maintenance_plans");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.Property(p => p.LastServiceOdometerKm).HasPrecision(18, 2);
+
+            b.Property(p => p.NextServiceOdometerKm).HasPrecision(18, 2);
+
+            b.HasIndex(p => new { p.TenantId, p.VehicleId, p.IsActive });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetMaintenanceService>(b =>
+
+        {
+
+            b.ToTable("fleet_maintenance_services");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.Property(s => s.OdometerKm).HasPrecision(18, 2);
+
+            b.Property(s => s.PartsCost).HasPrecision(18, 2);
+
+            b.Property(s => s.LaborCost).HasPrecision(18, 2);
+
+            b.Property(s => s.TotalCost).HasPrecision(18, 2);
+
+            b.Property(s => s.NextRecommendedOdometerKm).HasPrecision(18, 2);
+
+            b.HasIndex(s => new { s.TenantId, s.VehicleId, s.ServiceDateUtc });
+
+            b.HasIndex(s => new { s.TenantId, s.FinancialStatus });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.FleetTripAllocation>(b =>
+
+        {
+
+            b.ToTable("fleet_trip_allocations");
+
+            b.HasKey(a => a.Id);
+
+            b.Property(a => a.Version).IsRowVersion();
+
+            b.Property(a => a.AllocatedAmount).HasPrecision(18, 2);
+
+            b.Property(a => a.AllocationPercentage).HasPrecision(18, 4);
+
+            b.HasIndex(a => new { a.TenantId, a.TripId });
+
+            b.HasIndex(a => new { a.TenantId, a.TargetType, a.TargetId });
+
+            b.HasIndex(a => new { a.TenantId, a.InventoryUnitId });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPricingPolicy>(b =>
+
+        {
+
+            b.ToTable("product_pricing_policies");
+
+            b.HasKey(p => p.Id);
+
+            b.Property(p => p.Version).IsRowVersion();
+
+            b.Property(p => p.TargetAcquisitionDiscountRate).HasPrecision(18, 4);
+
+            b.Property(p => p.TargetMarkupRate).HasPrecision(18, 4);
+
+            b.Property(p => p.TargetMinMarginRate).HasPrecision(18, 4);
+
+            b.Property(p => p.EstimatedPickupLogisticsRate).HasPrecision(18, 4);
+
+            b.Property(p => p.EstimatedDeliveryLogisticsRate).HasPrecision(18, 4);
+
+            b.Property(p => p.OtherCommercialCostRate).HasPrecision(18, 4);
+
+            b.HasIndex(p => new { p.TenantId, p.BranchId, p.IsActive });
+
+            b.HasIndex(p => new { p.TenantId, p.Scope, p.TargetSkuId });
+
+        });
+
+
+
+        modelBuilder.Entity<FleetLogistics.Domain.Entities.ProductPriceSuggestion>(b =>
+
+        {
+
+            b.ToTable("product_price_suggestions");
+
+            b.HasKey(s => s.Id);
+
+            b.Property(s => s.Version).IsRowVersion();
+
+            b.Property(s => s.ReferencePrice).HasPrecision(18, 2);
+
+            b.Property(s => s.TargetNegotiationPrice).HasPrecision(18, 2);
+
+            b.Property(s => s.RealAcquisitionCost).HasPrecision(18, 2);
+
+            b.Property(s => s.AllocatedLogisticsCost).HasPrecision(18, 2);
+
+            b.Property(s => s.CommercialProvisions).HasPrecision(18, 2);
+
+            b.Property(s => s.TotalCostBase).HasPrecision(18, 2);
+
+            b.Property(s => s.MarkupRateApplied).HasPrecision(18, 4);
+
+            b.Property(s => s.CalculatedSuggestedPrice).HasPrecision(18, 2);
+
+            b.Property(s => s.MinimumAllowedPrice).HasPrecision(18, 2);
+
+            b.Property(s => s.ApprovedFinalPrice).HasPrecision(18, 2);
+
+            b.HasIndex(s => new { s.TenantId, s.ProductSkuId, s.Status });
+
+            b.HasIndex(s => new { s.TenantId, s.InventoryUnitId });
+
+        });
+
+
+
+        // Configuração Módulo Fiscal (MOD-14)
+        modelBuilder.Entity<FiscalEstablishment>(b =>
+        {
+            b.ToTable("fiscal_establishments");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Version).IsRowVersion();
+            b.HasIndex(e => new { e.TenantId, e.Cnpj }).IsUnique();
+        });
+
+        modelBuilder.Entity<FiscalCertificate>(b =>
+        {
+            b.ToTable("fiscal_certificates");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Version).IsRowVersion();
+            b.HasIndex(c => new { c.TenantId, c.Thumbprint });
+        });
+
+        modelBuilder.Entity<FiscalCsc>(b =>
+        {
+            b.ToTable("fiscal_cscs");
+            b.HasKey(c => c.Id);
+            b.Property(c => c.Version).IsRowVersion();
+            b.HasIndex(c => new { c.TenantId, c.CscId, c.Environment });
+        });
+
+        modelBuilder.Entity<FiscalDocument>(b =>
+        {
+            b.ToTable("fiscal_documents");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Version).IsRowVersion();
+            b.Property(d => d.TotalAmount).HasPrecision(18, 2);
+            b.Property(d => d.TotalDiscounts).HasPrecision(18, 2);
+            b.HasIndex(d => new { d.TenantId, d.AccessKey }).IsUnique();
+            b.HasIndex(d => new { d.TenantId, d.Series, d.Number });
+        });
+
+        modelBuilder.Entity<FiscalDocumentItem>(b =>
+        {
+            b.ToTable("fiscal_document_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Version).IsRowVersion();
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitPrice).HasPrecision(18, 4);
+            b.Property(i => i.TotalGrossAmount).HasPrecision(18, 2);
+            b.Property(i => i.DiscountAmount).HasPrecision(18, 2);
+            b.Property(i => i.NetAmount).HasPrecision(18, 2);
+            b.HasIndex(i => i.FiscalDocumentId);
+        });
+
+        modelBuilder.Entity<InboundFiscalDocument>(b =>
+        {
+            b.ToTable("inbound_fiscal_documents");
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Version).IsRowVersion();
+            b.Property(d => d.TotalProductsAmount).HasPrecision(18, 2);
+            b.Property(d => d.TotalInvoiceAmount).HasPrecision(18, 2);
+            b.Property(d => d.TotalIcmsAmount).HasPrecision(18, 2);
+            b.HasIndex(d => new { d.TenantId, d.AccessKey }).IsUnique();
+        });
+
+        modelBuilder.Entity<InboundFiscalItem>(b =>
+        {
+            b.ToTable("inbound_fiscal_items");
+            b.HasKey(i => i.Id);
+            b.Property(i => i.Version).IsRowVersion();
+            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.UnitCost).HasPrecision(18, 4);
+            b.Property(i => i.TotalCost).HasPrecision(18, 2);
+            b.HasIndex(i => i.InboundFiscalDocumentId);
+        });
+
+        // Configurar Filtros Globais Multi-Tenant Automaticos
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+
+        {
+
+            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
+
+            {
+
+                var method = typeof(AppDbContext)
+
+                    .GetMethod(nameof(ConfigureTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+
+                    .MakeGenericMethod(entityType.ClrType);
+
+
+
+                method?.Invoke(this, [modelBuilder]);
+
+            }
+
+        }
+
+    }
+
+
+
+    public Guid CurrentTenantId => _executionContext?.TenantId ?? Guid.Empty;
+
+    public bool IsContextAuthenticated => _executionContext?.IsAuthenticated ?? false;
+
+
+
+    private void ConfigureTenantFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, ITenantScoped
+
+    {
+
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e => !IsContextAuthenticated || e.TenantId == CurrentTenantId);
+
+    }
+
+
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+
+    {
+
+        // 0. Corrigir entidades filhas recém-anexadas com Version == 0 marcadas erroneamente como Modified
+
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
+
+        {
+
+            if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
+
+                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage or ManufacturingPrintAttempt
+
+                or DigitalProjectMilestone or DigitalProjectTask or DigitalProjectTimeEntry or DigitalProjectDeliverable or DigitalProjectChangeRequest or DigitalProjectContractVersion)
+
+            {
+
+                var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
+
+                if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))
+
+                {
+
+                    entry.State = EntityState.Added;
+
+                }
+
+            }
+
+        }
+
+
+
+        // 1. Validar e Forçar Isolamento de Tenant
+
+        var tenantEntries = ChangeTracker.Entries<ITenantScoped>()
+
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)
+
+            .ToList();
+
+
+
+        if (_executionContext != null && _executionContext.IsAuthenticated && _executionContext.TenantId != Guid.Empty)
+
+        {
+
+            foreach (var entry in tenantEntries)
+
+            {
+
+                if (entry.State == EntityState.Added)
+
+                {
+
+                    if (entry.Entity.TenantId == Guid.Empty)
+
+                    {
+
+                        entry.Property(nameof(ITenantScoped.TenantId)).CurrentValue = _executionContext.TenantId;
+
+                    }
+
+                    else if (entry.Entity.TenantId != _executionContext.TenantId)
+
+                    {
+
+                        throw new InvalidOperationException("Tentativa de gravação com TenantId diferente do contexto autenticado.");
+
+                    }
+
+                }
+
+                else if (entry.State == EntityState.Modified)
+
+                {
+
+                    var originalTenantId = entry.OriginalValues.GetValue<Guid>(nameof(ITenantScoped.TenantId));
+
+                    if (originalTenantId != _executionContext.TenantId || entry.Entity.TenantId != _executionContext.TenantId)
+
+                    {
+
+                        throw new InvalidOperationException("Violação de segurança: Não é permitido alterar ou transferir TenantId.");
+
+                    }
+
+                }
+
+            }
+
+        }
+
+
+
+        // 2. Gravar Eventos de Auditoria Sanitizada Automaticamente
+
+        var auditedEntries = ChangeTracker.Entries<BaseEntity>()
+
+            .Where(e => e.Entity is not AuditEvent && 
+
+                       (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted))
+
+            .ToList();
+
+
+
+        var auditList = new List<AuditEvent>();
+
+        foreach (var entry in auditedEntries)
+
+        {
+
+            var action = entry.State switch
+
+            {
+
+                EntityState.Added => "INSERT",
+
+                EntityState.Modified => "UPDATE",
+
+                EntityState.Deleted => "DELETE",
+
+                _ => "UNKNOWN"
+
+            };
+
+
+
+            Guid? tenantId = (entry.Entity as ITenantScoped)?.TenantId ?? _executionContext?.TenantId;
+
+            Guid? branchId = (entry.Entity as IBranchScoped)?.BranchId ?? _executionContext?.BranchId;
+
+
+
+            var audit = new AuditEvent(
+
+                tenantId,
+
+                branchId,
+
+                entry.Entity.GetType().Name,
+
+                entry.Property("Id").CurrentValue?.ToString() ?? Guid.Empty.ToString(),
+
+                action,
+
+                _executionContext?.UserId,
+
+                _executionContext?.UserEmail ?? "system",
+
+                _executionContext is AppExecutionContext ec ? ec.CorrelationId : null
+
+            );
+
+            auditList.Add(audit);
+
+        }
+
+
+
+        if (auditList.Count > 0)
+
+        {
+
+            AuditEvents.AddRange(auditList);
+
+        }
+
+
+
+        return await base.SaveChangesAsync(cancellationToken);
+
+    }
+
+}
+

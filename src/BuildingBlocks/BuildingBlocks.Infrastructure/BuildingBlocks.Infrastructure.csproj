@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\Modules\DigitalProjects\DigitalProjects.Domain\DigitalProjects.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\IdentityAccess\IdentityAccess.Application\IdentityAccess.Application.csproj" />
     <ProjectReference Include="..\..\Modules\FleetLogistics\FleetLogistics.Domain\FleetLogistics.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Fiscal\Fiscal.Domain\Fiscal.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Fiscal\Fiscal.Application\Fiscal.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

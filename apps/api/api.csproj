@@ -38,6 +38,9 @@
     <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Domain\FleetLogistics.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Application\FleetLogistics.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\FleetLogistics\FleetLogistics.Infrastructure\FleetLogistics.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Fiscal\Fiscal.Domain\Fiscal.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Fiscal\Fiscal.Application\Fiscal.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Fiscal\Fiscal.Infrastructure\Fiscal.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
