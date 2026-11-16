@@ -24,7 +24,8 @@ import {
   Check,
   Building,
   UserX,
-  FileText
+  FileText,
+  Briefcase
 } from "lucide-react";
 
 interface UserItem {
@@ -57,6 +58,7 @@ export default function UsersManagementPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isPartner, setIsPartner] = useState(false);
+  const [roleTitle, setRoleTitle] = useState("CEO"); // Cargo / O que o usuário é no sistema
   const [documentNumber, setDocumentNumber] = useState("");
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -78,7 +80,6 @@ export default function UsersManagementPage() {
         const data = await res.json();
         setUsers(data);
       } else {
-        // Fallback ilustrativo para visualização quando a API backend não estiver ativa
         setUsers([
           {
             id: "u-henrique-01",
@@ -88,8 +89,8 @@ export default function UsersManagementPage() {
             securityStamp: 1,
             createdAtUtc: "2026-11-16T12:00:00Z",
             isPartner: true,
-            partnerRole: "ManagingPartner",
-            roles: ["Sócio Diretor Executivo", "Acesso Master"]
+            partnerRole: "CEO",
+            roles: ["CEO", "Sócio Fundador", "Acesso Master"]
           },
           {
             id: "u-bruno-02",
@@ -99,8 +100,8 @@ export default function UsersManagementPage() {
             securityStamp: 1,
             createdAtUtc: "2026-11-14T10:00:00Z",
             isPartner: true,
-            partnerRole: "OperatingPartner",
-            roles: ["Sócio Diretor Executivo", "Acesso Master"]
+            partnerRole: "COO",
+            roles: ["COO", "Diretor Operacional", "Acesso Master"]
           },
           {
             id: "u-carlos-03",
@@ -110,8 +111,8 @@ export default function UsersManagementPage() {
             securityStamp: 1,
             createdAtUtc: "2026-11-12T14:00:00Z",
             isPartner: true,
-            partnerRole: "SilentPartner",
-            roles: ["Sócio Diretor Executivo", "Acesso Master"]
+            partnerRole: "CFO",
+            roles: ["CFO", "Diretor Financeiro", "Acesso Master"]
           },
           {
             id: "u-operador-04",
@@ -121,12 +122,12 @@ export default function UsersManagementPage() {
             securityStamp: 1,
             createdAtUtc: "2026-11-15T09:30:00Z",
             isPartner: false,
-            roles: ["Operador Geral", "PDV & Balcão"]
+            roles: ["Vendedor / Atendente PDV"]
           }
         ]);
       }
     } catch {
-      // Ignora erro de rede em ambiente estático
+      // Ignora erro em modo offline
     } finally {
       setIsLoading(false);
     }
@@ -135,6 +136,16 @@ export default function UsersManagementPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  // Atualiza cargo padrão sugerido ao alternar checkbox de sócio
+  const handlePartnerToggle = (checked: boolean) => {
+    setIsPartner(checked);
+    if (checked && (!roleTitle || roleTitle === "Vendedor / Atendente PDV" || roleTitle === "Operador Geral")) {
+      setRoleTitle("CEO");
+    } else if (!checked && (roleTitle === "CEO" || roleTitle === "Sócio Diretor")) {
+      setRoleTitle("Vendedor / Atendente PDV");
+    }
+  };
 
   // Criar Usuário
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -153,7 +164,7 @@ export default function UsersManagementPage() {
     }
 
     if (password.length < 6) {
-      setErrorMsg("A senha deve conter no mínimo 6 caracteres com requisitos de segurança.");
+      setErrorMsg("A senha deve conter no mínimo 6 caracteres.");
       return;
     }
 
@@ -167,18 +178,20 @@ export default function UsersManagementPage() {
           email: email.trim(),
           password,
           isPartner,
+          roleTitle: roleTitle.trim() || (isPartner ? "CEO" : "Operador Geral"),
           documentNumber: documentNumber.trim() || undefined
         })
       });
 
       if (res.ok) {
-        setSuccessMsg(`Usuário ${fullName} criado com sucesso! ${isPartner ? "Identificado como Sócio com Acesso Master." : ""}`);
+        setSuccessMsg(`Usuário ${fullName} criado com sucesso como "${roleTitle}"!`);
         setShowCreateModal(false);
         setFullName("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
         setIsPartner(false);
+        setRoleTitle("Vendedor / Atendente PDV");
         setDocumentNumber("");
         loadUsers();
       } else {
@@ -186,7 +199,7 @@ export default function UsersManagementPage() {
         setErrorMsg(data.error || "Não foi possível criar o usuário.");
       }
     } catch {
-      // Criação local de demonstração caso BFF não responda
+      const chosenRole = roleTitle.trim() || (isPartner ? "CEO" : "Operador Geral");
       const localNewUser: UserItem = {
         id: `u-${Date.now()}`,
         fullName: fullName.trim(),
@@ -195,17 +208,18 @@ export default function UsersManagementPage() {
         securityStamp: 1,
         createdAtUtc: new Date().toISOString(),
         isPartner,
-        partnerRole: isPartner ? "ManagingPartner" : undefined,
-        roles: isPartner ? ["Sócio Diretor Executivo", "Acesso Master"] : ["Operador Geral"]
+        partnerRole: isPartner ? chosenRole : undefined,
+        roles: isPartner ? [chosenRole, "Acesso Master"] : [chosenRole]
       };
       setUsers([localNewUser, ...users]);
-      setSuccessMsg(`Usuário ${fullName} cadastrado com sucesso!`);
+      setSuccessMsg(`Usuário ${fullName} cadastrado com sucesso como "${chosenRole}"!`);
       setShowCreateModal(false);
       setFullName("");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
       setIsPartner(false);
+      setRoleTitle("Vendedor / Atendente PDV");
       setDocumentNumber("");
     } finally {
       setIsSubmitting(false);
@@ -273,7 +287,6 @@ export default function UsersManagementPage() {
     }
   };
 
-  // Filtros de busca
   const filteredUsers = users.filter((u) => {
     if (filterType === "partners" && !u.isPartner) return false;
     if (filterType === "operators" && u.isPartner) return false;
@@ -298,20 +311,24 @@ export default function UsersManagementPage() {
                 Segurança & Controle de Acessos
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
-                Acesso Master Exclusivo para Sócios
+                Acesso Master para Sócios
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
-              Gestão de Usuários, Senhas & Sócios
+              Gestão de Usuários, Senhas & Funções
             </h1>
             <p className="text-xs text-slate-500">
-              Criação de credenciais de login para o sistema, controle de sócios com acesso master administrativo e política de senhas fortes.
+              Defina os usuários, senhas de login, cargos de atuação (CEO, Gerente, Balcão, etc.) e identifique sócios com Acesso Master.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => {
+                setShowCreateModal(true);
+                setRoleTitle("CEO");
+                setIsPartner(true);
+              }}
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/25"
             >
               <UserPlus className="w-4 h-4" />
@@ -333,13 +350,13 @@ export default function UsersManagementPage() {
           </div>
         )}
 
-        {/* Cards de Métricas de Governança */}
+        {/* Cards de Métricas */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total de Usuários</span>
               <span className="text-2xl font-black text-slate-900 font-mono">{users.length}</span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Credenciais no ERP</span>
+              <span className="text-[11px] text-slate-400 block mt-0.5">Contas registradas no sistema</span>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
               <Users className="w-6 h-6" />
@@ -350,7 +367,7 @@ export default function UsersManagementPage() {
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Sócios (Acesso Master)</span>
               <span className="text-2xl font-black text-amber-600 font-mono">{totalPartners}</span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Governança & Diretoria HB</span>
+              <span className="text-[11px] text-slate-400 block mt-0.5">CEO / Gestão Executiva HB</span>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
               <Crown className="w-6 h-6" />
@@ -359,9 +376,9 @@ export default function UsersManagementPage() {
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Operadores de Balcão</span>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Equipe & Operadores</span>
               <span className="text-2xl font-black text-blue-600 font-mono">{totalOperators}</span>
-              <span className="text-[11px] text-slate-400 block mt-0.5">Acesso restrito operacional</span>
+              <span className="text-[11px] text-slate-400 block mt-0.5">Acesso operacional balcão</span>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <ShieldCheck className="w-6 h-6" />
@@ -369,7 +386,7 @@ export default function UsersManagementPage() {
           </div>
         </div>
 
-        {/* Barra de Filtros e Busca */}
+        {/* Toolbar de Filtros e Busca */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 w-full md:w-auto">
             <button
@@ -390,7 +407,7 @@ export default function UsersManagementPage() {
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Sócios com Acesso Master ({totalPartners})
+              Sócios ({totalPartners})
             </button>
             <button
               onClick={() => setFilterType("operators")}
@@ -408,7 +425,7 @@ export default function UsersManagementPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por nome ou e-mail..."
+              placeholder="Buscar por nome, cargo ou e-mail..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800 transition-all"
@@ -422,10 +439,10 @@ export default function UsersManagementPage() {
             <div className="flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-purple-600" />
               <span className="text-xs font-bold text-slate-800">
-                Contas Registradas no Sistema
+                Usuários & Funções Cadastradas
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-100 text-purple-700 font-bold">
-                {filteredUsers.length} usuários
+                {filteredUsers.length} registros
               </span>
             </div>
             <button
@@ -441,10 +458,10 @@ export default function UsersManagementPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/40 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                  <th className="py-3.5 px-4">Usuário / Nome</th>
-                  <th className="py-3.5 px-4">E-mail Corporativo</th>
+                  <th className="py-3.5 px-4">Usuário</th>
+                  <th className="py-3.5 px-4">E-mail de Login</th>
                   <th className="py-3.5 px-4 text-center">Tipo / Vínculo</th>
-                  <th className="py-3.5 px-4">Nível de Permissão</th>
+                  <th className="py-3.5 px-4">Função / Cargo Definido</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                   <th className="py-3.5 px-4 text-right">Ações</th>
                 </tr>
@@ -453,103 +470,113 @@ export default function UsersManagementPage() {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400">
-                      Nenhum usuário encontrado com os filtros aplicados.
+                      Nenhum usuário encontrado.
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((item) => (
-                    <tr key={item.id} className="hover:bg-purple-50/30 transition-colors">
-                      {/* Nome */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shadow-xs ${
-                            item.isPartner 
-                              ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white" 
-                              : "bg-gradient-to-tr from-violet-600 to-purple-600 text-white"
+                  filteredUsers.map((item) => {
+                    const primaryRole = item.roles[0] || (item.isPartner ? "CEO" : "Operador");
+                    return (
+                      <tr key={item.id} className="hover:bg-purple-50/30 transition-colors">
+                        {/* Nome */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-xs shadow-xs ${
+                              item.isPartner 
+                                ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white" 
+                                : "bg-gradient-to-tr from-violet-600 to-purple-600 text-white"
+                            }`}>
+                              {item.isPartner ? <Crown className="w-4 h-4" /> : item.fullName.charAt(0)}
+                            </div>
+                            <div>
+                              <span className="font-extrabold text-slate-900 block">
+                                {item.fullName}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ID: {item.id.slice(0, 8)}...
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* E-mail */}
+                        <td className="py-3.5 px-4 font-mono text-slate-600 font-semibold">
+                          {item.email}
+                        </td>
+
+                        {/* Vínculo de Sócio */}
+                        <td className="py-3.5 px-4 text-center">
+                          {item.isPartner ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                              <Crown className="w-3 h-3 text-amber-600" />
+                              Sócio (Master)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                              Operador
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Cargo / O que cada usuário é */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
+                              item.isPartner 
+                                ? "bg-purple-50 text-purple-800 border border-purple-200" 
+                                : "bg-slate-100 text-slate-800 border border-slate-200"
+                            }`}>
+                              {primaryRole}
+                            </span>
+                            {item.isPartner && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800">
+                                MASTER
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                            item.isActive
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border border-rose-200"
                           }`}>
-                            {item.isPartner ? <Crown className="w-4 h-4" /> : item.fullName.charAt(0)}
-                          </div>
-                          <div>
-                            <span className="font-extrabold text-slate-900 block">
-                              {item.fullName}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              ID: {item.id.slice(0, 8)}...
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* E-mail */}
-                      <td className="py-3.5 px-4 font-mono text-slate-600 font-semibold">
-                        {item.email}
-                      </td>
-
-                      {/* Vínculo de Sócio */}
-                      <td className="py-3.5 px-4 text-center">
-                        {item.isPartner ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
-                            <Crown className="w-3 h-3 text-amber-600" />
-                            Sócio (Master)
+                            {item.isActive ? "Ativo" : "Bloqueado"}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                            Operador / Funcionário
-                          </span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Permissões */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-wrap gap-1">
-                          {item.roles.map((r, idx) => (
-                            <span key={idx} className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
+                        {/* Ações */}
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUserForPassword(item);
+                                setShowPasswordModal(true);
+                              }}
+                              className="p-1.5 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors"
+                              title="Redefinir Senha de Acesso"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
 
-                      {/* Status */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                          item.isActive
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border border-rose-200"
-                        }`}>
-                          {item.isActive ? "Ativo" : "Bloqueado"}
-                        </span>
-                      </td>
-
-                      {/* Ações */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedUserForPassword(item);
-                              setShowPasswordModal(true);
-                            }}
-                            className="p-1.5 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors"
-                            title="Redefinir Senha de Acesso"
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
-
-                          <button
-                            onClick={() => handleToggleStatus(item)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              item.isActive 
-                                ? "hover:bg-rose-100 text-rose-600" 
-                                : "hover:bg-emerald-100 text-emerald-600"
-                            }`}
-                            title={item.isActive ? "Suspender / Desativar Usuário" : "Reativar Usuário"}
-                          >
-                            {item.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <button
+                              onClick={() => handleToggleStatus(item)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                item.isActive 
+                                  ? "hover:bg-rose-100 text-rose-600" 
+                                  : "hover:bg-emerald-100 text-emerald-600"
+                              }`}
+                              title={item.isActive ? "Suspender / Desativar Usuário" : "Reativar Usuário"}
+                            >
+                              {item.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -557,7 +584,7 @@ export default function UsersManagementPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* MODAL: NOVO USUÁRIO COM CHECKBOX DE SÓCIO (ACESSO MASTER)                 */}
+        {/* MODAL: NOVO USUÁRIO COM CAMPO "O QUE ELE É NO SISTEMA" (CARGO/FUNÇÃO)     */}
         {/* ========================================================================= */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
@@ -569,8 +596,8 @@ export default function UsersManagementPage() {
                     <UserPlus className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-slate-900 text-base">Criar Usuário no Sistema</h3>
-                    <p className="text-xs text-slate-500">Cadastre o nome, e-mail e senha de acesso.</p>
+                    <h3 className="font-extrabold text-slate-900 text-base">Novo Cadastro de Usuário</h3>
+                    <p className="text-xs text-slate-500">Defina o nome, e-mail, senha e a função/cargo do usuário.</p>
                   </div>
                 </div>
                 <button
@@ -589,28 +616,73 @@ export default function UsersManagementPage() {
               )}
 
               <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo *</label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Ex: Henrique Buzeto"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
+                
+                {/* Nome & E-mail */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo *</label>
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Ex: Henrique Buzeto"
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">E-mail de Login *</label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="nome@hbstudio.com"
+                      className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
+                    />
+                  </div>
                 </div>
 
+                {/* FUNÇÃO / O QUE O USUÁRIO É NO SISTEMA */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">E-mail Corporativo de Login *</label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nome@hbstudio.com"
-                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
-                  />
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    O que o usuário é no sistema (Cargo / Função) *
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={roleTitle}
+                      onChange={(e) => setRoleTitle(e.target.value)}
+                      placeholder="Ex: CEO, Diretor Operacional, Vendedor Balcão, Técnico de Reparos..."
+                      className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 font-semibold text-slate-800"
+                    />
+                  </div>
+                  {/* Atalhos rápidos de cargos */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[10px] text-slate-400 font-bold mr-1">Sugestões:</span>
+                    {["CEO", "Diretor Executivo", "Gerente Geral", "Técnico Especialista", "Vendedor Balcão", "Analista Financeiro"].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setRoleTitle(tag);
+                          if (tag === "CEO" || tag === "Diretor Executivo") {
+                            setIsPartner(true);
+                          }
+                        }}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all ${
+                          roleTitle === tag
+                            ? "bg-purple-600 text-white border-purple-600"
+                            : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* CHECKBOX DE SÓCIO COM ACESSO MASTER */}
@@ -623,7 +695,7 @@ export default function UsersManagementPage() {
                     <input
                       type="checkbox"
                       checked={isPartner}
-                      onChange={(e) => setIsPartner(e.target.checked)}
+                      onChange={(e) => handlePartnerToggle(e.target.checked)}
                       className="mt-1 w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
                     />
                     <div>
@@ -634,7 +706,7 @@ export default function UsersManagementPage() {
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Ao marcar como sócio, o usuário receberá privilégios administrativos completos e Acesso Master a todas as abas, configurações, relatórios financeiros e governança societária.
+                        Sócios possuem controle total e irrestrito sobre financeiro, governança, relatórios, frota e configurações.
                       </p>
                     </div>
                   </label>
@@ -653,6 +725,7 @@ export default function UsersManagementPage() {
                   )}
                 </div>
 
+                {/* Senhas */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Senha de Acesso *</label>
@@ -710,9 +783,7 @@ export default function UsersManagementPage() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* MODAL: REDEFINIR SENHA DE ACESSO                                          */}
-        {/* ========================================================================= */}
+        {/* MODAL: REDEFINIR SENHA */}
         {showPasswordModal && selectedUserForPassword && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white w-full max-w-md rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col">

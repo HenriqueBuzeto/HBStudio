@@ -2542,19 +2542,21 @@ usersGroup.MapPost("/", async (
     var newUser = new User(currentTenantId, req.FullName.Trim(), normalizedEmail, passwordHash, branchId);
     db.Users.Add(newUser);
 
+    var customRoleName = !string.IsNullOrWhiteSpace(req.RoleTitle) ? req.RoleTitle.Trim() : (req.IsPartner ? "Sócio Diretor Executivo (CEO)" : "Operador Geral");
+
     if (req.IsPartner)
     {
-        var role = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == "Sócio Diretor Executivo", ct);
-        if (role == null)
+        var partnerRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == customRoleName, ct);
+        if (partnerRole == null)
         {
-            role = new Role(currentTenantId, "Sócio Diretor Executivo", "Acesso Master aos Socios da HB Studio");
+            partnerRole = new Role(currentTenantId, customRoleName, $"Acesso Master ({customRoleName}) aos Sócios da HB Studio");
             foreach (var perm in PermissionCatalog.All)
             {
-                role.AddPermission(perm);
+                partnerRole.AddPermission(perm);
             }
-            db.Roles.Add(role);
+            db.Roles.Add(partnerRole);
         }
-        newUser.AssignRole(role);
+        newUser.AssignRole(partnerRole);
 
         var existingPartner = await db.Partners.FirstOrDefaultAsync(p => 
             p.TenantId == currentTenantId && 
@@ -2574,24 +2576,24 @@ usersGroup.MapPost("/", async (
                 normalizedEmail,
                 PartnerType.ManagingPartner,
                 DateTime.UtcNow,
-                notes: "Socio cadastrado com Acesso Master via Painel de Usuarios",
+                notes: $"Sócio cadastrado como {customRoleName} com Acesso Master",
                 isErpAccessEnabled: true);
             db.Partners.Add(newPartner);
         }
     }
     else
     {
-        var defaultRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == "Operador Geral", ct);
-        if (defaultRole == null)
+        var userRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == customRoleName, ct);
+        if (userRole == null)
         {
-            defaultRole = new Role(currentTenantId, "Operador Geral", "Acesso Operacional ao ERP");
-            defaultRole.AddPermission(PermissionCatalog.CustomersView);
-            defaultRole.AddPermission(PermissionCatalog.CatalogProductsView);
-            defaultRole.AddPermission(PermissionCatalog.InventoryView);
-            defaultRole.AddPermission(PermissionCatalog.SalesPosUse);
-            db.Roles.Add(defaultRole);
+            userRole = new Role(currentTenantId, customRoleName, $"Função: {customRoleName}");
+            userRole.AddPermission(PermissionCatalog.CustomersView);
+            userRole.AddPermission(PermissionCatalog.CatalogProductsView);
+            userRole.AddPermission(PermissionCatalog.InventoryView);
+            userRole.AddPermission(PermissionCatalog.SalesPosUse);
+            db.Roles.Add(userRole);
         }
-        newUser.AssignRole(defaultRole);
+        newUser.AssignRole(userRole);
     }
 
     await db.SaveChangesAsync(ct);
@@ -2663,7 +2665,7 @@ usersGroup.MapPut("/{id:guid}/toggle-status", async (
 
 app.Run();
 
-public record CreateUserDto(string FullName, string Email, string Password, bool IsPartner, string? DocumentNumber = null);
+public record CreateUserDto(string FullName, string Email, string Password, bool IsPartner, string? DocumentNumber = null, string? RoleTitle = null);
 public record ResetPasswordDto(string NewPassword);
 
 // Tornar a classe Program acessivel para testes WebApplicationFactory
