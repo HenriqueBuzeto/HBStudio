@@ -32,6 +32,7 @@ interface UserItem {
   id: string;
   fullName: string;
   email: string;
+  jobTitle?: string;
   isActive: boolean;
   securityStamp: number;
   createdAtUtc: string;
@@ -509,16 +510,16 @@ export default function UsersManagementPage() {
                           {item.isPartner ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
                               <Crown className="w-3 h-3 text-amber-600" />
-                              Sócio (Master)
+                              Sócio Ativo
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
-                              Operador
+                              Colaborador
                             </span>
                           )}
                         </td>
 
-                        {/* Cargo / O que cada usuário é */}
+                        {/* Cargo Profissional Informativo */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
                             <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
@@ -526,11 +527,11 @@ export default function UsersManagementPage() {
                                 ? "bg-purple-50 text-purple-800 border border-purple-200" 
                                 : "bg-slate-100 text-slate-800 border border-slate-200"
                             }`}>
-                              {primaryRole}
+                              {item.jobTitle || primaryRole}
                             </span>
-                            {item.isPartner && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800">
-                                MASTER
+                            {item.roles.some(r => r.includes("Master") || r.includes("Administrador")) && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-300" title="Perfil administrativo concedido e auditado">
+                                ADMIN
                               </span>
                             )}
                           </div>
@@ -685,7 +686,7 @@ export default function UsersManagementPage() {
                   </div>
                 </div>
 
-                {/* CHECKBOX DE SÓCIO COM ACESSO MASTER */}
+                {/* CHECKBOX DE VÍNCULO SOCIETÁRIO */}
                 <div className={`p-4 rounded-2xl border transition-all ${
                   isPartner 
                     ? "bg-amber-50/80 border-amber-300 shadow-xs" 
@@ -700,20 +701,20 @@ export default function UsersManagementPage() {
                     />
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-slate-900 text-xs">Identificar como Sócio</span>
+                        <span className="font-extrabold text-slate-900 text-xs">Vínculo Societário Registrado</span>
                         <span className="px-2 py-0.2 rounded-full text-[9px] font-black bg-amber-200 text-amber-900 border border-amber-300">
-                          ACESSO MASTER
+                          SÓCIO AUDITADO
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Sócios possuem controle total e irrestrito sobre financeiro, governança, relatórios, frota e configurações.
+                        Valida o vínculo societário formal no PartnersCapital para habilitação do acesso interativo. Permissões administrativas exigem atribuição explícita de papéis.
                       </p>
                     </div>
                   </label>
 
                   {isPartner && (
                     <div className="mt-3 pt-3 border-t border-amber-200/80">
-                      <label className="block text-[11px] font-bold text-amber-900 mb-1">CPF do Sócio (opcional para contrato social)</label>
+                      <label className="block text-[11px] font-bold text-amber-900 mb-1">CPF do Sócio (para conferência no contrato social)</label>
                       <input
                         type="text"
                         value={documentNumber}

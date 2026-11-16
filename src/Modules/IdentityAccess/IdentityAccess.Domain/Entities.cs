@@ -55,6 +55,7 @@ public class User : TenantEntity
     public string FullName { get; private set; }
     public string Email { get; private set; }
     public string PasswordHash { get; private set; }
+    public string JobTitle { get; private set; } = string.Empty; // Cargo / Título Profissional Informativo
     public bool IsActive { get; private set; } = true;
     public Guid? DefaultBranchId { get; private set; }
     public uint SecurityStamp { get; private set; } = 1; // Incrementado a cada revogação/alteração de permissão
@@ -62,9 +63,9 @@ public class User : TenantEntity
     private readonly List<UserRole> _userRoles = [];
     public IReadOnlyCollection<UserRole> UserRoles => _userRoles.AsReadOnly();
 
-    private User() { FullName = string.Empty; Email = string.Empty; PasswordHash = string.Empty; }
+    private User() { FullName = string.Empty; Email = string.Empty; PasswordHash = string.Empty; JobTitle = string.Empty; }
 
-    public User(Guid tenantId, string fullName, string email, string passwordHash, Guid? defaultBranchId = null) : base(tenantId)
+    public User(Guid tenantId, string fullName, string email, string passwordHash, Guid? defaultBranchId = null, string? jobTitle = null) : base(tenantId)
     {
         if (string.IsNullOrWhiteSpace(fullName)) throw new ArgumentException("Nome obrigatório.", nameof(fullName));
         if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Email obrigatório.", nameof(email));
@@ -74,7 +75,14 @@ public class User : TenantEntity
         Email = email.Trim().ToLowerInvariant();
         PasswordHash = passwordHash;
         DefaultBranchId = defaultBranchId;
+        JobTitle = string.IsNullOrWhiteSpace(jobTitle) ? "Colaborador" : jobTitle.Trim();
         SecurityStamp = 1;
+    }
+
+    public void SetJobTitle(string jobTitle)
+    {
+        JobTitle = string.IsNullOrWhiteSpace(jobTitle) ? "Colaborador" : jobTitle.Trim();
+        UpdatedAtUtc = DateTime.UtcNow;
     }
 
     public void InvalidateSecurityStamp()
@@ -97,6 +105,16 @@ public class User : TenantEntity
         if (!_userRoles.Any(ur => ur.RoleId == role.Id))
         {
             _userRoles.Add(new UserRole(TenantId, Id, role.Id));
+            InvalidateSecurityStamp();
+        }
+    }
+
+    public void RemoveRole(Guid roleId)
+    {
+        var existing = _userRoles.FirstOrDefault(ur => ur.RoleId == roleId);
+        if (existing != null)
+        {
+            _userRoles.Remove(existing);
             InvalidateSecurityStamp();
         }
     }
@@ -127,6 +145,15 @@ public class Role : TenantEntity
         if (!_permissions.Any(p => p.PermissionKey == permissionKey))
         {
             _permissions.Add(new RolePermission(TenantId, Id, permissionKey));
+        }
+    }
+
+    public void RemovePermission(string permissionKey)
+    {
+        var existing = _permissions.FirstOrDefault(p => p.PermissionKey == permissionKey);
+        if (existing != null)
+        {
+            _permissions.Remove(existing);
         }
     }
 }

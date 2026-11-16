@@ -4930,411 +4930,418 @@ app.MapGet("/api/secure-inventory-cost", () => Results.Ok(new { sensitiveCost = 
 
 
 
-#region Identity & Users Management Endpoints (Gestao de Usuarios, Senhas & Socios)
+#region Endpoints de Gestão de Usuários e Acessos (IdentityAccess & Governança)
 
 var usersGroup = app.MapGroup("/api/users").RequireAuthorization();
 
-
-
+// 1. Listagem Segura de Usuários (Requer AccessManage)
 usersGroup.MapGet("/", async (
-
     AppDbContext db,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var currentTenantId = executionContext.TenantId;
 
     var users = await db.Users
-
         .AsNoTracking()
-
         .Where(u => u.TenantId == currentTenantId)
-
         .OrderBy(u => u.FullName)
-
         .ToListAsync(ct);
-
-
 
     var partners = await db.Partners
-
         .AsNoTracking()
-
         .Where(p => p.TenantId == currentTenantId && p.Status == PartnerStatus.Active)
-
         .ToListAsync(ct);
-
-
 
     var userRoles = await db.UserRoles
-
         .AsNoTracking()
-
         .Where(ur => ur.TenantId == currentTenantId)
-
         .ToListAsync(ct);
-
-
 
     var roles = await db.Roles
-
         .AsNoTracking()
-
         .Where(r => r.TenantId == currentTenantId)
-
         .ToListAsync(ct);
 
-
-
     var result = users.Select(u =>
-
     {
-
         var partner = partners.FirstOrDefault(p => 
-
             p.Email.Equals(u.Email, StringComparison.OrdinalIgnoreCase) || 
-
             p.Name.Equals(u.FullName, StringComparison.OrdinalIgnoreCase));
-
         
-
         var userRoleIds = userRoles.Where(ur => ur.UserId == u.Id).Select(ur => ur.RoleId).ToList();
-
         var userRoleNames = roles.Where(r => userRoleIds.Contains(r.Id)).Select(r => r.Name).ToList();
 
-
-
         return new
-
         {
-
             u.Id,
-
             u.FullName,
-
             u.Email,
-
+            JobTitle = u.JobTitle,
             u.IsActive,
-
             u.SecurityStamp,
-
             u.CreatedAtUtc,
-
             IsPartner = partner != null && partner.IsErpAccessEnabled,
-
             PartnerRole = partner?.Type.ToString(),
-
             Roles = userRoleNames
-
         };
-
     }).ToList();
 
-
-
     return Results.Ok(result);
+}).RequireAuthorization(PermissionCatalog.AccessManage);
 
-});
-
-
-
-usersGroup.MapPost("/", async (
-
-    CreateUserDto req,
-
+// 2. Consulta de Perfil e Permissões Efetivas de Usuário
+usersGroup.MapGet("/{id:guid}/permissions", async (
+    Guid id,
     AppDbContext db,
-
-    IPasswordHasher passwordHasher,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
+    var currentTenantId = executionContext.TenantId;
 
-    if (string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Password))
+    var targetUser = await db.Users
+        .AsNoTracking()
+        .FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
 
+    if (targetUser == null)
+        return Results.NotFound(new { error = "Usuário não encontrado." });
+
+    var userRoleIds = await db.UserRoles
+        .AsNoTracking()
+        .Where(ur => ur.TenantId == currentTenantId && ur.UserId == id)
+        .Select(ur => ur.RoleId)
+        .ToListAsync(ct);
+
+    var effectivePermissions = await db.RolePermissions
+        .AsNoTracking()
+        .Where(rp => rp.TenantId == currentTenantId && userRoleIds.Contains(rp.RoleId))
+        .Select(rp => rp.PermissionKey)
+        .Distinct()
+        .ToListAsync(ct);
+
+    var userRoles = await db.Roles
+        .AsNoTracking()
+        .Where(r => r.TenantId == currentTenantId && userRoleIds.Contains(r.Id))
+        .Select(r => new { r.Id, r.Name, r.Description })
+        .ToListAsync(ct);
+
+    return Results.Ok(new
     {
+        targetUser.Id,
+        targetUser.FullName,
+        targetUser.Email,
+        targetUser.JobTitle,
+        Roles = userRoles,
+        EffectivePermissions = effectivePermissions
+    });
+}).RequireAuthorization(PermissionCatalog.AccessManage);
 
-        return Results.BadRequest(new { error = "Nome completo, e-mail e senha inicial sao obrigatorios." });
-
+// 3. Cadastro Enterprise de Usuários (Não concede privilégios automaticamente nem cria sócio fictício)
+usersGroup.MapPost("/", async (
+    CreateUserDto req,
+    AppDbContext db,
+    IPasswordHasher passwordHasher,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(req.FullName) || string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Nome completo, e-mail e senha inicial são obrigatórios." });
     }
-
-
 
     var normalizedEmail = req.Email.Trim().ToLowerInvariant();
-
     var currentTenantId = executionContext.TenantId;
-
-
 
     bool exists = await db.Users.AnyAsync(u => u.TenantId == currentTenantId && u.Email == normalizedEmail, ct);
-
     if (exists)
-
     {
-
-        return Results.Conflict(new { error = "Ja existe um usuario cadastrado com este e-mail no sistema." });
-
+        return Results.Conflict(new { error = "Já existe um usuário cadastrado com este e-mail no sistema." });
     }
-
-
 
     var branch = await db.Branches.FirstOrDefaultAsync(b => b.TenantId == currentTenantId, ct);
-
     var branchId = branch?.Id;
 
-
-
+    var sanitizedJobTitle = !string.IsNullOrWhiteSpace(req.RoleTitle) ? req.RoleTitle.Trim() : "Colaborador";
     var passwordHash = passwordHasher.HashPassword(req.Password);
 
-    var newUser = new User(currentTenantId, req.FullName.Trim(), normalizedEmail, passwordHash, branchId);
-
+    // Cria o usuário com JobTitle meramente profissional e informativo
+    var newUser = new User(currentTenantId, req.FullName.Trim(), normalizedEmail, passwordHash, branchId, sanitizedJobTitle);
     db.Users.Add(newUser);
 
-
-
-    var customRoleName = !string.IsNullOrWhiteSpace(req.RoleTitle) ? req.RoleTitle.Trim() : (req.IsPartner ? "Sócio Diretor Executivo (CEO)" : "Operador Geral");
-
-
-
-    if (req.IsPartner)
-
+    // SEGURANÇA ENTERPRISE: Papel padrão seguro "Colaborador Operacional" com privilégios mínimos
+    var defaultRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == "Colaborador Operacional", ct);
+    if (defaultRole == null)
     {
+        defaultRole = new Role(currentTenantId, "Colaborador Operacional", "Perfil operacional padrão com privilégios mínimos de consulta");
+        defaultRole.AddPermission(PermissionCatalog.CustomersView);
+        defaultRole.AddPermission(PermissionCatalog.CatalogProductsView);
+        defaultRole.AddPermission(PermissionCatalog.InventoryView);
+        defaultRole.AddPermission(PermissionCatalog.SalesPosUse);
+        db.Roles.Add(defaultRole);
+    }
+    newUser.AssignRole(defaultRole);
 
-        var partnerRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == customRoleName, ct);
-
-        if (partnerRole == null)
-
-        {
-
-            partnerRole = new Role(currentTenantId, customRoleName, $"Acesso Master ({customRoleName}) aos Sócios da HB Studio");
-
-            foreach (var perm in PermissionCatalog.All)
-
-            {
-
-                partnerRole.AddPermission(perm);
-
-            }
-
-            db.Roles.Add(partnerRole);
-
-        }
-
-        newUser.AssignRole(partnerRole);
-
-
-
-        var existingPartner = await db.Partners.FirstOrDefaultAsync(p => 
-
+    // REGRA SOCIETÁRIA: Se houver indicação de sócio, valida formalmente se já existe no PartnersCapital
+    // É PROIBIDO criar um sócio fictício ou conceder acesso Master automaticamente por simples checkbox
+    Partner? partnerRecord = null;
+    if (req.IsPartner)
+    {
+        partnerRecord = await db.Partners.FirstOrDefaultAsync(p => 
             p.TenantId == currentTenantId && 
-
             (p.Email.ToLower() == normalizedEmail || p.Name.ToLower() == req.FullName.Trim().ToLower()), ct);
 
-
-
-        if (existingPartner != null)
-
+        // Se o sócio formalmente já existir no PartnersCapital, habilita o acesso interativo dele
+        if (partnerRecord != null)
         {
-
-            existingPartner.SetErpAccess(true);
-
+            partnerRecord.SetErpAccess(true);
         }
-
-        else
-
-        {
-
-            var newPartner = new Partner(
-
-                currentTenantId,
-
-                Guid.NewGuid(),
-
-                req.FullName.Trim(),
-
-                req.DocumentNumber ?? "00000000000",
-
-                normalizedEmail,
-
-                PartnerType.ManagingPartner,
-
-                DateTime.UtcNow,
-
-                notes: $"Sócio cadastrado como {customRoleName} com Acesso Master",
-
-                isErpAccessEnabled: true);
-
-            db.Partners.Add(newPartner);
-
-        }
-
     }
 
-    else
-
+    // Auditoria de criação de usuário
+    var actorEmail = executionContext.UserEmail ?? "System";
+    var auditJson = System.Text.Json.JsonSerializer.Serialize(new
     {
-
-        var userRole = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == customRoleName, ct);
-
-        if (userRole == null)
-
-        {
-
-            userRole = new Role(currentTenantId, customRoleName, $"Função: {customRoleName}");
-
-            userRole.AddPermission(PermissionCatalog.CustomersView);
-
-            userRole.AddPermission(PermissionCatalog.CatalogProductsView);
-
-            userRole.AddPermission(PermissionCatalog.InventoryView);
-
-            userRole.AddPermission(PermissionCatalog.SalesPosUse);
-
-            db.Roles.Add(userRole);
-
-        }
-
-        newUser.AssignRole(userRole);
-
-    }
-
-
+        JobTitle = sanitizedJobTitle,
+        AssignedRole = defaultRole.Name,
+        PartnerValidated = partnerRecord != null
+    });
+    var audit = new AuditEvent(
+        currentTenantId,
+        branchId,
+        "IdentityUser",
+        newUser.Id.ToString(),
+        "UserCreated",
+        executionContext.UserId,
+        actorEmail,
+        null,
+        null,
+        auditJson);
+    db.AuditEvents.Add(audit);
 
     await db.SaveChangesAsync(ct);
-
-
 
     return Results.Created($"/api/users/{newUser.Id}", new
-
     {
-
         newUser.Id,
-
         newUser.FullName,
-
         newUser.Email,
-
+        JobTitle = newUser.JobTitle,
         newUser.IsActive,
-
-        IsPartner = req.IsPartner
-
+        IsPartner = partnerRecord != null && partnerRecord.IsErpAccessEnabled,
+        AssignedRole = defaultRole.Name
     });
+}).RequireAuthorization(PermissionCatalog.AccessManage);
 
-});
-
-
-
-usersGroup.MapPut("/{id:guid}/password", async (
-
+// 4. Alteração Controlada de Papéis e Permissões (Com Prevenção contra Auto-Elevação e Registro de Auditoria)
+usersGroup.MapPut("/{id:guid}/roles", async (
     Guid id,
-
-    ResetPasswordDto req,
-
+    AssignRolesDto req,
     AppDbContext db,
-
-    IPasswordHasher passwordHasher,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
+    var currentTenantId = executionContext.TenantId;
+    var actorId = executionContext.UserId;
+    var actorEmail = executionContext.UserEmail ?? "System";
 
-    if (string.IsNullOrWhiteSpace(req.NewPassword))
+    var targetUser = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
+    if (targetUser == null)
+        return Results.NotFound(new { error = "Usuário não encontrado." });
 
+    // Proteção contra auto-elevação indevida: Usuário não pode alterar seus próprios papéis/permissões
+    if (actorId != Guid.Empty && actorId == targetUser.Id)
     {
-
-        return Results.BadRequest(new { error = "Nova senha nao pode ser vazia." });
-
+        return Results.Json(new { error = "Operação bloqueada: não é permitido alterar ou auto-elevar os próprios privilégios de acesso." }, statusCode: 403);
     }
 
+    // Se estiver concedendo uma role administrativa abrangente (ex: Administrador Master), exige que o alvo seja sócio ativo do PartnersCapital
+    if (req.RoleNames != null && req.RoleNames.Any(r => r.Contains("Master", StringComparison.OrdinalIgnoreCase) || r.Contains("Administrador", StringComparison.OrdinalIgnoreCase)))
+    {
+        var isPartner = await db.Partners.AnyAsync(p => 
+            p.TenantId == currentTenantId && 
+            p.Status == PartnerStatus.Active &&
+            (p.Email.ToLower() == targetUser.Email.ToLower() || p.Name.ToLower() == targetUser.FullName.ToLower()), ct);
 
+        if (!isPartner)
+        {
+            return Results.Json(new { error = "Perfil administrativo Master somente pode ser concedido a usuários com vínculo societário formal e ativo no PartnersCapital." }, statusCode: 403);
+        }
+    }
+
+    // Busca ou cria papéis solicitados dentro do Tenant
+    var currentAssignments = await db.UserRoles.Where(ur => ur.TenantId == currentTenantId && ur.UserId == id).ToListAsync(ct);
+    db.UserRoles.RemoveRange(currentAssignments);
+
+    var assignedRolesList = new List<string>();
+    if (req.RoleNames != null)
+    {
+        foreach (var roleName in req.RoleNames.Distinct())
+        {
+            if (string.IsNullOrWhiteSpace(roleName)) continue;
+            var role = await db.Roles.FirstOrDefaultAsync(r => r.TenantId == currentTenantId && r.Name == roleName.Trim(), ct);
+            if (role == null)
+            {
+                role = new Role(currentTenantId, roleName.Trim(), $"Papel: {roleName.Trim()}");
+                db.Roles.Add(role);
+            }
+            targetUser.AssignRole(role);
+            assignedRolesList.Add(role.Name);
+        }
+    }
+
+    // Invalida sessões ativas do usuário para que as novas permissões entrem em vigor imediatamente
+    targetUser.InvalidateSecurityStamp();
+
+    // Auditoria de concessão/revogação de papéis
+    var auditBefore = System.Text.Json.JsonSerializer.Serialize(new { RoleIds = currentAssignments.Select(ca => ca.RoleId).ToList() });
+    var auditAfter = System.Text.Json.JsonSerializer.Serialize(new { AssignedRoles = assignedRolesList, Justification = req.Justification ?? "Atualização administrativa de perfil" });
+    var audit = new AuditEvent(
+        currentTenantId,
+        targetUser.DefaultBranchId,
+        "IdentityUserRoles",
+        targetUser.Id.ToString(),
+        "UserRolesUpdated",
+        actorId,
+        actorEmail,
+        null,
+        auditBefore,
+        auditAfter);
+    db.AuditEvents.Add(audit);
+
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new
+    {
+        targetUser.Id,
+        targetUser.FullName,
+        AssignedRoles = assignedRolesList,
+        message = "Papéis atualizados com sucesso. Permissões recalculadas e sessões anteriores invalidadas."
+    });
+}).RequireAuthorization(PermissionCatalog.AccessManage);
+
+// 5. Atualização de Cargo Profissional (Informativo, não altera privilégios)
+usersGroup.MapPut("/{id:guid}/job-title", async (
+    Guid id,
+    UpdateJobTitleDto req,
+    AppDbContext db,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var currentTenantId = executionContext.TenantId;
+    var targetUser = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
+    if (targetUser == null)
+        return Results.NotFound(new { error = "Usuário não encontrado." });
+
+    var newTitle = !string.IsNullOrWhiteSpace(req.JobTitle) ? req.JobTitle.Trim() : "Colaborador";
+    var oldTitle = targetUser.JobTitle;
+    targetUser.SetJobTitle(newTitle);
+
+    var audit = new AuditEvent(
+        currentTenantId,
+        targetUser.DefaultBranchId,
+        "IdentityUser",
+        targetUser.Id.ToString(),
+        "JobTitleUpdated",
+        executionContext.UserId,
+        executionContext.UserEmail ?? "System",
+        null,
+        System.Text.Json.JsonSerializer.Serialize(new { PreviousJobTitle = oldTitle }),
+        System.Text.Json.JsonSerializer.Serialize(new { NewJobTitle = newTitle }));
+    db.AuditEvents.Add(audit);
+
+    await db.SaveChangesAsync(ct);
+
+    return Results.Ok(new { targetUser.Id, targetUser.FullName, JobTitle = targetUser.JobTitle });
+}).RequireAuthorization(PermissionCatalog.AccessManage);
+
+// 6. Redefinição de Senha
+usersGroup.MapPut("/{id:guid}/password", async (
+    Guid id,
+    ResetPasswordDto req,
+    AppDbContext db,
+    IPasswordHasher passwordHasher,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(req.NewPassword))
+    {
+        return Results.BadRequest(new { error = "Nova senha não pode ser vazia." });
+    }
 
     var currentTenantId = executionContext.TenantId;
-
     var userToUpdate = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
-
     if (userToUpdate == null)
-
     {
-
-        return Results.NotFound(new { error = "Usuario nao encontrado." });
-
+        return Results.NotFound(new { error = "Usuário não encontrado." });
     }
-
-
 
     var newHash = passwordHasher.HashPassword(req.NewPassword);
-
-    
-
     var prop = typeof(User).GetProperty("PasswordHash");
-
     prop?.SetValue(userToUpdate, newHash);
 
-
-
     userToUpdate.InvalidateSecurityStamp();
+
+    var audit = new AuditEvent(
+        currentTenantId,
+        userToUpdate.DefaultBranchId,
+        "IdentityUser",
+        userToUpdate.Id.ToString(),
+        "PasswordReset",
+        executionContext.UserId,
+        executionContext.UserEmail ?? "System",
+        null,
+        null,
+        System.Text.Json.JsonSerializer.Serialize(new { Reason = "Senha do usuário redefinida pelo administrador. Sessões invalidadas." }));
+    db.AuditEvents.Add(audit);
 
     await db.SaveChangesAsync(ct);
 
+    return Results.Ok(new { message = "Senha alterada e sessões anteriores invalidadas com sucesso." });
+}).RequireAuthorization(PermissionCatalog.AccessManage);
 
-
-    return Results.Ok(new { message = "Senha alterada e sessoes anteriores invalidadas com sucesso." });
-
-});
-
-
-
+// 7. Alternância de Bloqueio/Ativação
 usersGroup.MapPut("/{id:guid}/toggle-status", async (
-
     Guid id,
-
     AppDbContext db,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var currentTenantId = executionContext.TenantId;
-
     var userToUpdate = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == currentTenantId, ct);
-
     if (userToUpdate == null)
-
     {
-
-        return Results.NotFound(new { error = "Usuario nao encontrado." });
-
+        return Results.NotFound(new { error = "Usuário não encontrado." });
     }
 
-
+    // Proteção contra auto-bloqueio
+    if (executionContext.UserId != Guid.Empty && executionContext.UserId == userToUpdate.Id)
+    {
+        return Results.Json(new { error = "Operação bloqueada: não é permitido desativar a própria conta de acesso." }, statusCode: 403);
+    }
 
     var prop = typeof(User).GetProperty("IsActive");
-
     bool current = userToUpdate.IsActive;
-
     prop?.SetValue(userToUpdate, !current);
-
-
 
     userToUpdate.InvalidateSecurityStamp();
 
+    var audit = new AuditEvent(
+        currentTenantId,
+        userToUpdate.DefaultBranchId,
+        "IdentityUser",
+        userToUpdate.Id.ToString(),
+        "UserStatusToggled",
+        executionContext.UserId,
+        executionContext.UserEmail ?? "System",
+        null,
+        System.Text.Json.JsonSerializer.Serialize(new { IsActive = current }),
+        System.Text.Json.JsonSerializer.Serialize(new { IsActive = !current }));
+    db.AuditEvents.Add(audit);
+
     await db.SaveChangesAsync(ct);
 
-
-
     return Results.Ok(new { isActive = !current });
-
-});
+}).RequireAuthorization(PermissionCatalog.AccessManage);
 
 #endregion
 
@@ -5495,6 +5502,10 @@ app.Run();
 public record CreateUserDto(string FullName, string Email, string Password, bool IsPartner, string? DocumentNumber = null, string? RoleTitle = null);
 
 public record ResetPasswordDto(string NewPassword);
+
+public record AssignRolesDto(List<string> RoleNames, string? Justification = null);
+
+public record UpdateJobTitleDto(string JobTitle);
 
 
 

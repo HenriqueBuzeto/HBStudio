@@ -152,7 +152,8 @@ public class AuthenticationService : IAuthenticationService
             user.DefaultBranchId,
             IsPartner: true,
             PartnerRole: partner.Type.ToString(),
-            permissions);
+            permissions,
+            JobTitle: user.JobTitle);
 
         return new LoginResponse(tokenResult.AccessToken, tokenResult.ExpiresAtUtc, profile);
     }
@@ -208,7 +209,8 @@ public class AuthenticationService : IAuthenticationService
             user.DefaultBranchId,
             IsPartner: true,
             PartnerRole: partner.Type.ToString(),
-            permissions);
+            permissions,
+            JobTitle: user.JobTitle);
     }
 
     public async Task LogoutAsync(string sessionId, Guid? userId, CancellationToken ct = default)

@@ -444,7 +444,9 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.Property(u => u.FullName).HasMaxLength(200).IsRequired();
 
-            b.Property(u => u.Email).HasMaxLength(250).IsRequired();
+            b.Property(u => u.Email).HasMaxLength(250).IsRequired();
+
+            b.Property(u => u.JobTitle).HasMaxLength(100).HasDefaultValue("Colaborador");
 
             b.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
 

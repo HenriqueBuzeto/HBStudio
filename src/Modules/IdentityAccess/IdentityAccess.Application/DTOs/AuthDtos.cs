@@ -10,7 +10,8 @@ public record UserProfileDto(
     Guid? BranchId,
     bool IsPartner,
     string? PartnerRole,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+    string? JobTitle = null);
 
 public record LoginResponse(
     string AccessToken,

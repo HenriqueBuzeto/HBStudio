@@ -11,6 +11,7 @@ export interface UserProfile {
   branchId?: string;
   isPartner: boolean;
   partnerRole?: string;
+  jobTitle?: string;
   permissions: string[];
 }
 

@@ -219,7 +219,7 @@ export default function RootShellLayout({
             </div>
             <div className="truncate">
               <p className="text-sm font-bold text-white truncate">{user?.fullName ?? "Sócio Autorizado"}</p>
-              <p className="text-xs text-slate-400 truncate">CEO • HB Studio</p>
+              <p className="text-xs text-slate-400 truncate">{user?.jobTitle || "CEO"} • HB Studio</p>
             </div>
           </div>
           <button
@@ -286,7 +286,7 @@ export default function RootShellLayout({
                   {user?.fullName ?? "Sócio Autorizado"}
                 </span>
                 <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200/80 inline-block mt-0.5">
-                  CEO
+                  {user?.jobTitle || "CEO"}
                 </span>
               </div>
 
