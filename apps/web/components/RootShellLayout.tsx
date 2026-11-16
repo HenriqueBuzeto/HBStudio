@@ -200,8 +200,8 @@ export default function RootShellLayout({
         </div>
       </aside>
 
-      {/* Main Content Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-[#f8fafc]">
+      {/* Main Content Viewport com Fundo Quadriculado Sutil */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden hb-grid-background">
         {/* Top Navbar IDÊNTICO AO DESIGN SYSTEM HBVISIONX */}
         <header className="h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
           {/* Lado Esquerdo: Saudação, Data e Status do Caixa */}

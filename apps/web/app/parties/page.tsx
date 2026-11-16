@@ -16,7 +16,11 @@ import {
   CheckCircle2, 
   AlertCircle,
   FileText,
-  Clock
+  Clock,
+  Filter,
+  Eye,
+  Building,
+  UserCheck
 } from "lucide-react";
 
 export interface PartyContact {
@@ -58,88 +62,80 @@ export interface Party {
   stateRegistration?: string;
   birthDate?: string;
   isActive: boolean;
-  notes?: string;
   isCustomer: boolean;
   isSupplier: boolean;
+  notes?: string;
   contacts: PartyContact[];
   equipments: CustomerEquipment[];
   consents: PartyConsent[];
-  createdAtUtc: string;
-  version: number;
 }
 
-export default function CustomersPage() {
-  const [activeTab, setActiveTab] = useState<"all" | "customers" | "suppliers">("customers");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedParty, setSelectedParty] = useState<Party | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+const initialParties: Party[] = [
+  {
+    id: "p-01",
+    type: 1,
+    name: "Carlos Eduardo Silva",
+    documentNumber: "123.456.789-01",
+    isActive: true,
+    isCustomer: true,
+    isSupplier: false,
+    notes: "Cliente frequente para troca de display e compra de seminovos Apple.",
+    contacts: [
+      { id: "c-01", name: "Carlos Eduardo", email: "carlos.silva@email.com", phone: "(11) 98765-4321", whatsApp: "(11) 98765-4321", isPrimary: true }
+    ],
+    equipments: [
+      { id: "eq-01", equipmentType: "Smartphone", brand: "Apple", model: "iPhone 14 Pro 128GB", color: "Roxo Profundo", imei1: "354891029384756", notes: "Sem marcas na carcaça" }
+    ],
+    consents: [
+      { id: "cs-01", channel: "WhatsApp", purpose: "Comunicações de OS e Avisos", isOptIn: true, origin: "Balcão", eventDateUtc: "2026-11-10T14:30:00Z" }
+    ]
+  },
+  {
+    id: "p-02",
+    type: 2,
+    name: "Tech Parts & Serviços LTDA",
+    tradeName: "TechParts Distribuidora",
+    documentNumber: "12.345.678/0001-99",
+    stateRegistration: "110.223.344.555",
+    isActive: true,
+    isCustomer: true,
+    isSupplier: true,
+    notes: "Fornecedor homologado de telas OLED e baterias originais.",
+    contacts: [
+      { id: "c-02", name: "Roberto Vendas", email: "comercial@techparts.com.br", phone: "(11) 3333-4444", whatsApp: "(11) 97777-8888", isPrimary: true }
+    ],
+    equipments: [],
+    consents: [
+      { id: "cs-02", channel: "Email", purpose: "Recebimento de Ordens de Compra", isOptIn: true, origin: "Contrato Fornecedor", eventDateUtc: "2026-11-01T09:00:00Z" }
+    ]
+  }
+];
 
-  // Form states
+export default function PartiesPage() {
+  const [parties, setParties] = useState<Party[]>(initialParties);
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "customers" | "suppliers">("customers");
+  const [selectedParty, setSelectedParty] = useState<Party | null>(parties[0]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Formulário de Criação
   const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<1 | 2>(1);
   const [newDoc, setNewDoc] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [isCustomerCheck, setIsCustomerCheck] = useState(true);
-  const [isSupplierCheck, setIsSupplierCheck] = useState(false);
-  const [supplyCategories, setSupplyCategories] = useState("");
-
-  // Equipment form states
-  const [eqType, setEqType] = useState("Celular");
-  const [eqBrand, setEqBrand] = useState("Apple");
-  const [eqModel, setEqModel] = useState("");
-  const [eqImei, setEqImei] = useState("");
-  const [eqNotes, setEqNotes] = useState("");
-
-  // Lista local alimentada para validação interativa imediata no cliente
-  const [parties, setParties] = useState<Party[]>([
-    {
-      id: "c1",
-      type: 1,
-      name: "Carlos Eduardo Silva",
-      documentNumber: "12345678901",
-      isActive: true,
-      notes: "Cliente balcão fidelizado",
-      isCustomer: true,
-      isSupplier: false,
-      contacts: [{ id: "ct1", name: "Carlos", phone: "11987654321", isPrimary: true }],
-      equipments: [
-        { id: "eq1", equipmentType: "Celular", brand: "Apple", model: "iPhone 14 Pro Max", imei1: "354890123456789", color: "Roxo", notes: "Tela piscando" }
-      ],
-      consents: [
-        { id: "cs1", channel: "WHATSAPP", purpose: "Marketing", isOptIn: true, origin: "Balcão", eventDateUtc: "2026-11-13T21:40:00Z" }
-      ],
-      createdAtUtc: "2026-11-13T20:00:00Z",
-      version: 1
-    },
-    {
-      id: "c2",
-      type: 2,
-      name: "Tech Parts & Serviços LTDA",
-      tradeName: "TechParts",
-      documentNumber: "12345678000199",
-      stateRegistration: "123456789",
-      isActive: true,
-      notes: "Fornecedor de telas e cliente de manutenção",
-      isCustomer: true,
-      isSupplier: true,
-      contacts: [{ id: "ct2", name: "Comercial Tech", email: "contato@techparts.com", phone: "1133334444", isPrimary: true }],
-      equipments: [],
-      consents: [],
-      createdAtUtc: "2026-11-13T20:30:00Z",
-      version: 1
-    }
-  ]);
+  const [isCust, setIsCust] = useState(true);
+  const [isSupp, setIsSupp] = useState(false);
 
   const filteredParties = parties.filter((p) => {
-    if (activeTab === "customers" && !p.isCustomer) return false;
-    if (activeTab === "suppliers" && !p.isSupplier) return false;
-    if (searchTerm) {
-      const matchName = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchDoc = p.documentNumber?.includes(searchTerm);
-      return matchName || matchDoc;
-    }
-    return true;
+    const matchesSearch =
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.tradeName && p.tradeName.toLowerCase().includes(search.toLowerCase())) ||
+      (p.documentNumber && p.documentNumber.includes(search));
+
+    if (filterType === "customers") return matchesSearch && p.isCustomer;
+    if (filterType === "suppliers") return matchesSearch && p.isSupplier;
+    return matchesSearch;
   });
 
   const handleCreateParty = (e: React.FormEvent) => {
@@ -147,247 +143,272 @@ export default function CustomersPage() {
     if (!newName) return;
 
     const newParty: Party = {
-      id: "p_" + Date.now(),
-      type: newDoc.length > 11 ? 2 : 1,
+      id: `p-${Date.now()}`,
+      type: newType,
       name: newName,
-      documentNumber: newDoc,
+      documentNumber: newDoc || undefined,
       isActive: true,
-      isCustomer: isCustomerCheck,
-      isSupplier: isSupplierCheck,
-      contacts: newPhone ? [{ id: "ct_" + Date.now(), name: newName, phone: newPhone, email: newEmail, isPrimary: true }] : [],
+      isCustomer: isCust,
+      isSupplier: isSupp,
+      contacts: newPhone || newEmail ? [{
+        id: `c-${Date.now()}`,
+        name: newName,
+        phone: newPhone || undefined,
+        email: newEmail || undefined,
+        isPrimary: true
+      }] : [],
       equipments: [],
       consents: [
-        { id: "cs_" + Date.now(), channel: "WHATSAPP", purpose: "Operacional", isOptIn: true, origin: "Cadastro Inicial", eventDateUtc: new Date().toISOString() }
-      ],
-      createdAtUtc: new Date().toISOString(),
-      version: 1
+        {
+          id: `cs-${Date.now()}`,
+          channel: "WhatsApp",
+          purpose: "Comunicação de Atendimento",
+          isOptIn: true,
+          origin: "Cadastro Balcão",
+          eventDateUtc: new Date().toISOString()
+        }
+      ]
     };
 
     setParties([newParty, ...parties]);
-    setShowCreateModal(false);
     setSelectedParty(newParty);
+    setShowCreateModal(false);
     setNewName("");
     setNewDoc("");
     setNewPhone("");
     setNewEmail("");
   };
 
-  const handleAddEquipment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedParty || !eqModel) return;
-
-    const newEq: CustomerEquipment = {
-      id: "eq_" + Date.now(),
-      equipmentType: eqType,
-      brand: eqBrand,
-      model: eqModel,
-      imei1: eqImei,
-      notes: eqNotes
-    };
-
-    const updated = {
-      ...selectedParty,
-      equipments: [...selectedParty.equipments, newEq]
-    };
-
-    setParties(parties.map(p => p.id === selectedParty.id ? updated : p));
-    setSelectedParty(updated);
-    setShowEquipmentModal(false);
-    setEqModel("");
-    setEqImei("");
-    setEqNotes("");
-  };
-
   return (
     <RootShellLayout>
       <div className="space-y-6">
-        {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        {/* Header estilo HBVisionX */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
-              <Users className="w-6 h-6 text-purple-600" />
-              Gestão de Clientes & Fornecedores
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                Pessoas & Relacionamento
+              </span>
+            </div>
+            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
+              Clientes & Fornecedores
             </h1>
             <p className="text-xs text-slate-500">
-              Cadastro unificado, equipamentos do cliente, preferências de privacidade LGPD e histórico de atendimentos.
+              Cadastro unificado, histórico de aparelhos do cliente, canais de contato e consentimentos LGPD.
             </p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-colors shadow-sm"
-          >
-            <UserPlus className="w-4 h-4" />
-            Novo Cadastro
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Novo Cadastro
+            </button>
+          </div>
         </div>
 
-        {/* Filter Toolbar */}
+        {/* Toolbar de Filtro e Busca estilo HBVisionX */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-1 p-1 bg-slate-200/60 dark:bg-slate-800/60 rounded-lg w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-xs">
             <button
-              onClick={() => setActiveTab("customers")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "customers" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-600 dark:text-slate-400"
+              onClick={() => setFilterType("customers")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === "customers"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Clientes ({parties.filter(p => p.isCustomer).length})
             </button>
             <button
-              onClick={() => setActiveTab("suppliers")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "suppliers" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-600 dark:text-slate-400"
+              onClick={() => setFilterType("suppliers")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === "suppliers"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Fornecedores ({parties.filter(p => p.isSupplier).length})
             </button>
             <button
-              onClick={() => setActiveTab("all")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "all" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-600 dark:text-slate-400"
+              onClick={() => setFilterType("all")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                filterType === "all"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Todos ({parties.length})
             </button>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por nome ou CPF/CNPJ..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Buscar por nome, fantasia ou CPF/CNPJ..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800 transition-all shadow-xs"
             />
           </div>
         </div>
 
-        {/* Content Layout: Master-Detail */}
+        {/* Master-Detail Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Table / List */}
-          <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200 dark:border-slate-800">
+          {/* Tabela de Pessoas (Esquerda) */}
+          <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
+                <tr>
+                  <th className="py-3 px-4">Nome / Razão</th>
+                  <th className="py-3 px-4">Documento</th>
+                  <th className="py-3 px-4">Perfis</th>
+                  <th className="py-3 px-4">Contato</th>
+                  <th className="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredParties.map((p) => {
+                  const isSelected = selectedParty?.id === p.id;
+                  const primaryContact = p.contacts.find(c => c.isPrimary) || p.contacts[0];
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={() => setSelectedParty(p)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? "bg-purple-50/50 hover:bg-purple-50"
+                          : "hover:bg-slate-50/80"
+                      }`}
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="font-extrabold text-slate-900">{p.name}</div>
+                        {p.tradeName && <div className="text-[10px] text-slate-400">{p.tradeName}</div>}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-slate-600">
+                        {p.documentNumber || "Não informado"}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex gap-1">
+                          {p.isCustomer && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Cliente
+                            </span>
+                          )}
+                          {p.isSupplier && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              Fornecedor
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-600">
+                        {primaryContact?.phone || primaryContact?.email || "Sem contato"}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Ativo
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredParties.length === 0 && (
                   <tr>
-                    <th className="px-4 py-3">Nome / Razão</th>
-                    <th className="px-4 py-3">Documento</th>
-                    <th className="px-4 py-3">Perfis</th>
-                    <th className="px-4 py-3">Contato</th>
-                    <th className="px-4 py-3 text-right">Status</th>
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                      Nenhum registro encontrado com os filtros aplicados.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredParties.map((p) => {
-                    const primaryContact = p.contacts.find(c => c.isPrimary) || p.contacts[0];
-                    const isSelected = selectedParty?.id === p.id;
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => setSelectedParty(p)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? "bg-indigo-50/60 dark:bg-indigo-950/30" : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{p.name}</p>
-                          {p.tradeName && <p className="text-xs text-slate-400">{p.tradeName}</p>}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-400">
-                          {p.documentNumber || "Não informado"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-1">
-                            {p.isCustomer && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                                Cliente
-                              </span>
-                            )}
-                            {p.isSupplier && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
-                                Fornecedor
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
-                          {primaryContact?.phone || primaryContact?.email || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                            Ativo
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                )}
+              </tbody>
+            </table>
           </div>
 
-          {/* Details Pane */}
-          <div className="lg:col-span-5 space-y-4">
+          {/* Painel de Detalhes da Pessoa (Direita) */}
+          <div className="lg:col-span-5">
             {selectedParty ? (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-5">
-                <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-5">
+                <div className="flex items-start justify-between pb-4 border-b border-slate-100">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{selectedParty.name}</h3>
-                    <p className="text-xs text-slate-500 font-mono">
-                      {selectedParty.documentNumber ? `Doc: ${selectedParty.documentNumber}` : "Sem documento cadastrado"}
-                    </p>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                      {selectedParty.type === 1 ? "Pessoa Física (PF)" : "Pessoa Jurídica (PJ)"}
+                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 mt-2">{selectedParty.name}</h3>
+                    {selectedParty.documentNumber && (
+                      <p className="text-xs font-mono text-slate-500">{selectedParty.documentNumber}</p>
+                    )}
                   </div>
-                  <span className="text-xs font-semibold px-2 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 rounded">
-                    {selectedParty.type === 1 ? "Pessoa Física" : "Pessoa Jurídica"}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Ativo
                   </span>
                 </div>
 
-                {/* Equipamentos do Cliente */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
-                      Equipamentos do Cliente ({selectedParty.equipments.length})
-                    </h4>
-                    <button
-                      onClick={() => setShowEquipmentModal(true)}
-                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" /> Adicionar
-                    </button>
+                {/* Contatos */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-purple-600" />
+                    Canais de Contato
+                  </h4>
+                  <div className="space-y-1.5">
+                    {selectedParty.contacts.map((c) => (
+                      <div key={c.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-slate-800">{c.name}</p>
+                          <p className="text-[11px] text-slate-500">{c.phone || c.email}</p>
+                        </div>
+                        {c.isPrimary && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold bg-purple-50 text-purple-700 rounded border border-purple-200">
+                            Principal
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {selectedParty.equipments.length === 0 ? (
-                    <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-lg text-xs text-slate-500 text-center">
-                      Nenhum equipamento registrado (CustomerEquipment não é mercadoria vendável da empresa).
-                    </div>
-                  ) : (
+                </div>
+
+                {/* Equipamentos do Cliente */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Smartphone className="w-3.5 h-3.5 text-purple-600" />
+                    Aparelhos Vinculados
+                  </h4>
+                  {selectedParty.equipments.length > 0 ? (
                     <div className="space-y-2">
-                      {selectedParty.equipments.map(eq => (
-                        <div key={eq.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 text-xs">
-                          <p className="font-semibold text-slate-900 dark:text-slate-100">{eq.brand} {eq.model}</p>
-                          <p className="text-slate-500 font-mono mt-0.5">IMEI: {eq.imei1 || "Não informado"} | Tipo: {eq.equipmentType}</p>
-                          {eq.notes && <p className="text-slate-400 mt-1 italic">{eq.notes}</p>}
+                      {selectedParty.equipments.map((eq) => (
+                        <div key={eq.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-extrabold text-slate-900">{eq.brand} {eq.model}</span>
+                            <span className="text-[10px] font-mono text-slate-500">{eq.color}</span>
+                          </div>
+                          {eq.imei1 && (
+                            <p className="text-[10px] font-mono text-slate-500">IMEI: <strong>{eq.imei1}</strong></p>
+                          )}
                         </div>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400 border border-dashed border-slate-200">
+                      Nenhum equipamento registrado para este cliente.
                     </div>
                   )}
                 </div>
 
-                {/* Consentimentos & Privacidade LGPD */}
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    Consentimentos & Privacidade LGPD
+                {/* Consentimentos LGPD */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                    Consentimentos de Privacidade (LGPD)
                   </h4>
-                  <div className="space-y-2">
-                    {selectedParty.consents.map(c => (
-                      <div key={c.id} className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">{c.channel} ({c.purpose})</span>
-                          <p className="text-[10px] text-slate-400">Origem: {c.origin}</p>
-                        </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                          {c.isOptIn ? "Opt-in Autorizado" : "Revogado"}
+                  <div className="space-y-1">
+                    {selectedParty.consents.map((cs) => (
+                      <div key={cs.id} className="flex justify-between items-center text-[11px] p-2 bg-slate-50 rounded-lg">
+                        <span className="text-slate-600">{cs.channel}: {cs.purpose}</span>
+                        <span className="font-bold text-emerald-600 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Autorizado
                         </span>
                       </div>
                     ))}
@@ -395,185 +416,129 @@ export default function CustomersPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-400 shadow-sm">
-                <Users className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                <p className="text-sm font-medium">Selecione uma pessoa para visualizar os detalhes cadastrais e equipamentos vinculados.</p>
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-8 text-center text-slate-400 shadow-xs">
+                <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-xs font-semibold">Selecione uma pessoa para visualizar detalhes cadastrais e equipamentos.</p>
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Modal de Criação de Pessoa */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900">Novo Cadastro</h3>
-            <form onSubmit={handleCreateParty} className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Nome Completo / Razão Social *</label>
-                <input
-                  type="text"
-                  required
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">CPF ou CNPJ</label>
-                  <input
-                    type="text"
-                    value={newDoc}
-                    onChange={(e) => setNewDoc(e.target.value)}
-                    placeholder="Somente dígitos"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp / Celular</label>
-                  <input
-                    type="text"
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="DDD + Número"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-2">
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isCustomerCheck}
-                    onChange={(e) => setIsCustomerCheck(e.target.checked)}
-                    className="rounded text-indigo-600 focus:ring-indigo-500"
-                  />
-                  Habilitar Perfil Cliente
-                </label>
-                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isSupplierCheck}
-                    onChange={(e) => setIsSupplierCheck(e.target.checked)}
-                    className="rounded text-indigo-600 focus:ring-indigo-500"
-                  />
-                  Habilitar Perfil Fornecedor
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
+        {/* Modal de Cadastro */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Novo Cadastro</h3>
                 <button
-                  type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
                 >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
-                >
-                  Salvar Cadastro
+                  ✕
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Modal Adicionar Equipamento */}
-      {showEquipmentModal && selectedParty && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Vincular Equipamento ao Cliente</h3>
-            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-              Nota: CustomerEquipment é propriedade do cliente e não entra no estoque vendável da loja.
-            </p>
-            <form onSubmit={handleAddEquipment} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={handleCreateParty} className="space-y-3 text-xs">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tipo</label>
-                  <select
-                    value={eqType}
-                    onChange={(e) => setEqType(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                  >
-                    <option value="Celular">Celular</option>
-                    <option value="Notebook">Notebook</option>
-                    <option value="PC Gamer">PC Gamer</option>
-                    <option value="Videogame">Videogame</option>
-                    <option value="Caixa de Som">Caixa de Som</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Marca</label>
+                  <label className="font-bold text-slate-700 block mb-1">Nome Completo / Razão Social *</label>
                   <input
                     type="text"
                     required
-                    value={eqBrand}
-                    onChange={(e) => setEqBrand(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Ex: João da Silva ou Tech Store LTDA"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Modelo *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: iPhone 14 Pro Max 256GB"
-                  value={eqModel}
-                  onChange={(e) => setEqModel(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Tipo de Pessoa</label>
+                    <select
+                      value={newType}
+                      onChange={(e) => setNewType(Number(e.target.value) as 1 | 2)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-800 font-medium"
+                    >
+                      <option value={1}>Pessoa Física (CPF)</option>
+                      <option value={2}>Pessoa Jurídica (CNPJ)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">CPF ou CNPJ</label>
+                    <input
+                      type="text"
+                      value={newDoc}
+                      onChange={(e) => setNewDoc(e.target.value)}
+                      placeholder="000.000.000-00"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">IMEI ou Número de Série</label>
-                <input
-                  type="text"
-                  placeholder="IMEI1 ou Serial"
-                  value={eqImei}
-                  onChange={(e) => setEqImei(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Telefone / WhatsApp</label>
+                    <input
+                      type="text"
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder="(11) 90000-0000"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">E-mail</label>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="contato@email.com"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-800"
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Observações / Estado do Aparelho</label>
-                <textarea
-                  value={eqNotes}
-                  onChange={(e) => setEqNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Ex: Vidro traseiro trincado, sem carregador"
-                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg mt-1"
-                />
-              </div>
+                <div className="flex gap-4 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={isCust}
+                      onChange={(e) => setIsCust(e.target.checked)}
+                      className="rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    Perfil Cliente
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={isSupp}
+                      onChange={(e) => setIsSupp(e.target.checked)}
+                      className="rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    Perfil Fornecedor
+                  </label>
+                </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowEquipmentModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm"
-                >
-                  Vincular Equipamento
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
+                  >
+                    Salvar Cadastro
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </RootShellLayout>
   );
 }
