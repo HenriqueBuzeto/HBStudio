@@ -336,6 +336,40 @@ public class InventoryService
         return MapReservation(reservation);
     }
 
+    public async Task<StockReservationResponse> ExpireReservationAsync(Guid reservationId, CancellationToken ct = default)
+    {
+        var reservation = await _dbContext.StockReservations
+            .Include(r => r.Items)
+            .FirstOrDefaultAsync(r => r.Id == reservationId, ct);
+
+        if (reservation == null)
+            throw new KeyNotFoundException($"Reserva {reservationId} não encontrada.");
+
+        reservation.MarkExpired();
+
+        foreach (var item in reservation.Items)
+        {
+            var balance = await _dbContext.StockBalances
+                .FirstOrDefaultAsync(b => b.BranchId == reservation.BranchId &&
+                                          b.WarehouseId == item.WarehouseId &&
+                                          b.WarehouseLocationId == item.WarehouseLocationId &&
+                                          b.ProductSkuId == item.ProductSkuId, ct);
+
+            balance?.ReleaseReservation(item.Quantity);
+
+            if (item.InventoryUnitId.HasValue)
+            {
+                var serialPos = await _dbContext.SerialStockPositions
+                    .FirstOrDefaultAsync(p => p.InventoryUnitId == item.InventoryUnitId.Value, ct);
+
+                serialPos?.ReleaseReservation();
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(ct);
+        return MapReservation(reservation);
+    }
+
     public async Task<StockReservationResponse> ReleaseReservationAsync(Guid reservationId, CancellationToken ct = default)
     {
         var reservation = await _dbContext.StockReservations

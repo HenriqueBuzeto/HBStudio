@@ -126,6 +126,15 @@ public static class PermissionCatalog
     public const string AuditView = "audit.view";
     public const string AutomationManage = "automation.manage";
 
+    // Mensageria & Notificações (MOD-09)
+    public const string MessagingView = "messaging.view";
+    public const string MessagingSend = "messaging.send";
+    public const string MessagingTemplatesManage = "messaging.templates.manage";
+    public const string MessagingChannelsManage = "messaging.channels.manage";
+    public const string MessagingConversationsView = "messaging.conversations.view";
+    public const string MessagingConversationsReply = "messaging.conversations.reply";
+    public const string MessagingNotificationsView = "messaging.notifications.view";
+
     public static readonly IReadOnlyCollection<string> All = typeof(PermissionCatalog)
         .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
         .Where(f => f.IsLiteral && !f.IsInitOnly && f.FieldType == typeof(string))

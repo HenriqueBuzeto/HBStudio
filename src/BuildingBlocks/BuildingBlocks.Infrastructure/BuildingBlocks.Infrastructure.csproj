@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\Modules\PartnersCapital\PartnersCapital.Domain\PartnersCapital.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\RepairService\RepairService.Domain\RepairService.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\CRM\CRM.Domain\CRM.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Messaging\Messaging.Domain\Messaging.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

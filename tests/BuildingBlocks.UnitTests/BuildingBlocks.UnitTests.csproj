@@ -51,6 +51,8 @@
     <ProjectReference Include="..\..\src\Modules\CRM\CRM.Domain\CRM.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\CRM\CRM.Application\CRM.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\CRM\CRM.Infrastructure\CRM.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Messaging\Messaging.Application\Messaging.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Messaging\Messaging.Infrastructure\Messaging.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

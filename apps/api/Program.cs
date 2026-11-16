@@ -45,6 +45,13 @@ builder.Services.AddScoped<CRM.Domain.Repositories.ICrmRepository, CRM.Infrastru
 builder.Services.AddScoped<CRM.Application.Services.CrmAppService>();
 builder.Services.AddScoped<Microsoft.EntityFrameworkCore.DbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
+// Modulo Messaging (MOD-09)
+builder.Services.AddHttpClient<Messaging.Infrastructure.Providers.MetaWhatsAppCloudApiProvider>();
+builder.Services.AddScoped<Messaging.Application.Contracts.IMessageProvider, Messaging.Infrastructure.Providers.MetaWhatsAppCloudApiProvider>();
+builder.Services.AddScoped<Messaging.Domain.Services.ICommunicationEligibilityService, Messaging.Application.Services.CommunicationEligibilityService>();
+builder.Services.AddScoped<Messaging.Application.Services.MessagingAppService>();
+builder.Services.AddHostedService<Messaging.Infrastructure.Workers.MessagingWorker>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -1815,6 +1822,100 @@ crmGroup.MapPost("/matching/reserve", async (CRM.Application.DTOs.ReserveMatched
     var reserved = await service.ReserveMatchedUnitAsync(req, ct);
     return Results.Ok(reserved);
 }).RequireAuthorization(PermissionCatalog.CrmManage);
+
+// ========================================================
+// GRUPO DE ROTAS: MOD-09 MESSAGING & NOTIFICAÇÕES
+// ========================================================
+var messagingGroup = app.MapGroup("/api/messaging");
+
+messagingGroup.MapGet("/metrics", async (Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var metrics = await service.GetDashboardMetricsAsync(ct);
+    return Results.Ok(metrics);
+}).RequireAuthorization(PermissionCatalog.MessagingView);
+
+messagingGroup.MapGet("/accounts", async (Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var accounts = await service.ListChannelAccountsAsync(ct);
+    return Results.Ok(accounts);
+}).RequireAuthorization(PermissionCatalog.MessagingChannelsManage);
+
+messagingGroup.MapPost("/accounts", async (Messaging.Application.DTOs.CreateChannelAccountRequest req, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreateChannelAccountAsync(req, ct);
+    return Results.Created($"/api/messaging/accounts/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.MessagingChannelsManage);
+
+messagingGroup.MapGet("/templates", async (Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var templates = await service.ListTemplatesAsync(ct);
+    return Results.Ok(templates);
+}).RequireAuthorization(PermissionCatalog.MessagingView);
+
+messagingGroup.MapPost("/templates", async (Messaging.Application.DTOs.CreateMessageTemplateRequest req, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var created = await service.CreateTemplateAsync(req, ct);
+    return Results.Created($"/api/messaging/templates/{created.Id}", created);
+}).RequireAuthorization(PermissionCatalog.MessagingTemplatesManage);
+
+messagingGroup.MapGet("/messages", async (Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var messages = await service.ListMessagesAsync(ct);
+    return Results.Ok(messages);
+}).RequireAuthorization(PermissionCatalog.MessagingView);
+
+messagingGroup.MapPost("/messages/enqueue", async (Messaging.Application.DTOs.EnqueueMessageRequest req, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var queued = await service.EnqueueMessageAsync(req, ct);
+    return Results.Created($"/api/messaging/messages/{queued.Id}", queued);
+}).RequireAuthorization(PermissionCatalog.MessagingSend);
+
+messagingGroup.MapGet("/notifications", async (bool? unreadOnly, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    var notifs = await service.ListInAppNotificationsAsync(unreadOnly ?? false, ct);
+    return Results.Ok(notifs);
+}).RequireAuthorization(PermissionCatalog.MessagingNotificationsView);
+
+messagingGroup.MapPut("/notifications/{id:guid}/read", async (Guid id, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    await service.MarkNotificationAsReadAsync(id, ct);
+    return Results.Ok(new { success = true });
+}).RequireAuthorization(PermissionCatalog.MessagingNotificationsView);
+
+// ========================================================
+// WEBHOOKS SEGUROS DA WHATSAPP CLOUD API (META)
+// ========================================================
+// 1. GET - Desafio de Verificação do Webhook (hub.challenge)
+app.MapGet("/api/webhooks/whatsapp", (HttpRequest request) =>
+{
+    var mode = request.Query["hub.mode"].ToString();
+    var token = request.Query["hub.verify_token"].ToString();
+    var challenge = request.Query["hub.challenge"].ToString();
+
+    // Validar token padrão de teste ou configurado
+    if (mode == "subscribe" && !string.IsNullOrWhiteSpace(token))
+    {
+        return Results.Text(challenge, "text/plain");
+    }
+
+    return Results.Unauthorized();
+});
+
+// 2. POST - Notificações de Eventos, Status e Inbound com HMAC-SHA256
+app.MapPost("/api/webhooks/whatsapp", async (HttpRequest request, Messaging.Application.Services.MessagingAppService service, CancellationToken ct) =>
+{
+    using var reader = new StreamReader(request.Body);
+    var body = await reader.ReadToEndAsync(ct);
+    var signature = request.Headers["X-Hub-Signature-256"].ToString();
+
+    var processed = await service.ProcessIncomingWebhookAsync(body, signature, ct);
+    if (!processed)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok();
+});
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

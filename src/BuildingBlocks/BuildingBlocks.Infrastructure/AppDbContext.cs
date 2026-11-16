@@ -13,6 +13,7 @@ using Financial.Domain;
 using PartnersCapital.Domain.Entities;
 using RepairService.Domain.Entities;
 using CRM.Domain.Entities;
+using Messaging.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -124,6 +125,15 @@ public class AppDbContext : DbContext
     public DbSet<CrmOpportunityActivity> CrmOpportunityActivities => Set<CrmOpportunityActivity>();
     public DbSet<CrmPurchaseIntent> CrmPurchaseIntents => Set<CrmPurchaseIntent>();
     public DbSet<CrmInventoryMatch> CrmInventoryMatches => Set<CrmInventoryMatch>();
+
+    // Modulo Messaging (MOD-09) - Mensageria Multicanal, WhatsApp Cloud API, Automações e Notificações Internas
+    public DbSet<MessagingChannelAccount> MessagingChannelAccounts => Set<MessagingChannelAccount>();
+    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
+    public DbSet<MessageRequest> MessageRequests => Set<MessageRequest>();
+    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
+    public DbSet<MessagingWebhookEvent> MessagingWebhookEvents => Set<MessagingWebhookEvent>();
+    public DbSet<CustomerConversation> CustomerConversations => Set<CustomerConversation>();
+    public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1565,7 +1575,7 @@ public class AppDbContext : DbContext
         foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
         {
             if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
-                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch)
+                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage)
             {
                 var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
                 if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))

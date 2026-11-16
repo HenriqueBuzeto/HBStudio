@@ -40,6 +40,11 @@
     <Project Path="src/Modules/Inventory/Inventory.Domain/Inventory.Domain.csproj" />
     <Project Path="src/Modules/Inventory/Inventory.Infrastructure/Inventory.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Messaging/">
+    <Project Path="src/Modules/Messaging/Messaging.Application/Messaging.Application.csproj" />
+    <Project Path="src/Modules/Messaging/Messaging.Domain/Messaging.Domain.csproj" />
+    <Project Path="src/Modules/Messaging/Messaging.Infrastructure/Messaging.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Parties/">
     <Project Path="src/Modules/Parties/Parties.Application/Parties.Application.csproj" />
     <Project Path="src/Modules/Parties/Parties.Domain/Parties.Domain.csproj" />

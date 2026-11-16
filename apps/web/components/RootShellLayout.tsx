@@ -23,6 +23,7 @@ import {
   TrendingUp,
   Receipt,
   ShieldCheck,
+  MessageSquare,
   Moon,
   Clock,
   ArrowRightLeft
@@ -60,6 +61,7 @@ const navSections: NavSection[] = [
     title: "COMERCIAL & INTELIGÊNCIA",
     items: [
       { name: "CRM & Fila de Desejo", href: "/crm", icon: Target, badge: "Smart" },
+      { name: "Mensageria & WhatsApp", href: "/messaging", icon: MessageSquare, badge: "Meta" },
     ],
   },
   {
