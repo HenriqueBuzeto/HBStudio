@@ -2696,6 +2696,509 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.ToTable("warehouse_locations", (string)null);
                 });
 
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingDesignAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AssociatedProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Author")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsCommercialAllowed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LicenseType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("manufacturing_design_assets", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingDesignVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("EstimatedDurationMinutes")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedMassGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("FileFormat")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RevisionCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sha256Hash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TechnicalNotes")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssetId");
+
+                    b.ToTable("manufacturing_design_versions", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ActualEnergyCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ActualLaborCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ActualMachineCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ActualMaterialCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ActualWasteCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("ApprovedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("AssignedPrinterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DesignVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("EstimatedFilamentGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedPrintTimeMinutes")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MaterialProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("MaterialStockReservationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PlannedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProducedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RejectedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SalesOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TargetProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalEstimatedCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("manufacturing_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ActualDurationMinutes")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ActualMassGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("AttemptNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("EstimatedDurationMinutes")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedMassGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("FailureCategory")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FailureNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ManufacturingOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OperatorName")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PrinterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManufacturingOrderId");
+
+                    b.ToTable("manufacturing_print_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingPrinter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AcquisitionCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("AveragePowerWatts")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BuildVolume")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompatibleMaterials")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("ConfiguredHourlyMachineCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("EstimatedLifespanHours")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("ExtruderCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Manufacturer")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("NominalPowerWatts")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("SerialNumber")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StatusNote")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("StatusUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Technology")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("manufacturing_printers", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingQuote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CustomerPartyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("EstimatedEnergyCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedLaborCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedMachineCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedMaterialCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("EstimatedPlannedWasteCost")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MarkupPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("PlannedQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("QuoteNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("SuggestedFinalPrice")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("manufacturing_quotes", (string)null);
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingSpool", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BatchNumber")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DiameterMm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("InitialNetWeightGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MaterialType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("OpenedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductSkuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("RemainingWeightGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("SpoolCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("SpoolTareGrams")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("manufacturing_spools", (string)null);
+                });
+
             modelBuilder.Entity("Messaging.Domain.Entities.ConversationMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5950,6 +6453,24 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingDesignVersion", b =>
+                {
+                    b.HasOne("Manufacturing3D.Domain.Entities.ManufacturingDesignAsset", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("AssetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt", b =>
+                {
+                    b.HasOne("Manufacturing3D.Domain.Entities.ManufacturingOrder", null)
+                        .WithMany("Attempts")
+                        .HasForeignKey("ManufacturingOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Messaging.Domain.Entities.ConversationMessage", b =>
                 {
                     b.HasOne("Messaging.Domain.Entities.CustomerConversation", null)
@@ -6245,6 +6766,16 @@ namespace BuildingBlocks.Infrastructure.Migrations
             modelBuilder.Entity("Inventory.Domain.Warehouse", b =>
                 {
                     b.Navigation("Locations");
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingDesignAsset", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Manufacturing3D.Domain.Entities.ManufacturingOrder", b =>
+                {
+                    b.Navigation("Attempts");
                 });
 
             modelBuilder.Entity("Messaging.Domain.Entities.CustomerConversation", b =>

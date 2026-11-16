@@ -14,6 +14,7 @@ using PartnersCapital.Domain.Entities;
 using RepairService.Domain.Entities;
 using CRM.Domain.Entities;
 using Messaging.Domain.Entities;
+using Manufacturing3D.Domain.Entities;
 
 namespace BuildingBlocks.Infrastructure;
 
@@ -134,6 +135,15 @@ public class AppDbContext : DbContext
     public DbSet<MessagingWebhookEvent> MessagingWebhookEvents => Set<MessagingWebhookEvent>();
     public DbSet<CustomerConversation> CustomerConversations => Set<CustomerConversation>();
     public DbSet<ConversationMessage> ConversationMessages => Set<ConversationMessage>();
+
+    // Modulo Manufacturing 3D (MOD-10) - Fábrica 3D, Produção, OPs e Custos Reais
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrinter> ManufacturingPrinters => Set<Manufacturing3D.Domain.Entities.ManufacturingPrinter>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingSpool> ManufacturingSpools => Set<Manufacturing3D.Domain.Entities.ManufacturingSpool>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset> ManufacturingDesignAssets => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion> ManufacturingDesignVersions => Set<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingQuote> ManufacturingQuotes => Set<Manufacturing3D.Domain.Entities.ManufacturingQuote>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingOrder> ManufacturingOrders => Set<Manufacturing3D.Domain.Entities.ManufacturingOrder>();
+    public DbSet<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt> ManufacturingPrintAttempts => Set<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options, IExecutionContext? executionContext = null)
         : base(options)
@@ -1547,6 +1557,64 @@ public class AppDbContext : DbContext
             b.HasIndex(m => new { m.TenantId, m.InventoryUnitId });
         });
 
+        // Configuração Manufacturing 3D (MOD-10)
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingOrder>(b =>
+        {
+            b.ToTable("manufacturing_orders");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.Version).IsRowVersion();
+            b.HasMany(o => o.Attempts)
+             .WithOne()
+             .HasForeignKey(a => a.ManufacturingOrderId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrintAttempt>(b =>
+        {
+            b.ToTable("manufacturing_print_attempts");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Version).IsRowVersion();
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignAsset>(b =>
+        {
+            b.ToTable("manufacturing_design_assets");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Version).IsRowVersion();
+            b.HasMany(a => a.Versions)
+             .WithOne()
+             .HasForeignKey(v => v.AssetId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingDesignVersion>(b =>
+        {
+            b.ToTable("manufacturing_design_versions");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Version).IsRowVersion();
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingPrinter>(b =>
+        {
+            b.ToTable("manufacturing_printers");
+            b.HasKey(p => p.Id);
+            b.Property(p => p.Version).IsRowVersion();
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingQuote>(b =>
+        {
+            b.ToTable("manufacturing_quotes");
+            b.HasKey(q => q.Id);
+            b.Property(q => q.Version).IsRowVersion();
+        });
+
+        modelBuilder.Entity<Manufacturing3D.Domain.Entities.ManufacturingSpool>(b =>
+        {
+            b.ToTable("manufacturing_spools");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Version).IsRowVersion();
+        });
+
         // Configurar Filtros Globais Multi-Tenant Automaticos
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
@@ -1575,7 +1643,7 @@ public class AppDbContext : DbContext
         foreach (var entry in ChangeTracker.Entries<BaseEntity>().Where(e => e.State == EntityState.Modified).ToList())
         {
             if (entry.Entity is RepairChecklistItem or RepairEstimateItem or RepairPartUsage or RepairStatusHistoryEntry or RepairEvidenceAttachment or RepairWarrantyClaim
-                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage)
+                or CrmPipelineStage or CrmOpportunityActivity or CrmInventoryMatch or ConversationMessage or ManufacturingPrintAttempt)
             {
                 var versionProp = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Version");
                 if (versionProp != null && (versionProp.CurrentValue == null || Convert.ToUInt32(versionProp.CurrentValue) == 0))

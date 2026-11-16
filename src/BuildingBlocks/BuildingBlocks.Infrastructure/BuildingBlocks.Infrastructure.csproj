@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\Modules\RepairService\RepairService.Domain\RepairService.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\CRM\CRM.Domain\CRM.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Messaging\Messaging.Domain\Messaging.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Manufacturing3D\Manufacturing3D.Domain\Manufacturing3D.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

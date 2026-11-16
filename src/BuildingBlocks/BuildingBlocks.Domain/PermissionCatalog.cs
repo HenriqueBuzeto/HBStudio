@@ -102,12 +102,17 @@ public static class PermissionCatalog
     public const string PartnersDistributionPay = "partners.distribution.pay";
     public const string PartnersDistributionSettle = "partners.distribution.settle";
 
-    // Fábrica 3D
+    // Manufacturing 3D (MOD-10)
     public const string ManufacturingView = "manufacturing.view";
     public const string ManufacturingQuote = "manufacturing.quote";
     public const string ManufacturingSchedule = "manufacturing.schedule";
     public const string ManufacturingExecute = "manufacturing.execute";
     public const string ManufacturingCostView = "manufacturing.cost.view";
+    public const string ManufacturingPrintersManage = "manufacturing.printers.manage";
+    public const string ManufacturingOrdersManage = "manufacturing.orders.manage";
+    public const string ManufacturingQuotesManage = "manufacturing.quotes.manage";
+    public const string ManufacturingCostsView = "manufacturing.costs.view";
+    public const string ManufacturingQualityApprove = "manufacturing.quality.approve";
 
     // Projetos Digitais
     public const string ProjectsView = "projects.view";

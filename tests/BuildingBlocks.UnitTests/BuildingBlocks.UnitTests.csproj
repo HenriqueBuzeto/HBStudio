@@ -53,6 +53,9 @@
     <ProjectReference Include="..\..\src\Modules\CRM\CRM.Infrastructure\CRM.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Messaging\Messaging.Application\Messaging.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Messaging\Messaging.Infrastructure\Messaging.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Manufacturing3D\Manufacturing3D.Application\Manufacturing3D.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Manufacturing3D\Manufacturing3D.Domain\Manufacturing3D.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Manufacturing3D\Manufacturing3D.Infrastructure\Manufacturing3D.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

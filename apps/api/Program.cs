@@ -52,6 +52,9 @@ builder.Services.AddScoped<Messaging.Domain.Services.ICommunicationEligibilitySe
 builder.Services.AddScoped<Messaging.Application.Services.MessagingAppService>();
 builder.Services.AddHostedService<Messaging.Infrastructure.Workers.MessagingWorker>();
 
+// Modulo Manufacturing 3D (MOD-10)
+builder.Services.AddScoped<Manufacturing3D.Application.Services.Manufacturing3DAppService>();
+
 // Configuração de Autenticação JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
@@ -1916,6 +1919,70 @@ app.MapPost("/api/webhooks/whatsapp", async (HttpRequest request, Messaging.Appl
 
     return Results.Ok();
 });
+
+#region Manufacturing 3D (MOD-10) Endpoints
+
+app.MapGet("/api/manufacturing/printers", async (Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var list = await svc.ListPrintersAsync(ct);
+    return Results.Ok(list);
+}).RequireAuthorization(PermissionCatalog.ManufacturingView);
+
+app.MapPost("/api/manufacturing/printers", async (Manufacturing3D.Application.DTOs.CreatePrinterRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var printer = await svc.CreatePrinterAsync(req, ct);
+    return Results.Created($"/api/manufacturing/printers/{printer.Id}", printer);
+}).RequireAuthorization(PermissionCatalog.ManufacturingPrintersManage);
+
+app.MapPost("/api/manufacturing/quotes/calculate", async (Manufacturing3D.Application.DTOs.CalculateManufacturingQuoteRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var quote = await svc.CalculateAndSaveQuoteAsync(req, ct);
+    return Results.Ok(quote);
+}).RequireAuthorization(PermissionCatalog.ManufacturingQuote);
+
+app.MapGet("/api/manufacturing/orders", async (Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var orders = await svc.ListOrdersAsync(ct);
+    return Results.Ok(orders);
+}).RequireAuthorization(PermissionCatalog.ManufacturingView);
+
+app.MapPost("/api/manufacturing/orders", async (Manufacturing3D.Application.DTOs.CreateManufacturingOrderRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var order = await svc.CreateOrderAsync(req, ct);
+    return Results.Created($"/api/manufacturing/orders/{order.Id}", order);
+}).RequireAuthorization(PermissionCatalog.ManufacturingOrdersManage);
+
+app.MapPost("/api/manufacturing/orders/{id:guid}/reserve", async (Guid id, Guid warehouseId, decimal quantityGrams, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var order = await svc.ReserveMaterialAsync(id, warehouseId, quantityGrams, ct);
+    return Results.Ok(order);
+}).RequireAuthorization(PermissionCatalog.ManufacturingOrdersManage);
+
+app.MapPost("/api/manufacturing/orders/{id:guid}/attempts/start", async (Guid id, int attemptNumber, Guid printerId, string operatorName, decimal estimatedMinutes, decimal estimatedGrams, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var attemptId = await svc.StartPrintAttemptAsync(id, attemptNumber, printerId, operatorName, estimatedMinutes, estimatedGrams, ct);
+    return Results.Ok(new { attemptId });
+}).RequireAuthorization(PermissionCatalog.ManufacturingExecute);
+
+app.MapPost("/api/manufacturing/orders/{id:guid}/attempts/{attemptId:guid}/complete", async (Guid id, Guid attemptId, Manufacturing3D.Application.DTOs.CompletePrintAttemptRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    await svc.CompletePrintAttemptAsync(id, attemptId, req, ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ManufacturingExecute);
+
+app.MapPost("/api/manufacturing/orders/{id:guid}/attempts/{attemptId:guid}/fail", async (Guid id, Guid attemptId, Manufacturing3D.Application.DTOs.FailPrintAttemptRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    await svc.RegisterPrintFailureAsync(id, attemptId, req, ct);
+    return Results.Ok();
+}).RequireAuthorization(PermissionCatalog.ManufacturingExecute);
+
+app.MapPost("/api/manufacturing/orders/{id:guid}/quality-and-receive", async (Guid id, Manufacturing3D.Application.DTOs.CompleteOrderQualityInspectionRequest req, Manufacturing3D.Application.Services.Manufacturing3DAppService svc, CancellationToken ct) =>
+{
+    var order = await svc.CompleteQualityAndReceiveFinishedGoodAsync(id, req, ct);
+    return Results.Ok(order);
+}).RequireAuthorization(PermissionCatalog.ManufacturingQualityApprove);
+
+#endregion
 
 // Endpoint de Teste Protegido com PermissionKey
 app.MapGet("/api/secure-inventory", () => Results.Ok(new { message = "Acesso autorizado ao estoque." }))

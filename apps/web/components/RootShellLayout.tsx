@@ -24,6 +24,7 @@ import {
   Receipt,
   ShieldCheck,
   MessageSquare,
+  Printer,
   Moon,
   Clock,
   ArrowRightLeft
@@ -55,6 +56,7 @@ const navSections: NavSection[] = [
       { name: "Estoque & Kardex", href: "/inventory", icon: Package },
       { name: "Compras & Entrada", href: "/procurement", icon: Receipt },
       { name: "Assistência Técnica (OS)", href: "/repairs", icon: Wrench, badge: "OS" },
+      { name: "Fábrica 3D & Custos", href: "/manufacturing", icon: Printer, badge: "3D" },
     ],
   },
   {
