@@ -31,6 +31,7 @@ public class AppDbContext : DbContext, IIdentityDbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<RevokedSession> RevokedSessions => Set<RevokedSession>();
 
     // Modulo Parties
     public DbSet<Party> Parties => Set<Party>();
@@ -246,6 +247,15 @@ public class AppDbContext : DbContext, IIdentityDbContext
              .WithMany()
              .HasForeignKey(ur => ur.RoleId)
              .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RevokedSession>(b =>
+        {
+            b.ToTable("revoked_sessions");
+            b.HasKey(rs => rs.Id);
+            b.Property(rs => rs.SessionId).IsRequired().HasMaxLength(128);
+            b.HasIndex(rs => rs.SessionId).IsUnique();
+            b.HasIndex(rs => rs.ExpiresAtUtc);
         });
 
         modelBuilder.Entity<RolePermission>(b =>

@@ -2376,6 +2376,45 @@ namespace BuildingBlocks.Infrastructure.Migrations
                     b.ToTable("branches", (string)null);
                 });
 
+            modelBuilder.Entity("IdentityAccess.Domain.RevokedSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SessionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("SessionId")
+                        .IsUnique();
+
+                    b.ToTable("revoked_sessions", (string)null);
+                });
+
             modelBuilder.Entity("IdentityAccess.Domain.Role", b =>
                 {
                     b.Property<Guid>("Id")

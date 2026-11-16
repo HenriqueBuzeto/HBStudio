@@ -22,6 +22,7 @@ public interface IIdentityDbContext
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<Partner> Partners { get; }
     DbSet<AuditEvent> AuditEvents { get; }
+    DbSet<RevokedSession> RevokedSessions { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

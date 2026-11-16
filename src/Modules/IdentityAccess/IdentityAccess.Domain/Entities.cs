@@ -198,3 +198,24 @@ public class AuditEvent : BaseEntity
         AfterStateJson = afterStateJson;
     }
 }
+
+public class RevokedSession : BaseEntity
+{
+    public string SessionId { get; private set; }
+    public Guid? UserId { get; private set; }
+    public string? Reason { get; private set; }
+    public DateTime ExpiresAtUtc { get; private set; }
+
+    private RevokedSession() { SessionId = string.Empty; }
+
+    public RevokedSession(string sessionId, Guid? userId, DateTime expiresAtUtc, string? reason = null)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            throw new ArgumentException("SessionId is required.", nameof(sessionId));
+
+        SessionId = sessionId.Trim();
+        UserId = userId;
+        ExpiresAtUtc = expiresAtUtc;
+        Reason = reason;
+    }
+}

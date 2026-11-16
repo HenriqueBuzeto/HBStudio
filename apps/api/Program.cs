@@ -60,7 +60,7 @@ builder.Services.AddScoped<DigitalProjects.Application.Services.DigitalProjectsA
 
 // Modulo IdentityAccess & Segurança dos Sócios
 builder.Services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
-builder.Services.AddSingleton<ISessionRevocationManager, MemorySessionRevocationManager>();
+builder.Services.AddScoped<ISessionRevocationManager, IdentityAccess.Application.Services.DbSessionRevocationManager>();
 builder.Services.AddScoped<IdentityAccess.Application.Services.IIdentityDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 builder.Services.AddScoped<IdentityAccess.Application.Services.IAuthenticationService, IdentityAccess.Application.Services.AuthenticationService>();
 
