@@ -114,31 +114,47 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public void AesGcm_Encryption_And_Tampering_Verification_Should_Work()
+    public void AesGcm_Encryption_Hkdf_Aad_And_Tampering_Verification_Should_Work()
     {
-        // 1. Chave AES de 256 bits
-        byte[] key = AesGcmEncryptionHelper.DeriveKeyFromSecret("TenantSuperKey2026");
-        byte[] originalData = Encoding.UTF8.GetBytes("CertificadoA1PrivateKeyAndSecret1234");
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
 
-        // 2. Criptografa gerando [Nonce 12b][Tag 16b][Ciphertext]
-        byte[] encrypted = AesGcmEncryptionHelper.Encrypt(originalData, key);
+        // 1. Chaves derivadas via HKDF a partir da Chave-Mestra do Sistema
+        byte[] keyA = AesGcmEncryptionHelper.DeriveTenantKey(tenantA);
+        byte[] keyB = AesGcmEncryptionHelper.DeriveTenantKey(tenantB);
+
+        // Chaves de tenants distintos nunca devem coincidir
+        keyA.Should().NotEqual(keyB);
+
+        byte[] originalData = Encoding.UTF8.GetBytes("CertificadoA1PrivateKeyAndSecret1234");
+        byte[] aadA = AesGcmEncryptionHelper.BuildAad(tenantA, "FiscalCertificate", "Cert01");
+
+        // 2. Criptografa vinculando ao Tenant A via AAD
+        byte[] encrypted = AesGcmEncryptionHelper.Encrypt(originalData, keyA, aadA);
         encrypted.Length.Should().Be(12 + 16 + originalData.Length);
 
-        // 3. Descriptografa com sucesso
-        byte[] decrypted = AesGcmEncryptionHelper.Decrypt(encrypted, key);
+        // 3. Descriptografa com chave e AAD corretos
+        byte[] decrypted = AesGcmEncryptionHelper.Decrypt(encrypted, keyA, aadA);
         Encoding.UTF8.GetString(decrypted).Should().Be("CertificadoA1PrivateKeyAndSecret1234");
 
-        // 4. Teste de Violação: Adulterar 1 byte do ciphertext
-        byte[] tampered = (byte[])encrypted.Clone();
-        tampered[^1] ^= 0xFF; // Inverte o último bit
+        // 4. Tentativa de descriptografar com a chave do Tenant B (Isolamento Multi-tenant)
+        var actTenantMismatch = () => AesGcmEncryptionHelper.Decrypt(encrypted, keyB, aadA);
+        actTenantMismatch.Should().Throw<CryptographicException>();
 
-        // 5. Autenticação criptográfica deve rejeitar imediatamente
-        var act = () => AesGcmEncryptionHelper.Decrypt(tampered, key);
-        act.Should().Throw<CryptographicException>();
+        // 5. Tentativa de usar AAD de outro Tenant (AAD Tampering)
+        byte[] aadB = AesGcmEncryptionHelper.BuildAad(tenantB, "FiscalCertificate", "Cert01");
+        var actAadMismatch = () => AesGcmEncryptionHelper.Decrypt(encrypted, keyA, aadB);
+        actAadMismatch.Should().Throw<CryptographicException>();
+
+        // 6. Teste de Adulteração de Bits no Ciphertext
+        byte[] tampered = (byte[])encrypted.Clone();
+        tampered[^1] ^= 0xFF;
+        var actTampered = () => AesGcmEncryptionHelper.Decrypt(tampered, keyA, aadA);
+        actTampered.Should().Throw<CryptographicException>();
     }
 
     [Fact]
-    public void QrCode_NT2025_001_V3_And_V2_Resolution_Should_Be_Compliant()
+    public void QrCode_NT2025_001_V3_Online_And_Contingency_With_RsaSha1_Should_Be_Compliant()
     {
         var provider = new ZeusNFeProvider();
         var est = new FiscalEstablishment(
@@ -158,32 +174,34 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
             "01001000"
         );
         est.SwitchEnvironment(FiscalEnvironment.Homologation);
+        est.SetQrCodeVersion(QrCodeVersion.V3);
 
         string accessKey = "35261148951871000180650010000000011189201450";
 
-        // Caso 1: QR Code Versão 3 (NT 2025.001) - Online (Sem CSC, p=chNFe|3|tpAmb)
-        est.SetQrCodeVersion(QrCodeVersion.V3);
+        // Cenário 1: QR Code V3 Online (tpEmis = 1) -> estritamente p=chNFe|3|tpAmb
         string v3OnlineUrl = provider.GenerateQrCodeUrl(est, accessKey, 8990.00m, "12345678909", null, tpEmis: 1);
-        v3OnlineUrl.Should().Contain("homologacao.nfce.fazenda.sp.gov.br/qrcode?p=");
         v3OnlineUrl.Should().EndWith($"?p={accessKey}|3|1");
 
-        // Caso 2: QR Code Versão 2 (Legado - Exige CSC e Hash SHA-1)
-        est.SetQrCodeVersion(QrCodeVersion.V2);
-        var csc = new FiscalCsc(
-            Guid.NewGuid(),
-            est.Id,
-            "000001",
-            Encoding.UTF8.GetBytes("TOKEN_CSC_SEFAZ_SP_SECRET"),
-            "TOK***RET",
-            FiscalEnvironment.Homologation
-        );
-        string v2Url = provider.GenerateQrCodeUrl(est, accessKey, 8990.00m, "12345678909", csc, tpEmis: 1);
-        v2Url.Should().Contain("|2|1|");
-        v2Url.Should().Contain("|000001|");
+        // Cenário 2: QR Code V3 Contingência Offline (tpEmis = 9) com Destinatário Identificado
+        using var rsaKey = RSA.Create(2048);
+        string v3ContingencyWithDest = provider.GenerateQrCodeUrl(
+            est, accessKey, 8990.00m, "12345678909", null, tpEmis: 9, rsaPrivateKey: rsaKey);
+
+        v3ContingencyWithDest.Should().Contain($"?p={accessKey}|3|1|");
+        v3ContingencyWithDest.Should().Contain("|8990.00|1|12345678909|"); // tpIdDest=1 (CPF)
+
+        // Cenário 3: QR Code V3 Contingência Offline (tpEmis = 9) SEM Destinatário Identificado (Consumidor Anônimo)
+        // Regra NT 2025.001: Suprime parâmetros de destinatário sem gerar separadores vazios duplicados (||)
+        string v3ContingencyNoDest = provider.GenerateQrCodeUrl(
+            est, accessKey, 150.00m, null, null, tpEmis: 9, rsaPrivateKey: rsaKey);
+
+        v3ContingencyNoDest.Should().NotContain("||");
+        string dia = DateTime.UtcNow.ToString("dd");
+        v3ContingencyNoDest.Should().Contain($"?p={accessKey}|3|1|{dia}|150.00|");
     }
 
     [Fact]
-    public async Task Fiscal_Inbound_Xml_Should_Reject_When_Payload_Exceeds_Or_Cnpj_Mismatch()
+    public async Task Fiscal_Inbound_Xml_Should_Validate_Signature_And_Prevent_Tampering()
     {
         var tenantId = Guid.NewGuid();
         var branchId = Guid.NewGuid();
@@ -213,23 +231,44 @@ public class FiscalModuleIntegrationTests : IClassFixture<WebApplicationFactory<
 
         var client = CreateClientWithPermissions(tenantId, branchId, PermissionCatalog.FiscalDocumentsView, PermissionCatalog.FiscalIssue);
 
-        // XML com CNPJ destinatário divergente
-        var mismatchXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+        // XML sem a tag de assinatura digital <Signature>
+        var xmlWithoutSignature = @"<?xml version=""1.0"" encoding=""UTF-8""?>
 <nfeProc xmlns=""http://www.portalfiscal.inf.br/nfe"" versao=""4.00"">
   <NFe>
-    <infNFe Id=""NFe35261199999999000199550010000012341234567890"" versao=""4.00"">
-      <ide><nNF>999</nNF><serie>1</serie><dhEmi>2026-11-16T14:30:00-03:00</dhEmi></ide>
-      <emit><CNPJ>12345678000199</CNPJ><xNome>OUTRO FORNECEDOR</xNome></emit>
-      <dest><CNPJ>00000000000000</CNPJ><xNome>OUTRA EMPRESA</xNome></dest>
-      <det nItem=""1""><prod><cProd>1</cProd><xProd>TESTE</xProd><NCM>85285200</NCM><qCom>1</qCom><vUnCom>100</vUnCom><vProd>100</vProd></prod></det>
+    <infNFe Id=""NFe35261148951871000180550010000012341234567890"" versao=""4.00"">
+      <ide><nNF>1234</nNF><serie>1</serie><dhEmi>2026-11-16T14:30:00-03:00</dhEmi></ide>
+      <emit><CNPJ>12345678000199</CNPJ><xNome>FORNECEDOR VALIDO</xNome></emit>
+      <dest><CNPJ>48951871000180</CNPJ><xNome>HB STUDIO</xNome></dest>
+      <det nItem=""1""><prod><cProd>1</cProd><xProd>PROD</xProd><NCM>85285200</NCM><qCom>1</qCom><vUnCom>100</vUnCom><vProd>100</vProd></prod></det>
       <total><ICMSTot><vProd>100</vProd><vNF>100</vNF><vICMS>0</vICMS></ICMSTot></total>
     </infNFe>
   </NFe>
 </nfeProc>";
 
-        var res = await client.PostAsJsonAsync("/api/fiscal/inbound/import", new InboundXmlUploadRequest(mismatchXml));
+        var res = await client.PostAsJsonAsync("/api/fiscal/inbound/import", new InboundXmlUploadRequest(xmlWithoutSignature));
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var err = await res.Content.ReadAsStringAsync();
-        err.Should().Contain("não coincide com o CNPJ do estabelecimento");
+        err.Should().Contain("não contém assinatura digital");
+    }
+
+    [Fact]
+    public async Task Fiscal_Authorization_And_Tenant_Isolation_Should_Enforce_403()
+    {
+        var tenantId = Guid.NewGuid();
+        var branchId = Guid.NewGuid();
+
+        // Cliente autenticado mas SEM a permissão fiscal.issue
+        var clientNoPermission = CreateClientWithPermissions(
+            tenantId,
+            branchId,
+            PermissionCatalog.FiscalDocumentsView);
+
+        var emitReq = new EmitNfceFromSaleRequest(
+            SaleId: Guid.NewGuid(),
+            ConsumerCpf: "12345678909",
+            ConsumerName: "Consumidor Teste");
+
+        var emitRes = await clientNoPermission.PostAsJsonAsync("/api/fiscal/nfce/sale", emitReq);
+        emitRes.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

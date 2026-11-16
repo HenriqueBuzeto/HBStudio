@@ -1,4 +1,4 @@
-﻿using IdentityAccess.Domain;
+using IdentityAccess.Domain;
 
 using PartnersCapital.Domain.Entities;
 
@@ -5341,222 +5341,124 @@ usersGroup.MapPut("/{id:guid}/toggle-status", async (
 
 
 #region MOD-14 FISCAL (ZEUS DFE.NET)
-
 var fiscalGroup = app.MapGroup("/api/fiscal")
-
     .RequireAuthorization();
 
-
-
 fiscalGroup.MapGet("/establishment", async (
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var est = await fiscalService.GetEstablishmentAsync(tenantId, ct);
-
     return Results.Ok(est);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalDocumentsView);
 
 fiscalGroup.MapPost("/establishment", async (
-
     Fiscal.Application.DTOs.ConfigureEstablishmentRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var branchId = executionContext.BranchId ?? Guid.Empty;
-
     var est = await fiscalService.ConfigureEstablishmentAsync(tenantId, branchId, req, ct);
-
     return Results.Ok(est);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalSettingsManage);
 
 fiscalGroup.MapPost("/certificate", async (
-
     Fiscal.Application.DTOs.UploadCertificateRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var ok = await fiscalService.UploadCertificateAsync(tenantId, req, ct);
-
     return Results.Ok(new { success = ok, message = "Certificado A1 gravado com criptografia segura." });
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalSettingsManage);
 
 fiscalGroup.MapPost("/csc", async (
-
     Fiscal.Application.DTOs.RegisterCscRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var ok = await fiscalService.RegisterCscAsync(tenantId, req, ct);
-
     return Results.Ok(new { success = ok, message = "Token CSC registrado com sucesso para emissão de NFC-e." });
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalSettingsManage);
 
 fiscalGroup.MapGet("/status", async (
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var status = await fiscalService.CheckStatusAsync(tenantId, ct);
-
     return Results.Ok(status);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalDocumentsView);
 
 fiscalGroup.MapGet("/documents", async (
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var docs = await fiscalService.ListDocumentsAsync(tenantId, ct);
-
     return Results.Ok(docs);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalDocumentsView);
 
 fiscalGroup.MapPost("/nfce/sale", async (
-
     Fiscal.Application.DTOs.EmitNfceFromSaleRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var result = await fiscalService.EmitNfceFromSaleAsync(tenantId, req, ct);
-
     return Results.Ok(result);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalIssue);
 
 fiscalGroup.MapPost("/documents/{id:guid}/cancel", async (
-
     Guid id,
-
     Fiscal.Application.DTOs.CancelNfceRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var result = await fiscalService.CancelNfceAsync(tenantId, id, req, ct);
-
     return Results.Ok(result);
+}).RequireAuthorization(PermissionCatalog.FiscalCancel);
 
-});
-
-
+fiscalGroup.MapPost("/documents/{id:guid}/reconcile", async (
+    Guid id,
+    Fiscal.Application.Services.IFiscalService fiscalService,
+    IExecutionContext executionContext,
+    CancellationToken ct) =>
+{
+    var tenantId = executionContext.TenantId;
+    var result = await fiscalService.ReconcileDocumentStatusAsync(tenantId, id, ct);
+    return Results.Ok(result);
+}).RequireAuthorization(PermissionCatalog.FiscalIssue);
 
 fiscalGroup.MapGet("/inbound", async (
-
     Fiscal.Application.Services.IFiscalService fiscalService,
-
     IExecutionContext executionContext,
-
     CancellationToken ct) =>
-
 {
-
     var tenantId = executionContext.TenantId;
-
     var docs = await fiscalService.ListInboundDocumentsAsync(tenantId, ct);
-
     return Results.Ok(docs);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalDocumentsView);
 
 fiscalGroup.MapPost("/inbound/parse", async (
-
     Fiscal.Application.DTOs.InboundXmlUploadRequest req,
-
     Fiscal.Application.Services.IFiscalService fiscalService) =>
-
 {
-
     var parsed = await fiscalService.ParseInboundXmlAsync(req.RawXml);
-
     return Results.Ok(parsed);
-
-});
-
-
+}).RequireAuthorization(PermissionCatalog.FiscalDocumentsView);
 
 fiscalGroup.MapPost("/inbound/import", async (
     Fiscal.Application.DTOs.InboundXmlUploadRequest req,
@@ -5578,7 +5480,7 @@ fiscalGroup.MapPost("/inbound/import", async (
     {
         return Results.BadRequest(new { error = ex.Message });
     }
-});
+}).RequireAuthorization(PermissionCatalog.FiscalIssue);
 
 #endregion
 

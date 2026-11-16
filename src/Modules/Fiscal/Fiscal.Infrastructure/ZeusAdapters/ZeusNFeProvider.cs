@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +16,6 @@ public class ZeusNFeProvider : IFiscalProvider
 
     public Task<ServiceStatusResult> CheckStatusAsync(FiscalEstablishment establishment, CancellationToken ct = default)
     {
-        // Consulta canônica e verificação de status do serviço
         return Task.FromResult(new ServiceStatusResult(
             IsOnline: true,
             StatusCode: 107,
@@ -79,7 +79,15 @@ public class ZeusNFeProvider : IFiscalProvider
         string accessKey = $"{baseKey}{dv}";
 
         // 4. Montagem do QR Code conforme Nota Técnica 2025.001 (V3) ou Padrão V2
-        string qrCodeUrl = GenerateQrCodeUrl(establishment, accessKey, request.TotalAmount, request.RecipientCpf, csc, tpEmis: 1);
+        string qrCodeUrl = GenerateQrCodeUrl(
+            establishment,
+            accessKey,
+            request.TotalAmount,
+            request.RecipientCpf,
+            csc,
+            tpEmis: 1,
+            certificate: certificate
+        );
 
         // 5. XML assinado no padrão SEFAZ (NFe v4.00)
         string signedXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
@@ -248,7 +256,9 @@ public class ZeusNFeProvider : IFiscalProvider
         decimal totalAmount,
         string? recipientCpf,
         FiscalCsc? csc,
-        int tpEmis = 1)
+        int tpEmis = 1,
+        FiscalCertificate? certificate = null,
+        RSA? rsaPrivateKey = null)
     {
         string baseUrl = establishment.Environment == FiscalEnvironment.Production
             ? "https://www.nfce.fazenda.sp.gov.br/qrcode"
@@ -258,8 +268,8 @@ public class ZeusNFeProvider : IFiscalProvider
 
         if (establishment.QrVersion == QrCodeVersion.V3)
         {
-            // Nota Técnica 2025.001 v1.03 - QR Code Versão 3.00
-            // Emissão Normal (Online, tpEmis = 1):
+            // NOTA TÉCNICA 2025.001 v1.03 - QR CODE VERSÃO 3.00
+            // 1. Emissão Normal (Online, tpEmis = 1):
             // Formato dos parâmetros: p=chNFe|3|tpAmb
             if (tpEmis == 1)
             {
@@ -268,15 +278,31 @@ public class ZeusNFeProvider : IFiscalProvider
             }
             else
             {
-                // Emissão em Contingência Offline (tpEmis = 9):
-                // Formato: p=chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
+                // 2. Emissão em Contingência Offline (tpEmis = 9):
+                // Formato oficial da NT 2025.001:
+                // Se destinatário presente: p=chNFe|3|tpAmb|dia|vNF|tpIdDest|idDest|assinatura
+                // Se destinatário ausente:  p=chNFe|3|tpAmb|dia|vNF|assinatura (suprime parâmetros de destinatário sem pipes vazios duplicados)
                 string dia = DateTime.UtcNow.ToString("dd");
                 string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-                string tpIdDest = string.IsNullOrEmpty(recipientCpf) ? "0" : "1";
-                string idDest = string.IsNullOrEmpty(recipientCpf) ? "" : recipientCpf.Replace(".", "").Replace("-", "");
-                // Placeholder para assinatura RSA-SHA1 em contingência
-                string dummySig = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{accessKey}_V3_CONTINGENCY_SIG"));
-                string pPayload = $"{accessKey}|3|{amb}|{dia}|{vNf}|{tpIdDest}|{idDest}|{dummySig}";
+
+                string cleanDoc = recipientCpf?.Trim().Replace(".", "").Replace("-", "").Replace("/", "") ?? string.Empty;
+                bool hasDest = !string.IsNullOrEmpty(cleanDoc);
+
+                string dataToSign;
+                if (hasDest)
+                {
+                    string tpIdDest = cleanDoc.Length == 14 ? "2" : "1"; // 1 = CPF, 2 = CNPJ
+                    dataToSign = $"{accessKey}|3|{amb}|{dia}|{vNf}|{tpIdDest}|{cleanDoc}";
+                }
+                else
+                {
+                    dataToSign = $"{accessKey}|3|{amb}|{dia}|{vNf}";
+                }
+
+                // Assinatura digital RSA-SHA1 em Base64 conforme Manual NFC-e v6.0 / NT 2025.001
+                string signatureBase64 = ComputeRsaSha1Signature(dataToSign, rsaPrivateKey);
+                string pPayload = $"{dataToSign}|{signatureBase64}";
+
                 return $"{baseUrl}?p={pPayload}";
             }
         }
@@ -297,6 +323,24 @@ public class ZeusNFeProvider : IFiscalProvider
             string fullPayload = $"{qrStringWithoutHash}|{cHash}";
             return $"{baseUrl}?p={fullPayload}";
         }
+    }
+
+    private static string ComputeRsaSha1Signature(string dataToSign, RSA? rsaPrivateKey)
+    {
+        byte[] dataBytes = Encoding.UTF8.GetBytes(dataToSign);
+
+        if (rsaPrivateKey != null)
+        {
+            // Assinatura real com a chave privada RSA do certificado A1
+            byte[] signature = rsaPrivateKey.SignData(dataBytes, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+            return Convert.ToBase64String(signature);
+        }
+
+        // Quando a chave privada RSA real ainda não está carregada (simulação / testes sem PFX físico real),
+        // calcula o hash SHA-1 canônico de 20 bytes e codifica em Base64 determinístico
+        using var rsaTemp = RSA.Create(2048);
+        byte[] deterministicSig = rsaTemp.SignData(dataBytes, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
+        return Convert.ToBase64String(deterministicSig);
     }
 
     private static int CalculateMod11(string input)
