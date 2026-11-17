@@ -426,12 +426,12 @@ ON CONFLICT ("TenantId", "RoleId", "PermissionKey") DO NOTHING;
 -- 5. Usuario Master (Henrique Buzeto)
 INSERT INTO users ("Id", "TenantId", "DefaultBranchId", "FullName", "Email", "JobTitle", "PasswordHash", "IsActive", "SecurityStamp", "CreatedAtUtc", "UpdatedAtUtc")
 VALUES ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'Henrique Buzeto', 'henriquebuzeto@hbstudio.com', 'CEO', 'v1.600000.VsMWxYC6v53uqrSGoacdeA==.afg6R+UlwTENn3DyUFZmAuX9cPEQEIn2pfkfhmTYoEw=', true, 1, NOW(), NOW())
-ON CONFLICT ("TenantId", "Email") DO UPDATE SET "PasswordHash" = EXCLUDED."PasswordHash", "JobTitle" = 'CEO', "IsActive" = true, "SecurityStamp" = users."SecurityStamp" + 1;
+ON CONFLICT ("Id") DO UPDATE SET "PasswordHash" = EXCLUDED."PasswordHash", "JobTitle" = 'CEO', "IsActive" = true, "SecurityStamp" = users."SecurityStamp" + 1;
 
 -- 6. Vinculo do Usuario ao Perfil Master
-INSERT INTO user_roles ("UserId", "RoleId", "TenantId")
-VALUES ('d0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001')
-ON CONFLICT ("UserId", "RoleId") DO NOTHING;
+INSERT INTO user_roles ("TenantId", "UserId", "RoleId")
+VALUES ('a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001')
+ON CONFLICT ("TenantId", "UserId", "RoleId") DO NOTHING;
 
 -- 7. Vinculo Societario Oficial no Modulo PartnersCapital (Socio-Administrador / ManagingPartner)
 INSERT INTO partners ("Id", "TenantId", "PartyId", "Name", "DocumentNumber", "Email", "Type", "Status", "AdmissionDate", "MonthlyCompensationCap", "IsErpAccessEnabled", "CreatedAtUtc", "UpdatedAtUtc")
