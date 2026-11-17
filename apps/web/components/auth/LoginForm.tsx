@@ -57,11 +57,19 @@ export function LoginForm() {
         const data = await res.json();
         login(data.user);
         router.push("/");
-      } else if (res.status === 401 || res.status === 403) {
-        // Mensagem genérica padronizada: segurança contra enumeração de contas
-        setFeedback("Credenciais inválidas ou acesso corporativo suspenso.");
       } else {
-        setFeedback("Não foi possível conectar ao servidor. Tente novamente.");
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setFeedback(errData.error || "Credenciais inválidas ou usuário inativo.");
+        } else if (res.status === 403) {
+          setFeedback(errData.error || "Acesso restrito exclusivamente a sócios com habilitação ativa no ERP.");
+        } else if (res.status === 429) {
+          setFeedback(errData.error || "Muitas tentativas. Acesso temporariamente bloqueado por 15 minutos.");
+        } else if (res.status === 503) {
+          setFeedback("Serviço de banco de dados Neon temporariamente indisponível. Verifique as configurações na Vercel.");
+        } else {
+          setFeedback(errData.error || "Não foi possível conectar ao servidor. Tente novamente.");
+        }
       }
     } catch {
       setFeedback("Não foi possível conectar ao servidor. Tente novamente.");
