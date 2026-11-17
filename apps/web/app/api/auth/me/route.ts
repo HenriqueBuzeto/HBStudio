@@ -42,25 +42,42 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 1. Verificar se a sessão foi revogada
+    // 1. Verificar se a sessão foi revogada na tabela canônica revoked_sessions (Fail-Closed)
     if (sessionId) {
-      const revoked = await sql.query(
-        `SELECT "Id" FROM "RevokedSessions" WHERE "SessionId" = $1 LIMIT 1;`,
-        [sessionId]
-      ).catch(() => []);
-      if (revoked.length > 0) {
-        return clearSessionResponse(correlationId);
+      try {
+        const revoked = await sql.query(
+          `SELECT "Id" FROM revoked_sessions WHERE "SessionId" = $1 LIMIT 1;`,
+          [sessionId]
+        );
+        if (revoked.length > 0) {
+          return clearSessionResponse(correlationId);
+        }
+      } catch (err: any) {
+        console.error(`[${correlationId}] Erro ao verificar revogação de sessão no Neon:`, err.message);
+        return NextResponse.json(
+          { error: "Erro de comunicação ao validar integridade da sessão.", code: "DATABASE_ERROR" },
+          { status: 503, headers: { "X-Correlation-Id": correlationId } }
+        );
       }
     }
 
     // 2. Buscar usuário no Neon e validar SecurityStamp
-    const users = await sql.query(
-      `SELECT "Id", "FullName", "Email", "IsActive", "DefaultBranchId", "TenantId", "JobTitle", "SecurityStamp"
-       FROM users 
-       WHERE "Id" = $1 
-       LIMIT 1;`,
-      [userId]
-    );
+    let users;
+    try {
+      users = await sql.query(
+        `SELECT "Id", "FullName", "Email", "IsActive", "DefaultBranchId", "TenantId", "JobTitle", "SecurityStamp"
+         FROM users 
+         WHERE "Id" = $1 
+         LIMIT 1;`,
+        [userId]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao buscar dados de usuário no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Erro de comunicação com o banco de dados.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     if (users.length === 0 || !users[0].IsActive) {
       return clearSessionResponse(correlationId);
@@ -74,16 +91,25 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Validar se continua sendo sócio com acesso habilitado
-    const partners = await sql.query(
-      `SELECT "Id", "Name", "Type", "Status", "IsErpAccessEnabled"
-       FROM partners
-       WHERE "TenantId" = $1 
-         AND (LOWER("Email") = LOWER($2) OR LOWER("Name") = LOWER($3))
-         AND "Status" = 1 
-         AND "IsErpAccessEnabled" = true
-       LIMIT 1;`,
-      [user.TenantId, user.Email.toLowerCase(), user.FullName.toLowerCase()]
-    );
+    let partners;
+    try {
+      partners = await sql.query(
+        `SELECT "Id", "Name", "Type", "Status", "IsErpAccessEnabled"
+         FROM partners
+         WHERE "TenantId" = $1 
+           AND (LOWER("Email") = LOWER($2) OR LOWER("Name") = LOWER($3))
+           AND "Status" = 1 
+           AND "IsErpAccessEnabled" = true
+         LIMIT 1;`,
+        [user.TenantId, user.Email.toLowerCase(), user.FullName.toLowerCase()]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao validar status societário no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Erro de comunicação com o banco de dados.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     if (partners.length === 0) {
       return clearSessionResponse(correlationId);
@@ -92,13 +118,22 @@ export async function GET(request: NextRequest) {
     const partner = partners[0];
 
     // 4. Coletar permissões atualizadas
-    const permsRes = await sql.query(
-      `SELECT DISTINCT rp."PermissionKey"
-       FROM role_permissions rp
-       JOIN user_roles ur ON rp."RoleId" = ur."RoleId"
-       WHERE ur."UserId" = $1 AND ur."TenantId" = $2;`,
-      [user.Id, user.TenantId]
-    );
+    let permsRes;
+    try {
+      permsRes = await sql.query(
+        `SELECT DISTINCT rp."PermissionKey"
+         FROM role_permissions rp
+         JOIN user_roles ur ON rp."RoleId" = ur."RoleId" AND rp."TenantId" = ur."TenantId"
+         WHERE ur."UserId" = $1 AND ur."TenantId" = $2;`,
+        [user.Id, user.TenantId]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao buscar permissões no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Erro de comunicação com o banco de dados.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     const permissions = permsRes.map((r: any) => r.PermissionKey);
     const partnerRoleName =

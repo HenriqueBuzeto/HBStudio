@@ -56,13 +56,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Busca do usuário na tabela oficial users
-    const users = await sql.query(
-      `SELECT "Id", "FullName", "Email", "PasswordHash", "IsActive", "DefaultBranchId", "TenantId", "JobTitle", "SecurityStamp"
-       FROM users 
-       WHERE LOWER("Email") = LOWER($1) 
-       LIMIT 1;`,
-      [normalizedEmail]
-    );
+    let users;
+    try {
+      users = await sql.query(
+        `SELECT "Id", "FullName", "Email", "PasswordHash", "IsActive", "DefaultBranchId", "TenantId", "JobTitle", "SecurityStamp"
+         FROM users 
+         WHERE LOWER("Email") = LOWER($1) 
+         LIMIT 1;`,
+        [normalizedEmail]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao consultar tabela users no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Falha na comunicação com o banco de dados Neon.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     // Proteção contra enumeração: resposta uniforme caso não exista ou esteja inativo
     if (users.length === 0 || !users[0].IsActive) {
@@ -87,16 +96,25 @@ export async function POST(request: NextRequest) {
 
     // 4. REGRA CENTRAL ENTERPRISE: ACESSO INTERATIVO RESTRITO EXCLUSIVAMENTE AOS SÓCIOS AUTORIZADOS
     // O usuário deve possuir registro societário ativo e IsErpAccessEnabled = true
-    const partners = await sql.query(
-      `SELECT "Id", "Name", "Type", "Status", "IsErpAccessEnabled"
-       FROM partners
-       WHERE "TenantId" = $1 
-         AND (LOWER("Email") = LOWER($2) OR LOWER("Name") = LOWER($3))
-         AND "Status" = 1 
-         AND "IsErpAccessEnabled" = true
-       LIMIT 1;`,
-      [user.TenantId, normalizedEmail, user.FullName.toLowerCase()]
-    );
+    let partners;
+    try {
+      partners = await sql.query(
+        `SELECT "Id", "Name", "Type", "Status", "IsErpAccessEnabled"
+         FROM partners
+         WHERE "TenantId" = $1 
+           AND (LOWER("Email") = LOWER($2) OR LOWER("Name") = LOWER($3))
+           AND "Status" = 1 
+           AND "IsErpAccessEnabled" = true
+         LIMIT 1;`,
+        [user.TenantId, normalizedEmail, user.FullName.toLowerCase()]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao consultar tabela partners no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Falha na validação societária com o banco Neon.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     if (partners.length === 0) {
       recordFailure(normalizedEmail);
@@ -109,14 +127,23 @@ export async function POST(request: NextRequest) {
     const partner = partners[0];
     failedAttemptsMap.delete(normalizedEmail);
 
-    // 5. Coleta das permissões efetivas do usuário
-    const permsRes = await sql.query(
-      `SELECT DISTINCT rp."PermissionKey"
-       FROM role_permissions rp
-       JOIN user_roles ur ON rp."RoleId" = ur."RoleId"
-       WHERE ur."UserId" = $1 AND ur."TenantId" = $2;`,
-      [user.Id, user.TenantId]
-    );
+    // 5. Coleta das permissões efetivas do usuário com isolamento multi-tenant estrito
+    let permsRes;
+    try {
+      permsRes = await sql.query(
+        `SELECT DISTINCT rp."PermissionKey"
+         FROM role_permissions rp
+         JOIN user_roles ur ON rp."RoleId" = ur."RoleId" AND rp."TenantId" = ur."TenantId"
+         WHERE ur."UserId" = $1 AND ur."TenantId" = $2;`,
+        [user.Id, user.TenantId]
+      );
+    } catch (err: any) {
+      console.error(`[${correlationId}] Erro ao consultar permissões no Neon:`, err.message);
+      return NextResponse.json(
+        { error: "Falha na coleta de permissões do usuário.", code: "DATABASE_ERROR" },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     const permissions = permsRes.map((r: any) => r.PermissionKey);
     const sessionId = crypto.randomUUID().replace(/-/g, "");
@@ -158,15 +185,36 @@ export async function POST(request: NextRequest) {
       jobTitle: user.JobTitle,
     };
 
-    // 7. Registro de auditoria no Neon
+    // 7. Registro de auditoria no Neon compatível com o esquema canônico da tabela audit_events
     try {
       await sql.query(
-        `INSERT INTO audit_events ("Id", "TenantId", "BranchId", "EventType", "UserId", "Email", "Details", "CreatedAtUtc", "Severity")
-         VALUES (gen_random_uuid(), $1, $2, 'PartnerLoginSuccess', $3, $4, $5, NOW(), 1);`,
-        [user.TenantId, user.DefaultBranchId, user.Id, user.Email, `Login efetuado com sucesso pelo sócio ${partner.Name}. Sessão: ${sessionId}`]
+        `INSERT INTO audit_events (
+          "Id", "TenantId", "BranchId", "EntityType", "EntityId", "Action",
+          "ActorId", "ActorEmail", "CorrelationId", "BeforeStateJson", "AfterStateJson",
+          "CreatedAtUtc", "Version"
+        )
+        VALUES (
+          gen_random_uuid(), $1, $2, 'Session', $3, 'PartnerLogin',
+          $4, $5, $6, NULL, $7::jsonb,
+          NOW(), 1
+        );`,
+        [
+          user.TenantId,
+          user.DefaultBranchId,
+          sessionId,
+          user.Id,
+          user.Email,
+          correlationId,
+          JSON.stringify({
+            partnerId: partner.Id,
+            partnerType: partnerRoleName,
+            partnerName: partner.Name,
+            ipAddress: request.headers.get("x-forwarded-for") || "unknown",
+          }),
+        ]
       );
     } catch (auditErr) {
-      console.warn("Aviso: Falha ao registrar log de auditoria no Neon:", auditErr);
+      console.warn(`[${correlationId}] Aviso: Falha não bloqueante ao registrar log de auditoria no Neon:`, auditErr);
     }
 
     // 8. Resposta segura com Cookie HttpOnly blindado
