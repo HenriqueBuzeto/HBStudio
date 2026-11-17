@@ -79,7 +79,8 @@ public record CreateProductModelRequest(
     SerializationPolicy SerializationPolicy,
     Guid BrandId,
     Guid CategoryId,
-    string? Description
+    string? Description,
+    CreateProductSkuRequest? InitialSku = null
 );
 
 public record CreateProductSkuRequest(

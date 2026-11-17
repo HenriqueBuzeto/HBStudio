@@ -709,27 +709,23 @@ catalogGroup.MapGet("/units/{id:guid}", async (
 
 
 catalogGroup.MapPost("/units", async (
-
     Catalog.Application.RegisterInventoryUnitRequest req,
-
     System.Security.Claims.ClaimsPrincipal user,
-
     Catalog.Application.ICatalogService service,
-
     CancellationToken ct) =>
-
 {
-
     try
-
     {
-
         bool canViewCost = user.HasClaim("permission", PermissionCatalog.CatalogCostView);
+        // Regra de Integridade Enterprise: se o payload declarar um custo de aquisição maior que zero,
+        // o operador deve ter permissão explícita de gestão ou visualização de custos de catálogo
+        if (req.AcquisitionCost > 0 && !canViewCost)
+        {
+            return Results.Forbid();
+        }
 
         var created = await service.RegisterUnitAsync(req, canViewCost, ct);
-
         return Results.Created($"/api/catalog/units/{created.Id}", created);
-
     }
 
     catch (KeyNotFoundException)

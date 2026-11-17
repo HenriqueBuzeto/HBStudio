@@ -116,6 +116,16 @@ public class CatalogService : ICatalogService
     public async Task<ProductModelResponse> CreateModelAsync(CreateProductModelRequest request, CancellationToken ct = default)
     {
         var tenantId = _executionContext.TenantId;
+
+        // Validar categoria e marca existentes
+        var categoryExists = await _dbContext.ProductCategories.AnyAsync(c => c.Id == request.CategoryId, ct);
+        if (!categoryExists)
+            throw new KeyNotFoundException($"Categoria {request.CategoryId} não encontrada.");
+
+        var brandExists = await _dbContext.ProductBrands.AnyAsync(b => b.Id == request.BrandId, ct);
+        if (!brandExists)
+            throw new KeyNotFoundException($"Marca {request.BrandId} não encontrada.");
+
         var model = new ProductModel(
             tenantId,
             request.Name,
@@ -125,6 +135,23 @@ public class CatalogService : ICatalogService
             request.CategoryId,
             request.Description
         );
+
+        if (request.InitialSku != null)
+        {
+            var skuCodeNorm = request.InitialSku.SkuCode.Trim().ToUpper();
+            var skuExists = await _dbContext.ProductSkus.AnyAsync(s => s.SkuCode == skuCodeNorm, ct);
+            if (skuExists)
+                throw new InvalidOperationException($"Já existe um SKU com o código '{skuCodeNorm}'.");
+
+            var sku = model.AddSku(
+                skuCodeNorm,
+                request.InitialSku.VariantName,
+                request.InitialSku.DefaultPrice,
+                request.InitialSku.BarcodeEan,
+                request.InitialSku.TechnicalSpecsJson
+            );
+            _dbContext.ProductSkus.Add(sku);
+        }
 
         _dbContext.ProductModels.Add(model);
         await _dbContext.SaveChangesAsync(ct);
@@ -176,9 +203,9 @@ public class CatalogService : ICatalogService
         if (sku == null)
             throw new KeyNotFoundException($"SKU {skuId} não encontrado.");
 
-        if (request.ExpectedVersion != 0 && sku.Version != request.ExpectedVersion)
+        if (request.ExpectedVersion <= 0 || sku.Version != request.ExpectedVersion)
         {
-            throw new DbUpdateConcurrencyException($"Conflito de versão no SKU {skuId}. Esperado: {request.ExpectedVersion}, Atual: {sku.Version}");
+            throw new DbUpdateConcurrencyException($"Conflito de concorrência no SKU {skuId}. Versão esperada: {request.ExpectedVersion}, Versão atual no banco: {sku.Version}. Recarregue o registro antes de salvar.");
         }
 
         sku.UpdatePrice(request.NewPrice);
@@ -318,9 +345,9 @@ public class CatalogService : ICatalogService
         if (unit == null)
             throw new KeyNotFoundException($"Unidade {unitId} não encontrada.");
 
-        if (request.ExpectedVersion != 0 && unit.Version != request.ExpectedVersion)
+        if (request.ExpectedVersion <= 0 || unit.Version != request.ExpectedVersion)
         {
-            throw new DbUpdateConcurrencyException($"Conflito de versão na unidade {unitId}. Esperado: {request.ExpectedVersion}, Atual: {unit.Version}");
+            throw new DbUpdateConcurrencyException($"Conflito de concorrência na unidade {unitId}. Versão esperada: {request.ExpectedVersion}, Versão atual no banco: {unit.Version}. Recarregue o registro antes de aprovar.");
         }
 
         unit.ApproveForSale(request.ApprovalNotes);

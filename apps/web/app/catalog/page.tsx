@@ -131,10 +131,12 @@ export default function CatalogPage() {
   const [targetUnit, setTargetUnit] = useState<InventoryUnit | null>(null);
   const [approvalNotes, setApprovalNotes] = useState("");
 
-  // Carregar dados de Catálogo do Backend
+  // Carregar dados de Catálogo do Backend com tratamento rigoroso por coleção
   const loadCatalogData = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
+    const fetchErrors: string[] = [];
+
     try {
       const [catRes, brandRes, modelRes, unitRes] = await Promise.all([
         fetch("/api/catalog/categories"),
@@ -144,20 +146,31 @@ export default function CatalogPage() {
       ]);
 
       if (catRes.ok) {
-        const catData = await catRes.json();
-        setCategories(catData);
+        setCategories(await catRes.json());
+      } else {
+        fetchErrors.push("Categorias");
       }
+
       if (brandRes.ok) {
-        const brandData = await brandRes.json();
-        setBrands(brandData);
+        setBrands(await brandRes.json());
+      } else {
+        fetchErrors.push("Marcas");
       }
+
       if (modelRes.ok) {
-        const modelData = await modelRes.json();
-        setModels(modelData);
+        setModels(await modelRes.json());
+      } else {
+        fetchErrors.push("Modelos");
       }
+
       if (unitRes.ok) {
-        const unitData = await unitRes.json();
-        setUnits(unitData);
+        setUnits(await unitRes.json());
+      } else {
+        fetchErrors.push("Unidades");
+      }
+
+      if (fetchErrors.length > 0) {
+        setErrorMsg(`Atenção: Não foi possível carregar os dados de: ${fetchErrors.join(", ")}.`);
       }
     } catch {
       setErrorMsg("Falha de comunicação com o serviço de catálogo.");
@@ -170,7 +183,7 @@ export default function CatalogPage() {
     loadCatalogData();
   }, [loadCatalogData]);
 
-  // Handler: Criar Modelo com SKU inicial
+  // Handler: Criar Modelo com SKU inicial em Transação Atômica no Backend
   const handleCreateModel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modelName.trim() || !selectedBrandId || !selectedCategoryId || !initialSkuCode.trim()) {
@@ -179,51 +192,36 @@ export default function CatalogPage() {
     }
 
     try {
-      const modelPayload = {
+      const payload = {
         name: modelName.trim(),
         kind: 1, // Standard
         serializationPolicy: policy,
         brandId: selectedBrandId,
         categoryId: selectedCategoryId,
-        description: modelDescription.trim() || null
+        description: modelDescription.trim() || null,
+        initialSku: {
+          skuCode: initialSkuCode.trim().toUpperCase(),
+          variantName: initialVariantName.trim() || modelName.trim(),
+          defaultPrice: parseFloat(initialPrice) || 0,
+          barcodeEan: null,
+          technicalSpecsJson: null
+        }
       };
 
       const res = await fetch("/api/catalog/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(modelPayload)
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setErrorMsg(err.error || "Erro ao criar modelo.");
+        setErrorMsg(err.error || "Erro ao criar modelo e SKU atômicos no catálogo.");
         return;
       }
 
-      const createdModel = await res.json();
-
-      // Cadastra o SKU inicial
-      const skuPayload = {
-        skuCode: initialSkuCode.trim().toUpperCase(),
-        variantName: initialVariantName.trim() || modelName.trim(),
-        defaultPrice: parseFloat(initialPrice) || 0,
-        barcodeEan: null,
-        technicalSpecsJson: null
-      };
-
-      const skuRes = await fetch(`/api/catalog/models/${createdModel.id}/skus`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(skuPayload)
-      });
-
-      if (!skuRes.ok) {
-        const err = await skuRes.json().catch(() => ({}));
-        setErrorMsg(`Modelo criado, mas falhou ao registrar SKU: ${err.error || "erro desconhecido"}`);
-      } else {
-        setSuccessMsg(`Modelo "${modelName}" e SKU inicial persistidos com sucesso!`);
-        setTimeout(() => setSuccessMsg(null), 4000);
-      }
+      setSuccessMsg(`Modelo "${modelName}" e SKU inicial persistidos em transação atômica única!`);
+      setTimeout(() => setSuccessMsg(null), 4000);
 
       setIsCreateModelOpen(false);
       setModelName("");

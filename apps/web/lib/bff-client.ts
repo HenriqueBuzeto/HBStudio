@@ -53,11 +53,37 @@ export async function forwardToBackend(
         );
       }
     } else {
-      // Se não houver Origin, validar Sec-Fetch-Site para navegadores modernos
+      // Política Fail-Closed para Navegadores:
+      // Em requisições de mutação, o navegador SEMPRE envia Origin ou Sec-Fetch-Site / Referer
       const secFetchSite = request.headers.get("sec-fetch-site");
-      if (secFetchSite && secFetchSite === "cross-site") {
+      const referer = request.headers.get("referer");
+
+      if (secFetchSite) {
+        if (secFetchSite === "cross-site") {
+          return NextResponse.json(
+            { error: "Requisição cross-site bloqueada.", code: "CSRF_CROSS_SITE" },
+            { status: 403 }
+          );
+        }
+      } else if (referer) {
+        try {
+          const refUrl = new URL(referer);
+          if (host && refUrl.host !== host) {
+            return NextResponse.json(
+              { error: "Acesso bloqueado por cabeçalho Referer incompatível.", code: "CSRF_FORBIDDEN" },
+              { status: 403 }
+            );
+          }
+        } catch {
+          return NextResponse.json(
+            { error: "Cabeçalho Referer malformado.", code: "INVALID_REFERER" },
+            { status: 400 }
+          );
+        }
+      } else if (process.env.NODE_ENV === "production") {
+        // Em produção, rejeitar mutações sem Origin, Sec-Fetch-Site ou Referer
         return NextResponse.json(
-          { error: "Requisição cross-site bloqueada.", code: "CSRF_CROSS_SITE" },
+          { error: "Requisição rejeitada por ausência de identificação de origem segura.", code: "CSRF_FAIL_CLOSED" },
           { status: 403 }
         );
       }
@@ -157,9 +183,8 @@ export async function forwardToBackend(
       );
     }
 
-    const errorMsg = err instanceof Error ? err.message : "Falha na comunicação";
     return NextResponse.json(
-      { error: "Falha na comunicação com o serviço do backend.", details: errorMsg, code: "SERVICE_UNAVAILABLE" },
+      { error: "Serviço temporariamente indisponível. Tente novamente mais tarde.", code: "SERVICE_UNAVAILABLE" },
       { status: 503 }
     );
   }

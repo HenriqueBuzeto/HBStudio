@@ -94,13 +94,13 @@ export interface PartyConsent {
 }
 
 export interface CustomerGamification {
-  pointsBalance: number;
-  tier: "Bronze" | "Prata" | "Ouro" | "Diamante";
-  totalSpent: number;
-  cashbackAvailable: number;
-  ordersCount: number;
-  repairsCount: number;
-  lifetimeValue: number;
+  pointsBalance?: number;
+  tier?: "Bronze" | "Prata" | "Ouro" | "Diamante";
+  totalSpent?: number;
+  cashbackAvailable?: number;
+  ordersCount?: number;
+  repairsCount?: number;
+  lifetimeValue?: number;
   lastPointsEarnedDate?: string;
 }
 
@@ -148,7 +148,7 @@ export interface Party {
   addresses: PartyAddress[];
   equipments: CustomerEquipment[];
   consents: PartyConsent[];
-  gamification: CustomerGamification;
+  gamification?: CustomerGamification;
   history: CustomerHistoryItem[];
   createdAtUtc: string;
 }
@@ -308,15 +308,7 @@ export default function PartiesPage() {
             origin: cs.origin,
             eventDateUtc: cs.eventDateUtc
           })),
-          gamification: {
-            pointsBalance: 0,
-            tier: "Bronze",
-            totalSpent: 0,
-            cashbackAvailable: 0,
-            ordersCount: 0,
-            repairsCount: 0,
-            lifetimeValue: 0
-          },
+          gamification: undefined,
           history: []
         }));
         setParties(mapped);
@@ -401,7 +393,7 @@ export default function PartiesPage() {
       enableSupplier: isSupplierCheck,
       customerNotes: newNotes.trim() || null,
       supplyCategories: null,
-      paymentTerms: "À Vista / Pix / Cartão",
+      paymentTerms: null,
       primaryPhone: newPhone.trim() || null,
       primaryEmail: newEmail.trim() || null
     };
@@ -453,6 +445,8 @@ export default function PartiesPage() {
       if (newStreet.trim()) {
         if (!newCity.trim() || !newState.trim()) {
           partialErrors.push("Endereço: Cidade e Estado são obrigatórios quando a rua for informada.");
+        } else if (!newNeighborhood.trim() || !newPostalCode.trim()) {
+          partialErrors.push("Endereço: Bairro e CEP são obrigatórios quando a rua for informada.");
         } else {
           try {
             const addrRes = await fetch(`/api/parties/${created.id}/addresses`, {
@@ -462,10 +456,10 @@ export default function PartiesPage() {
                 street: newStreet.trim(),
                 number: newNumber.trim() || "S/N",
                 complement: newComplement.trim() || null,
-                neighborhood: newNeighborhood.trim() || "Não Informado",
+                neighborhood: newNeighborhood.trim(),
                 city: newCity.trim(),
                 state: newState.trim().toUpperCase(),
-                postalCode: newPostalCode.trim() || "00000000",
+                postalCode: newPostalCode.trim(),
                 isPrimary: true
               })
             });
@@ -524,7 +518,7 @@ export default function PartiesPage() {
   const filteredParties = parties.filter((p) => {
     if (filterType === "customers" && !p.isCustomer) return false;
     if (filterType === "suppliers" && !p.isSupplier) return false;
-    if (selectedTierFilter !== "all" && p.gamification.tier !== selectedTierFilter) return false;
+    if (selectedTierFilter !== "all" && p.gamification?.tier !== selectedTierFilter) return false;
 
     if (!search.trim()) return true;
     const term = search.toLowerCase();
@@ -762,19 +756,23 @@ export default function PartiesPage() {
 
                         {/* Gamificação & Pontos por CPF */}
                         <td className="py-3.5 px-4">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${getTierColor(party.gamification?.tier || "Bronze")}`}>
-                                Clube {party.gamification?.tier || "Bronze"}
-                              </span>
-                              <span className="text-xs font-extrabold text-purple-700 font-mono">
-                                {party.gamification?.pointsBalance ?? 0} pts
+                          {party.gamification ? (
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${getTierColor(party.gamification.tier || "Bronze")}`}>
+                                  Clube {party.gamification.tier || "Bronze"}
+                                </span>
+                                <span className="text-xs font-extrabold text-purple-700 font-mono">
+                                  {party.gamification.pointsBalance ?? 0} pts
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400">
+                                Cashback: R$ {(party.gamification.cashbackAvailable || 0).toFixed(2)}
                               </span>
                             </div>
-                            <span className="text-[10px] text-slate-400">
-                              Cashback: R$ {(party.gamification?.cashbackAvailable || 0).toFixed(2)}
-                            </span>
-                          </div>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Fidelidade não ativada</span>
+                          )}
                         </td>
 
                         {/* Aparelhos */}
@@ -796,12 +794,18 @@ export default function PartiesPage() {
 
                         {/* LTV */}
                         <td className="py-3.5 px-4">
-                          <div className="font-extrabold text-slate-900 font-mono">
-                            R$ {(party.gamification?.lifetimeValue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {party.gamification?.ordersCount || 0} compras • {party.gamification?.repairsCount || 0} OS
-                          </div>
+                          {party.gamification ? (
+                            <>
+                              <div className="font-extrabold text-slate-900 font-mono">
+                                R$ {(party.gamification.lifetimeValue || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {party.gamification.ordersCount || 0} compras • {party.gamification.repairsCount || 0} OS
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Dados indisponíveis</span>
+                          )}
                         </td>
 
                         {/* Status */}
@@ -881,8 +885,8 @@ export default function PartiesPage() {
                       <h2 className="text-xl font-black text-slate-900 tracking-tight">
                         {fullScreenParty.name}
                       </h2>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getTierColor(fullScreenParty.gamification.tier)}`}>
-                        Clube {fullScreenParty.gamification.tier}
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getTierColor(fullScreenParty.gamification?.tier || "Bronze")}`}>
+                        Clube {fullScreenParty.gamification?.tier || "Bronze (Pendente)"}
                       </span>
                       <button
                         type="button"
@@ -964,7 +968,7 @@ export default function PartiesPage() {
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-purple-700 font-mono">
-                    {fullScreenParty.gamification.pointsBalance} pts
+                    {fullScreenParty.gamification ? `${fullScreenParty.gamification.pointsBalance ?? 0} pts` : "Não ativado"}
                   </div>
                   <div className="text-[10px] text-slate-400">
                     Acumulados em compras pelo CPF
@@ -977,7 +981,9 @@ export default function PartiesPage() {
                     <Coins className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-emerald-600 font-mono">
-                    R$ {fullScreenParty.gamification.cashbackAvailable.toFixed(2)}
+                    {fullScreenParty.gamification && fullScreenParty.gamification.cashbackAvailable !== undefined
+                      ? `R$ ${fullScreenParty.gamification.cashbackAvailable.toFixed(2)}`
+                      : "R$ 0,00"}
                   </div>
                   <div className="text-[10px] text-slate-400">
                     Abatimento direto no PDV
@@ -990,10 +996,12 @@ export default function PartiesPage() {
                     <DollarSign className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-slate-900 font-mono">
-                    R$ {fullScreenParty.gamification.lifetimeValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {fullScreenParty.gamification && fullScreenParty.gamification.lifetimeValue !== undefined
+                      ? `R$ ${fullScreenParty.gamification.lifetimeValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                      : "R$ 0,00"}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    {fullScreenParty.gamification.ordersCount} pedidos faturados
+                    {fullScreenParty.gamification?.ordersCount ?? 0} pedidos faturados
                   </div>
                 </div>
 
@@ -1003,7 +1011,7 @@ export default function PartiesPage() {
                     <Wrench className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-slate-900 font-mono">
-                    {fullScreenParty.gamification.repairsCount} Reparos
+                    {fullScreenParty.gamification?.repairsCount ?? 0} Reparos
                   </div>
                   <div className="text-[10px] text-slate-400">
                     Assistência técnica concluída
@@ -1048,7 +1056,7 @@ export default function PartiesPage() {
                   <Gift className="w-4 h-4 text-amber-500" />
                   Módulo Gamificação & Resgate de Brindes
                   <span className="px-2 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold">
-                    {fullScreenParty.gamification.pointsBalance} pts
+                    {fullScreenParty.gamification?.pointsBalance ?? 0} pts
                   </span>
                 </button>
                 <button
@@ -1257,7 +1265,7 @@ export default function PartiesPage() {
                             </span>
                           </div>
                           <h3 className="text-2xl font-black mt-1">
-                            {fullScreenParty.name} — Nível {fullScreenParty.gamification.tier}
+                            {fullScreenParty.name} — Nível {fullScreenParty.gamification?.tier || "Bronze"}
                           </h3>
                           <p className="text-xs text-purple-200 mt-1 max-w-xl">
                             Todas as compras e ordens de serviço faturadas neste CPF acumulam 1 ponto a cada R$ 10,00 gastos. Pontos podem ser trocados a qualquer momento por brindes e vales-compra no balcão.
@@ -1267,7 +1275,7 @@ export default function PartiesPage() {
                         <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
                           <div>
                             <span className="text-[10px] font-bold text-purple-200 block uppercase">Saldo Disponível</span>
-                            <span className="text-3xl font-black font-mono text-amber-300">{fullScreenParty.gamification.pointsBalance}</span>
+                            <span className="text-3xl font-black font-mono text-amber-300">{fullScreenParty.gamification?.pointsBalance ?? 0}</span>
                             <span className="text-xs font-bold text-purple-200 ml-1">pts</span>
                           </div>
                         </div>
@@ -1276,8 +1284,8 @@ export default function PartiesPage() {
                       {/* Barra de Progressão de Nível */}
                       <div className="mt-6 pt-4 border-t border-white/15">
                         <div className="flex justify-between text-xs font-bold mb-1.5 text-purple-200">
-                          <span>Nível Atual: {fullScreenParty.gamification.tier}</span>
-                          <span>Próximo Nível: {fullScreenParty.gamification.tier === "Ouro" ? "Diamante (Faltam 550 pts)" : "Ouro"}</span>
+                          <span>Nível Atual: {fullScreenParty.gamification?.tier || "Bronze"}</span>
+                          <span>Próximo Nível: {fullScreenParty.gamification?.tier === "Ouro" ? "Diamante (Faltam 550 pts)" : "Ouro"}</span>
                         </div>
                         <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
                           <div className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full" style={{ width: "72%" }} />
@@ -1298,13 +1306,13 @@ export default function PartiesPage() {
                           </p>
                         </div>
                         <span className="text-xs font-extrabold text-purple-700 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200">
-                          Saldo do Cliente: {fullScreenParty.gamification.pointsBalance} pts
+                          Saldo do Cliente: {fullScreenParty.gamification?.pointsBalance ?? 0} pts
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {REWARDS_CATALOG.map((reward) => {
-                          const canRedeem = fullScreenParty.gamification.pointsBalance >= reward.pointsRequired;
+                          const canRedeem = (fullScreenParty.gamification?.pointsBalance ?? 0) >= reward.pointsRequired;
                           return (
                             <div 
                               key={reward.id} 
@@ -1347,7 +1355,7 @@ export default function PartiesPage() {
                                   </>
                                 ) : (
                                   <>
-                                    <span>Faltam {reward.pointsRequired - fullScreenParty.gamification.pointsBalance} pts</span>
+                                    <span>Faltam {reward.pointsRequired - (fullScreenParty.gamification?.pointsBalance ?? 0)} pts</span>
                                   </>
                                 )}
                               </button>
