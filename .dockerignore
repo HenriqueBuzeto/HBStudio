@@ -1,0 +1,15 @@
+.git
+.github
+.vscode
+.idea
+**/bin
+**/obj
+**/node_modules
+**/.next
+**/out
+apps/web
+publish-test
+pgdata
+*.md
+*.log
+*.env*

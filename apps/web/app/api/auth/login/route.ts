@@ -3,9 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:5021";
+    const apiUrl = process.env.API_INTERNAL_URL;
+    if (!apiUrl) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "CONFIG_ERROR: A variável de ambiente API_INTERNAL_URL é obrigatória em ambiente de produção na Vercel." },
+          { status: 500 }
+        );
+      }
+    }
+    const resolvedApiUrl = apiUrl || "http://localhost:5021";
 
-    const backendRes = await fetch(`${apiUrl}/api/auth/login`, {
+    const backendRes = await fetch(`${resolvedApiUrl}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

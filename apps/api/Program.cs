@@ -154,12 +154,24 @@ builder.Services.AddScoped<IdentityAccess.Application.Services.IAuthenticationSe
 
 
 
-// Configuração de Autenticação JWT
+// Configuração de Autenticação JWT com Hardening Estrito para Produção
+var jwtKey = builder.Configuration["Jwt:Key"];
 
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "HBStudioEnterpriseErpSuperSecretKey20261113!";
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    if (builder.Environment.IsProduction())
+    {
+        throw new InvalidOperationException("CRITICAL_SECURITY_ERROR: A chave JWT (Jwt:Key) é estritamente obrigatória em ambiente de Produção e não foi fornecida.");
+    }
+
+    jwtKey = "HBStudioEnterpriseErpSuperSecretKey20261113!";
+}
+else if (jwtKey.Length < 32)
+{
+    throw new InvalidOperationException("CRITICAL_SECURITY_ERROR: A chave JWT fornecida deve conter no mínimo 32 caracteres.");
+}
 
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "HBStudioErp";
-
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "HBStudioErpClient";
 
 
@@ -254,9 +266,25 @@ app.UseAuthorization();
 
 
 
-// Health Check Endpoint
-
+// Health Check Endpoints: Liveness & Readiness com PostgreSQL
 app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
+
+app.MapGet("/health/ready", async (AppDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync(ct);
+        if (canConnect)
+        {
+            return Results.Ok(new { status = "Ready", database = "Connected", timestamp = DateTime.UtcNow });
+        }
+        return Results.Json(new { status = "Unhealthy", database = "Disconnected", timestamp = DateTime.UtcNow }, statusCode: 503);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { status = "Unhealthy", error = "Falha de conexão com o banco de dados.", timestamp = DateTime.UtcNow }, statusCode: 503);
+    }
+});
 
 
 
