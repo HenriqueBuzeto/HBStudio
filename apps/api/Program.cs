@@ -492,10 +492,10 @@ partiesGroup.MapPost("/{id:guid}/addresses", async (Guid id, Parties.Application
     return Results.Created($"/api/parties/{id}/addresses/{address.Id}", address);
 }).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
-partiesGroup.MapPut("/{id:guid}/status", async (Guid id, bool isActive, Parties.Application.IPartiesService service, CancellationToken ct) =>
+partiesGroup.MapPut("/{id:guid}/status", async (Guid id, UpdatePartyStatusRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
 {
-    await service.SetStatusAsync(id, isActive, ct);
-    return Results.Ok(new { id, isActive });
+    await service.SetStatusAsync(id, req.IsActive, ct);
+    return Results.Ok(new { id, isActive = req.IsActive });
 }).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
 
@@ -5514,6 +5514,8 @@ public record ResetPasswordDto(string NewPassword);
 public record AssignRolesDto(List<string> RoleNames, string? Justification = null);
 
 public record UpdateJobTitleDto(string JobTitle);
+
+public record UpdatePartyStatusRequest(bool IsActive);
 
 
 

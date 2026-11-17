@@ -226,12 +226,32 @@ export default function PartiesPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Carregar Clientes Reais do Backend via BFF
-  const loadParties = React.useCallback(async () => {
+  // Paginação e busca no servidor
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "customers" | "suppliers">("customers");
+  const [selectedTierFilter, setSelectedTierFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  // Carregar Clientes Reais do Backend via BFF com Paginação e Busca no Servidor
+  const loadParties = React.useCallback(async (targetPage = 1, currentSearch = search, currentFilter = filterType) => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/parties");
+      const params = new URLSearchParams();
+      params.set("page", targetPage.toString());
+      params.set("pageSize", pageSize.toString());
+
+      if (currentSearch.trim()) {
+        params.set("search", currentSearch.trim());
+      }
+      if (currentFilter === "customers") {
+        params.set("onlyCustomers", "true");
+      } else if (currentFilter === "suppliers") {
+        params.set("onlySuppliers", "true");
+      }
+
+      const res = await fetch(`/api/parties?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         const mapped: Party[] = data.map((item: any) => ({
@@ -247,8 +267,8 @@ export default function PartiesPage() {
           isCustomer: item.isCustomer ?? true,
           isSupplier: item.isSupplier ?? false,
           notes: item.notes,
-          creditLimit: 5000.0,
-          paymentTerms: "À Vista / Pix / Cartão",
+          creditLimit: undefined,
+          paymentTerms: undefined,
           createdAtUtc: item.createdAtUtc,
           contacts: (item.contacts || []).map((c: any) => ({
             id: c.id,
@@ -289,7 +309,7 @@ export default function PartiesPage() {
             eventDateUtc: cs.eventDateUtc
           })),
           gamification: {
-            pointsBalance: 100,
+            pointsBalance: 0,
             tier: "Bronze",
             totalSpent: 0,
             cashbackAvailable: 0,
@@ -300,6 +320,7 @@ export default function PartiesPage() {
           history: []
         }));
         setParties(mapped);
+        setPage(targetPage);
       } else {
         const err = await res.json().catch(() => ({}));
         setErrorMsg(err.error || "Erro ao carregar clientes do servidor.");
@@ -309,16 +330,11 @@ export default function PartiesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [search, filterType]);
 
   React.useEffect(() => {
-    loadParties();
-  }, [loadParties]);
-
-  // Filtros e busca
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "customers" | "suppliers">("customers");
-  const [selectedTierFilter, setSelectedTierFilter] = useState<string>("all");
+    loadParties(1, search, filterType);
+  }, [filterType]);
 
   // Visualização e Detalhes
   const [fullScreenParty, setFullScreenParty] = useState<Party | null>(null);
@@ -357,40 +373,11 @@ export default function PartiesPage() {
   const [isCustomerCheck, setIsCustomerCheck] = useState(true);
   const [isSupplierCheck, setIsSupplierCheck] = useState(false);
 
-  // Resgate de Brindes no Módulo de Gamificação
+  // Resgate de Brindes no Módulo de Gamificação (Pendente de motor transacional no backend)
   const handleRedeemReward = (reward: RewardItem) => {
-    if (!fullScreenParty) return;
-
-    if (fullScreenParty.gamification.pointsBalance < reward.pointsRequired) {
-      alert(`Saldo insuficiente! O cliente possui ${fullScreenParty.gamification.pointsBalance} pts e o brinde requer ${reward.pointsRequired} pts.`);
-      return;
-    }
-
-    const newBalance = fullScreenParty.gamification.pointsBalance - reward.pointsRequired;
-    const redemptionItem: CustomerHistoryItem = {
-      id: `red-${Date.now()}`,
-      type: "Resgate",
-      title: `Resgate de Brinde: ${reward.title}`,
-      dateUtc: new Date().toISOString(),
-      amount: reward.estimatedValue,
-      pointsDelta: -reward.pointsRequired,
-      status: "Resgatado & Liberado",
-      details: `Resgate autorizado no balcão. ${reward.description} Débito de ${reward.pointsRequired} pontos no CPF ${fullScreenParty.documentNumber}.`
-    };
-
-    const updatedParty: Party = {
-      ...fullScreenParty,
-      gamification: {
-        ...fullScreenParty.gamification,
-        pointsBalance: newBalance
-      },
-      history: [redemptionItem, ...fullScreenParty.history]
-    };
-
-    setParties(parties.map(p => p.id === updatedParty.id ? updatedParty : p));
-    setFullScreenParty(updatedParty);
-    setRedemptionSuccessMsg(`Brinde "${reward.title}" resgatado com sucesso! Saldo restante: ${newBalance} pts.`);
-    setTimeout(() => setRedemptionSuccessMsg(null), 5000);
+    alert(
+      `O resgate do brinde "${reward.title}" requer processamento transacional pelo módulo de Fidelidade do backend, que se encontra em fase de homologação. Nenhuma dedução simulada foi realizada.`
+    );
   };
 
   // Salvar novo cadastro completo com persistência real via BFF
@@ -434,47 +421,73 @@ export default function PartiesPage() {
       }
 
       const created = await res.json();
+      const partialErrors: string[] = [];
 
-      // Se informou equipamento, persiste no backend
+      // Se informou equipamento, persiste no backend de forma explícita
       if (newEquipmentModel.trim()) {
-        await fetch(`/api/parties/${created.id}/equipments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            equipmentType: "Smartphone",
-            brand: newEquipmentBrand,
-            model: newEquipmentModel.trim(),
-            color: newEquipmentColor.trim() || null,
-            imei1: newEquipmentImei.trim() || null,
-            imei2: null,
-            serialNumber: null,
-            notes: null
-          })
-        }).catch(() => {});
+        try {
+          const eqRes = await fetch(`/api/parties/${created.id}/equipments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              equipmentType: "Smartphone",
+              brand: newEquipmentBrand,
+              model: newEquipmentModel.trim(),
+              color: newEquipmentColor.trim() || null,
+              imei1: newEquipmentImei.trim() || null,
+              imei2: null,
+              serialNumber: null,
+              notes: null
+            })
+          });
+          if (!eqRes.ok) {
+            const eqErr = await eqRes.json().catch(() => ({}));
+            partialErrors.push(`Equipamento: ${eqErr.error || "falha ao registrar aparelho"}`);
+          }
+        } catch {
+          partialErrors.push("Equipamento: falha de comunicação");
+        }
       }
 
-      // Se informou endereço, persiste no backend
+      // Se informou endereço, valida e persiste no backend sem dados artificiais
       if (newStreet.trim()) {
-        await fetch(`/api/parties/${created.id}/addresses`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            street: newStreet.trim(),
-            number: newNumber.trim() || "S/N",
-            complement: newComplement.trim() || null,
-            neighborhood: newNeighborhood.trim() || "Centro",
-            city: newCity.trim() || "São Paulo",
-            state: newState.trim() || "SP",
-            postalCode: newPostalCode.trim() || "00000-000",
-            isPrimary: true
-          })
-        }).catch(() => {});
+        if (!newCity.trim() || !newState.trim()) {
+          partialErrors.push("Endereço: Cidade e Estado são obrigatórios quando a rua for informada.");
+        } else {
+          try {
+            const addrRes = await fetch(`/api/parties/${created.id}/addresses`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                street: newStreet.trim(),
+                number: newNumber.trim() || "S/N",
+                complement: newComplement.trim() || null,
+                neighborhood: newNeighborhood.trim() || "Não Informado",
+                city: newCity.trim(),
+                state: newState.trim().toUpperCase(),
+                postalCode: newPostalCode.trim() || "00000000",
+                isPrimary: true
+              })
+            });
+            if (!addrRes.ok) {
+              const addrErr = await addrRes.json().catch(() => ({}));
+              partialErrors.push(`Endereço: ${addrErr.error || "falha ao registrar endereço"}`);
+            }
+          } catch {
+            partialErrors.push("Endereço: falha de comunicação");
+          }
+        }
       }
 
-      // Recarrega lista completa e abre o cliente salvo
+      // Recarrega lista completa
       await loadParties();
-      setSuccessMsg(`Cadastro de "${newName}" salvo e persistido com sucesso!`);
-      setTimeout(() => setSuccessMsg(null), 5000);
+
+      if (partialErrors.length > 0) {
+        setErrorMsg(`Cliente gravado com pendências parciais: ${partialErrors.join("; ")}`);
+      } else {
+        setSuccessMsg(`Cadastro de "${newName}" salvo e persistido com sucesso!`);
+        setTimeout(() => setSuccessMsg(null), 5000);
+      }
 
       setShowCreateModal(false);
 
@@ -631,16 +644,22 @@ export default function PartiesPage() {
           </div>
 
           {/* Campo de Busca Rápida por Nome, CPF/CNPJ, Telefone ou IMEI */}
-          <div className="relative w-full md:w-96">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              loadParties(1, search, filterType);
+            }}
+            className="relative w-full md:w-96"
+          >
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por nome, CPF/CNPJ, WhatsApp ou IMEI..."
+              placeholder="Buscar por nome, CPF/CNPJ ou telefone (Enter para buscar)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800 transition-all"
             />
-          </div>
+          </form>
         </div>
 
         {/* Tabela Completa de Clientes Nível Senior (Largura Total) */}
@@ -817,6 +836,31 @@ export default function PartiesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginação Real no Servidor */}
+          <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+            <div>
+              Página <span className="font-bold text-slate-900">{page}</span> ({filteredParties.length} registros nesta página)
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => loadParties(Math.max(1, page - 1), search, filterType)}
+                disabled={page <= 1 || isLoading}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ← Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => loadParties(page + 1, search, filterType)}
+                disabled={filteredParties.length < pageSize || isLoading}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-bold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Próxima →
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* ========================================================================= */}
@@ -840,9 +884,39 @@ export default function PartiesPage() {
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getTierColor(fullScreenParty.gamification.tier)}`}>
                         Clube {fullScreenParty.gamification.tier}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {fullScreenParty.isActive ? "Cadastro Ativo" : "Cadastro Inativo"}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newStatus = !fullScreenParty.isActive;
+                          try {
+                            const res = await fetch(`/api/parties/${fullScreenParty.id}/status`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ isActive: newStatus }),
+                            });
+                            if (res.ok) {
+                              const updated = { ...fullScreenParty, isActive: newStatus };
+                              setFullScreenParty(updated);
+                              setParties(parties.map((p) => (p.id === updated.id ? updated : p)));
+                              setSuccessMsg(`Status alterado com sucesso para ${newStatus ? "Ativo" : "Inativo"}.`);
+                              setTimeout(() => setSuccessMsg(null), 4000);
+                            } else {
+                              const err = await res.json().catch(() => ({}));
+                              setErrorMsg(err.error || "Falha ao alterar status.");
+                            }
+                          } catch {
+                            setErrorMsg("Erro de comunicação ao alterar status.");
+                          }
+                        }}
+                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
+                          fullScreenParty.isActive
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                        }`}
+                        title="Clique para alternar status ativo/inativo no banco"
+                      >
+                        {fullScreenParty.isActive ? "Cadastro Ativo (Clique p/ Inativar)" : "Cadastro Inativo (Clique p/ Ativar)"}
+                      </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-mono mt-1">
                       <span>{fullScreenParty.type === 1 ? "Pessoa Física" : "Pessoa Jurídica"}</span>
@@ -1432,13 +1506,17 @@ export default function PartiesPage() {
                         <div className="space-y-3 text-xs">
                           <div className="flex justify-between items-center py-2 border-b border-slate-100">
                             <span className="text-slate-500">Limite Aprovado no Balcão:</span>
-                            <span className="font-black text-slate-900 font-mono text-sm">
-                              R$ {(fullScreenParty.creditLimit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            <span className="font-bold text-slate-800 font-mono text-xs">
+                              {fullScreenParty.creditLimit !== undefined
+                                ? `R$ ${fullScreenParty.creditLimit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                                : "Não configurado"}
                             </span>
                           </div>
                           <div className="flex justify-between items-center py-2 border-b border-slate-100">
                             <span className="text-slate-500">Condição Padrão de Pagamento:</span>
-                            <span className="font-bold text-slate-800">{fullScreenParty.paymentTerms || "À Vista / Pix"}</span>
+                            <span className="font-bold text-slate-800">
+                              {fullScreenParty.paymentTerms || "Não configurada"}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center py-2 border-b border-slate-100">
                             <span className="text-slate-500">Situação Cadastral de Crédito:</span>
@@ -1739,7 +1817,7 @@ export default function PartiesPage() {
                           type="text"
                           value={newCity}
                           onChange={(e) => setNewCity(e.target.value)}
-                          placeholder="São Paulo"
+                          placeholder="Ex: São Paulo, Campinas..."
                           className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                         />
                       </div>
@@ -1749,7 +1827,8 @@ export default function PartiesPage() {
                           type="text"
                           value={newState}
                           onChange={(e) => setNewState(e.target.value)}
-                          placeholder="SP"
+                          placeholder="UF (ex: SP, RJ)"
+                          maxLength={2}
                           className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 uppercase"
                         />
                       </div>

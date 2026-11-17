@@ -29,7 +29,42 @@ export async function forwardToBackend(
     );
   }
 
-  // 2. Obtenção do Token HttpOnly
+  const method = options?.customMethod || request.method;
+
+  // 2. Proteção CSRF em métodos de mutação (POST, PUT, DELETE, PATCH)
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(method.toUpperCase())) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host");
+
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        // Validar se a origem bate com o host da requisição
+        if (host && originUrl.host !== host) {
+          return NextResponse.json(
+            { error: "Acesso bloqueado por violação de política de Origem (CSRF detectado).", code: "CSRF_FORBIDDEN" },
+            { status: 403 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Cabeçalho Origin malformado.", code: "INVALID_ORIGIN" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Se não houver Origin, validar Sec-Fetch-Site para navegadores modernos
+      const secFetchSite = request.headers.get("sec-fetch-site");
+      if (secFetchSite && secFetchSite === "cross-site") {
+        return NextResponse.json(
+          { error: "Requisição cross-site bloqueada.", code: "CSRF_CROSS_SITE" },
+          { status: 403 }
+        );
+      }
+    }
+  }
+
+  // 3. Obtenção do Token HttpOnly
   const token = request.cookies.get("hb_access_token")?.value;
   if (!token) {
     return NextResponse.json(
@@ -46,9 +81,7 @@ export async function forwardToBackend(
     return NextResponse.json({ error: msg, code: "CONFIGURATION_ERROR" }, { status: 500 });
   }
 
-  const method = options?.customMethod || request.method;
-
-  // 3. Headers com Repasse de CorrelationId
+  // 4. Headers com Repasse de CorrelationId
   const correlationId =
     request.headers.get("x-correlation-id") ||
     request.headers.get("x-request-id") ||
@@ -75,7 +108,7 @@ export async function forwardToBackend(
     }
   }
 
-  // 4. Timeout e Cancelamento Seguro
+  // 5. Timeout e Cancelamento Seguro
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
@@ -124,7 +157,7 @@ export async function forwardToBackend(
       );
     }
 
-    const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
+    const errorMsg = err instanceof Error ? err.message : "Falha na comunicação";
     return NextResponse.json(
       { error: "Falha na comunicação com o serviço do backend.", details: errorMsg, code: "SERVICE_UNAVAILABLE" },
       { status: 503 }

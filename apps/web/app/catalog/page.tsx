@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import { 
   Boxes, 
@@ -9,122 +9,444 @@ import {
   Plus, 
   Eye, 
   EyeOff, 
-  Package, 
-  Layers, 
   FolderOpen,
-  Sparkles,
-  Truck,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  Tag,
+  ShieldCheck
 } from "lucide-react";
 
 export interface SkuVariant {
   id: string;
   skuCode: string;
   variantName: string;
-  color?: string;
-  storage?: string;
+  barcodeEan?: string;
   defaultPrice: number;
-  availableQuantity: number;
+  availableUnitsCount?: number;
   isActive: boolean;
+  version: number;
 }
 
 export interface ProductModel {
   id: string;
-  brand: string;
+  brandName?: string;
   name: string;
-  category: string;
-  serializationPolicy: number; // 1 = StrictSerialized (IMEI obrigatório), 2 = StandardBatch (livre)
+  categoryName?: string;
+  brandId: string;
+  categoryId: string;
+  serializationPolicy: number; // 0 = None, 1 = Optional, 2 = StrictSerialized
+  kind: number;
   isActive: boolean;
   skus: SkuVariant[];
+  version: number;
 }
 
 export interface InventoryUnit {
   id: string;
-  skuCode: string;
-  modelName: string;
-  serialNumberOrImei: string;
+  productSkuId: string;
+  skuCode?: string;
+  modelName?: string;
+  serialNumber?: string;
+  imei1?: string;
   imei2?: string;
   condition: number;
-  cosmeticGrade: number;
+  grade: number;
   batteryHealthPercentage?: number;
-  acquisitionCost: number;
-  allocatedFreightCost?: number;
-  totalInventoryCost?: number;
-  retailPrice: number;
-  suggestedPrice?: number;
+  acquisitionCost?: number;
+  supplierPartyId?: string;
   operationalStatus: number;
-  operationalStatusName: string;
+  inspectionNotes?: string;
+  acquisitionDateUtc: string;
+  version: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
 }
 
 export default function CatalogPage() {
   const [models, setModels] = useState<ProductModel[]>([]);
-  const [units, setUnits] = useState<InventoryUnit[]>([
-    {
-      id: "u-iphone14-1",
-      skuCode: "IPH14P-128-ROX",
-      modelName: "iPhone 14 Pro 128GB Roxo Profundo",
-      serialNumberOrImei: "354891828374651",
-      condition: 2,
-      cosmeticGrade: 1,
-      batteryHealthPercentage: 89,
-      acquisitionCost: 3200.00,
-      allocatedFreightCost: 42.00,
-      totalInventoryCost: 3242.00,
-      retailPrice: 4499.90,
-      suggestedPrice: 4499.90,
-      operationalStatus: 3,
-      operationalStatusName: "Aprovado para Venda"
-    }
-  ]);
+  const [units, setUnits] = useState<InventoryUnit[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<"models" | "units">("models");
   const [search, setSearch] = useState("");
   const [showCost, setShowCost] = useState(false);
+
+  // Modais
   const [isCreateModelOpen, setIsCreateModelOpen] = useState(false);
+  const [isCreateSkuOpen, setIsCreateSkuOpen] = useState(false);
+  const [isUpdatePriceOpen, setIsUpdatePriceOpen] = useState(false);
   const [isRegisterUnitOpen, setIsRegisterUnitOpen] = useState(false);
+  const [isApproveUnitOpen, setIsApproveUnitOpen] = useState(false);
 
-  // Form Novo Modelo
-  const [brand, setBrand] = useState("Apple");
+  // Estado de Formulário de Modelo
+  const [selectedBrandId, setSelectedBrandId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [modelName, setModelName] = useState("");
-  const [category, setCategory] = useState("Smartphones");
-  const [policy, setPolicy] = useState(1);
-  const [skuCode, setSkuCode] = useState("");
-  const [skuName, setSkuName] = useState("");
-  const [price, setPrice] = useState("");
+  const [policy, setPolicy] = useState(2); // StrictSerialized por padrão para eletrônicos/smartphones
+  const [modelDescription, setModelDescription] = useState("");
+  const [initialSkuCode, setInitialSkuCode] = useState("");
+  const [initialVariantName, setInitialVariantName] = useState("");
+  const [initialPrice, setInitialPrice] = useState("");
 
-  const handleCreateModel = (e: React.FormEvent) => {
+  // Estado para Adicionar SKU
+  const [targetModelId, setTargetModelId] = useState<string | null>(null);
+  const [newSkuCode, setNewSkuCode] = useState("");
+  const [newSkuVariantName, setNewSkuVariantName] = useState("");
+  const [newSkuPrice, setNewSkuPrice] = useState("");
+  const [newSkuBarcode, setNewSkuBarcode] = useState("");
+
+  // Estado para Atualizar Preço
+  const [targetSku, setTargetSku] = useState<SkuVariant | null>(null);
+  const [updatePriceValue, setUpdatePriceValue] = useState("");
+
+  // Estado para Registrar Unidade
+  const [unitSkuId, setUnitSkuId] = useState("");
+  const [unitCondition, setUnitCondition] = useState(2); // PreOwned
+  const [unitCost, setUnitCost] = useState("");
+  const [unitImei1, setUnitImei1] = useState("");
+  const [unitImei2, setUnitImei2] = useState("");
+  const [unitSerial, setUnitSerial] = useState("");
+  const [unitGrade, setUnitGrade] = useState(1); // Grade A
+  const [unitBattery, setUnitBattery] = useState("95");
+  const [unitNotes, setUnitNotes] = useState("");
+
+  // Estado para Aprovar Unidade
+  const [targetUnit, setTargetUnit] = useState<InventoryUnit | null>(null);
+  const [approvalNotes, setApprovalNotes] = useState("");
+
+  // Carregar dados de Catálogo do Backend
+  const loadCatalogData = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const [catRes, brandRes, modelRes, unitRes] = await Promise.all([
+        fetch("/api/catalog/categories"),
+        fetch("/api/catalog/brands"),
+        fetch("/api/catalog/models"),
+        fetch("/api/catalog/units")
+      ]);
+
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        setCategories(catData);
+      }
+      if (brandRes.ok) {
+        const brandData = await brandRes.json();
+        setBrands(brandData);
+      }
+      if (modelRes.ok) {
+        const modelData = await modelRes.json();
+        setModels(modelData);
+      }
+      if (unitRes.ok) {
+        const unitData = await unitRes.json();
+        setUnits(unitData);
+      }
+    } catch {
+      setErrorMsg("Falha de comunicação com o serviço de catálogo.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCatalogData();
+  }, [loadCatalogData]);
+
+  // Handler: Criar Modelo com SKU inicial
+  const handleCreateModel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modelName || !skuCode) return;
+    if (!modelName.trim() || !selectedBrandId || !selectedCategoryId || !initialSkuCode.trim()) {
+      setErrorMsg("Preencha todos os campos obrigatórios do modelo e SKU.");
+      return;
+    }
 
-    const newModel: ProductModel = {
-      id: `m-${Date.now()}`,
-      brand,
-      name: modelName,
-      category,
-      serializationPolicy: policy,
-      isActive: true,
-      skus: [
-        {
-          id: `s-${Date.now()}`,
-          skuCode: skuCode.toUpperCase(),
-          variantName: skuName || modelName,
-          defaultPrice: parseFloat(price) || 0,
-          availableQuantity: 0,
-          isActive: true
-        }
-      ]
-    };
+    try {
+      const modelPayload = {
+        name: modelName.trim(),
+        kind: 1, // Standard
+        serializationPolicy: policy,
+        brandId: selectedBrandId,
+        categoryId: selectedCategoryId,
+        description: modelDescription.trim() || null
+      };
 
-    setModels([newModel, ...models]);
-    setIsCreateModelOpen(false);
-    setModelName("");
-    setSkuCode("");
-    setSkuName("");
-    setPrice("");
+      const res = await fetch("/api/catalog/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(modelPayload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Erro ao criar modelo.");
+        return;
+      }
+
+      const createdModel = await res.json();
+
+      // Cadastra o SKU inicial
+      const skuPayload = {
+        skuCode: initialSkuCode.trim().toUpperCase(),
+        variantName: initialVariantName.trim() || modelName.trim(),
+        defaultPrice: parseFloat(initialPrice) || 0,
+        barcodeEan: null,
+        technicalSpecsJson: null
+      };
+
+      const skuRes = await fetch(`/api/catalog/models/${createdModel.id}/skus`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(skuPayload)
+      });
+
+      if (!skuRes.ok) {
+        const err = await skuRes.json().catch(() => ({}));
+        setErrorMsg(`Modelo criado, mas falhou ao registrar SKU: ${err.error || "erro desconhecido"}`);
+      } else {
+        setSuccessMsg(`Modelo "${modelName}" e SKU inicial persistidos com sucesso!`);
+        setTimeout(() => setSuccessMsg(null), 4000);
+      }
+
+      setIsCreateModelOpen(false);
+      setModelName("");
+      setModelDescription("");
+      setInitialSkuCode("");
+      setInitialVariantName("");
+      setInitialPrice("");
+      await loadCatalogData();
+    } catch {
+      setErrorMsg("Erro de rede ao salvar modelo.");
+    }
+  };
+
+  // Handler: Adicionar SKU a modelo existente
+  const handleAddSku = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetModelId || !newSkuCode.trim()) return;
+
+    try {
+      const payload = {
+        skuCode: newSkuCode.trim().toUpperCase(),
+        variantName: newSkuVariantName.trim() || newSkuCode.trim().toUpperCase(),
+        defaultPrice: parseFloat(newSkuPrice) || 0,
+        barcodeEan: newSkuBarcode.trim() || null,
+        technicalSpecsJson: null
+      };
+
+      const res = await fetch(`/api/catalog/models/${targetModelId}/skus`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Falha ao registrar novo SKU.");
+        return;
+      }
+
+      setSuccessMsg(`Novo SKU "${payload.skuCode}" registrado com sucesso!`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setIsCreateSkuOpen(false);
+      setNewSkuCode("");
+      setNewSkuVariantName("");
+      setNewSkuPrice("");
+      setNewSkuBarcode("");
+      await loadCatalogData();
+    } catch {
+      setErrorMsg("Erro de comunicação ao criar SKU.");
+    }
+  };
+
+  // Handler: Atualizar Preço do SKU
+  const handleUpdatePrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetSku || !updatePriceValue) return;
+
+    try {
+      const payload = {
+        newPrice: parseFloat(updatePriceValue),
+        expectedVersion: targetSku.version
+      };
+
+      const res = await fetch(`/api/catalog/skus/${targetSku.id}/price`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Erro ao atualizar preço.");
+        return;
+      }
+
+      setSuccessMsg(`Preço do SKU "${targetSku.skuCode}" atualizado com sucesso!`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setIsUpdatePriceOpen(false);
+      setTargetSku(null);
+      setUpdatePriceValue("");
+      await loadCatalogData();
+    } catch {
+      setErrorMsg("Erro de rede ao atualizar preço do SKU.");
+    }
+  };
+
+  // Handler: Registrar Unidade Física (IMEI/Serial)
+  const handleRegisterUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unitSkuId || !unitCost) {
+      setErrorMsg("Selecione o SKU e informe o custo de aquisição.");
+      return;
+    }
+
+    try {
+      const payload = {
+        productSkuId: unitSkuId,
+        condition: unitCondition,
+        acquisitionCost: parseFloat(unitCost) || 0,
+        serialNumber: unitSerial.trim() || null,
+        imei1: unitImei1.trim() || null,
+        imei2: unitImei2.trim() || null,
+        grade: unitGrade,
+        batteryHealthPercentage: unitBattery ? parseInt(unitBattery) : null,
+        supplierPartyId: null,
+        inspectionNotes: unitNotes.trim() || null
+      };
+
+      const res = await fetch("/api/catalog/units", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Erro ao registrar unidade física.");
+        return;
+      }
+
+      setSuccessMsg("Unidade física cadastrada com sucesso!");
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setIsRegisterUnitOpen(false);
+      setUnitCost("");
+      setUnitImei1("");
+      setUnitImei2("");
+      setUnitSerial("");
+      setUnitNotes("");
+      await loadCatalogData();
+    } catch {
+      setErrorMsg("Erro de rede ao registrar unidade.");
+    }
+  };
+
+  // Handler: Aprovar Unidade para Venda
+  const handleApproveUnit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetUnit) return;
+
+    try {
+      const payload = {
+        approvalNotes: approvalNotes.trim() || null,
+        expectedVersion: targetUnit.version
+      };
+
+      const res = await fetch(`/api/catalog/units/${targetUnit.id}/approve`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Falha ao aprovar unidade.");
+        return;
+      }
+
+      setSuccessMsg("Unidade aprovada para venda com sucesso!");
+      setTimeout(() => setSuccessMsg(null), 4000);
+      setIsApproveUnitOpen(false);
+      setTargetUnit(null);
+      setApprovalNotes("");
+      await loadCatalogData();
+    } catch {
+      setErrorMsg("Erro de comunicação ao aprovar unidade.");
+    }
+  };
+
+  // Filtragem de busca
+  const filteredModels = models.filter((m) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    const matchName = m.name.toLowerCase().includes(term);
+    const matchBrand = m.brandName?.toLowerCase().includes(term);
+    const matchSku = m.skus.some(s => s.skuCode.toLowerCase().includes(term) || s.variantName.toLowerCase().includes(term));
+    return matchName || matchBrand || matchSku;
+  });
+
+  const filteredUnits = units.filter((u) => {
+    if (!search.trim()) return true;
+    const term = search.toLowerCase();
+    const matchImei = u.imei1?.toLowerCase().includes(term) || u.imei2?.toLowerCase().includes(term);
+    const matchSerial = u.serialNumber?.toLowerCase().includes(term);
+    const matchModel = u.modelName?.toLowerCase().includes(term);
+    const matchSku = u.skuCode?.toLowerCase().includes(term);
+    return matchImei || matchSerial || matchModel || matchSku;
+  });
+
+  const getStatusName = (status: number) => {
+    switch (status) {
+      case 1: return "Pendente Inspeção";
+      case 2: return "Em Bancada";
+      case 3: return "Aprovado p/ Venda";
+      case 4: return "Quarentena";
+      case 5: return "Vendido";
+      default: return "Desconhecido";
+    }
   };
 
   return (
     <RootShellLayout>
       <div className="space-y-6">
+        {/* Notificações */}
+        {errorMsg && (
+          <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600" />
+              <span>{errorMsg}</span>
+            </div>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-500 hover:text-rose-700">✕</button>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+            <button onClick={() => setSuccessMsg(null)} className="text-emerald-500 hover:text-emerald-700">✕</button>
+          </div>
+        )}
+
         {/* Header estilo HBVisionX */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
           <div>
@@ -132,12 +454,15 @@ export default function CatalogPage() {
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
                 Produtos & Aparelhos
               </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                PostgreSQL Neon Conectado
+              </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
               Catálogo de Modelos & Unidades Serializadas
             </h1>
             <p className="text-xs text-slate-500">
-              Gestão de aparelhos novos, seminovos Apple com laudo de bateria/grau estético, peças e insumos.
+              Gestão corporativa de aparelhos novos, seminovos com laudo de bateria/grau estético, peças e insumos.
             </p>
           </div>
 
@@ -147,7 +472,14 @@ export default function CatalogPage() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
               {showCost ? <EyeOff className="w-3.5 h-3.5 text-purple-600" /> : <Eye className="w-3.5 h-3.5 text-slate-400" />}
-              <span>{showCost ? "Ocultar Custo" : "Ver Custo Real"}</span>
+              <span>{showCost ? "Ocultar Custos" : "Ver Custos Oficiais"}</span>
+            </button>
+            <button
+              onClick={() => setIsRegisterUnitOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-all shadow-xs"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              Registrar Unidade (IMEI)
             </button>
             <button
               onClick={() => setIsCreateModelOpen(true)}
@@ -199,76 +531,11 @@ export default function CatalogPage() {
         {/* Tab 1: Modelos */}
         {activeTab === "models" && (
           <div className="space-y-4">
-            {models.map((model) => (
-              <div key={model.id} className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700">
-                      <Smartphone className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {model.brand}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {model.category}
-                        </span>
-                        {model.serializationPolicy === 1 && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
-                            Rastreamento IMEI Obrigatório
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-base font-extrabold text-slate-900 mt-1">{model.name}</h3>
-                    </div>
-                  </div>
-
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-auto">
-                    Ativo no Catálogo
-                  </span>
-                </div>
-
-                {/* SKUs Variants Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
-                      <tr>
-                        <th className="py-2.5 px-3">Código SKU</th>
-                        <th className="py-2.5 px-3">Variação / Especificação</th>
-                        <th className="py-2.5 px-3">Preço Sugerido</th>
-                        <th className="py-2.5 px-3">Disponível em Estoque</th>
-                        <th className="py-2.5 px-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {model.skus.map((sku) => (
-                        <tr key={sku.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{sku.skuCode}</td>
-                          <td className="py-2.5 px-3 text-slate-600">{sku.variantName}</td>
-                          <td className="py-2.5 px-3 font-extrabold text-slate-900">
-                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(sku.defaultPrice)}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="inline-flex items-center gap-1 font-bold text-slate-500">
-                              <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                              {sku.availableQuantity} un pronta(s)
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Ativo
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            {isLoading ? (
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center text-slate-400">
+                Carregando catálogo do PostgreSQL...
               </div>
-            ))}
-
-            {models.length === 0 && (
+            ) : filteredModels.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center text-slate-400 shadow-xs">
                 <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                 <p className="font-bold text-slate-700 text-sm">Nenhum modelo cadastrado no catálogo</p>
@@ -280,6 +547,93 @@ export default function CatalogPage() {
                   Cadastrar Primeiro Modelo
                 </button>
               </div>
+            ) : (
+              filteredModels.map((model) => (
+                <div key={model.id} className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                            {model.brandName || "Marca"}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                            {model.categoryName || "Categoria"}
+                          </span>
+                          {model.serializationPolicy === 2 && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                              Rastreamento IMEI Obrigatório
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-base font-extrabold text-slate-900 mt-1">{model.name}</h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setTargetModelId(model.id);
+                          setIsCreateSkuOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 hover:bg-purple-100 hover:text-purple-700 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+                      >
+                        + Novo SKU
+                      </button>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Ativo
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SKUs Variants Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-3">Código SKU</th>
+                          <th className="py-2.5 px-3">Variação / Especificação</th>
+                          <th className="py-2.5 px-3">Preço Atual</th>
+                          <th className="py-2.5 px-3">Unidades em Estoque</th>
+                          <th className="py-2.5 px-3 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {model.skus.map((sku) => (
+                          <tr key={sku.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="py-2.5 px-3 font-mono font-bold text-slate-800">{sku.skuCode}</td>
+                            <td className="py-2.5 px-3 text-slate-600">{sku.variantName}</td>
+                            <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(sku.defaultPrice)}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span className="inline-flex items-center gap-1 font-bold text-slate-500">
+                                <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                                {sku.availableUnitsCount ?? 0} un pronta(s)
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                onClick={() => {
+                                  setTargetSku(sku);
+                                  setUpdatePriceValue(sku.defaultPrice.toString());
+                                  setIsUpdatePriceOpen(true);
+                                }}
+                                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-bold"
+                              >
+                                Alterar Preço
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         )}
@@ -293,113 +647,129 @@ export default function CatalogPage() {
                   <th className="py-3 px-4">Modelo / SKU</th>
                   <th className="py-3 px-4">IMEI / Número de Série</th>
                   <th className="py-3 px-4">Condição & Grau</th>
-                  <th className="py-3 px-4">Bateria</th>
-                  {showCost && (
-                    <>
-                      <th className="py-3 px-4">Custo Compra</th>
-                      <th className="py-3 px-4">Frete Rateado</th>
-                      <th className="py-3 px-4">Custo Estoque</th>
-                    </>
-                  )}
-                  <th className="py-3 px-4">Preço Sugerido</th>
-                  <th className="py-3 px-4">Preço Aprovado</th>
+                  <th className="py-3 px-4">Saúde Bateria</th>
+                  {showCost && <th className="py-3 px-4 font-mono text-rose-700">Custo de Aquisição</th>}
                   <th className="py-3 px-4">Status Operacional</th>
+                  <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {units.map((unit) => (
-                  <tr key={unit.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4">
-                      <div className="font-extrabold text-slate-900">{unit.modelName}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{unit.skuCode}</div>
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-purple-700">
-                      {unit.serialNumberOrImei}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-800">Seminovo</div>
-                      <div className="text-[10px] text-slate-500">Grau A / Impecável</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="font-bold text-emerald-600">{unit.batteryHealthPercentage}%</span>
-                    </td>
-                    {showCost && (
-                      <>
-                        <td className="py-3 px-4 font-mono text-slate-600">
-                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.acquisitionCost)}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-cyan-600">
-                          {unit.allocatedFreightCost ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.allocatedFreightCost) : "R$ 0,00"}
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-emerald-600">
-                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.totalInventoryCost ?? (unit.acquisitionCost + (unit.allocatedFreightCost ?? 0)))}
-                        </td>
-                      </>
-                    )}
-                    <td className="py-3 px-4 font-mono font-semibold text-purple-700">
-                      {unit.suggestedPrice ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.suggestedPrice) : "—"}
-                    </td>
-                    <td className="py-3 px-4 font-extrabold text-slate-900">
-                      {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.retailPrice)}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {unit.operationalStatusName}
-                      </span>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={showCost ? 7 : 6} className="py-12 text-center text-slate-400">
+                      Carregando unidades serializadas do banco...
                     </td>
                   </tr>
-                ))}
-                {units.length === 0 && (
+                ) : filteredUnits.length === 0 ? (
                   <tr>
                     <td colSpan={showCost ? 7 : 6} className="py-16 text-center text-slate-400">
                       <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                       <p className="font-bold text-slate-700">Nenhum aparelho serializado cadastrado</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Os aparelhos entram automaticamente através do recebimento de compras ou cadastro de seminovos.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Registrar Unidade (IMEI)" para cadastrar aparelhos novos ou seminovos.</p>
                     </td>
                   </tr>
+                ) : (
+                  filteredUnits.map((unit) => (
+                    <tr key={unit.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-extrabold text-slate-900">{unit.modelName || "Modelo"}</div>
+                        <div className="text-[10px] font-mono text-slate-400">{unit.skuCode || "SKU"}</div>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-purple-700">
+                        {unit.imei1 || unit.serialNumber || "Sem identificador"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-slate-800">
+                          {unit.condition === 1 ? "Novo Lacrado" : unit.condition === 2 ? "Seminovo / Usado" : "Recondicionado"}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {unit.grade === 1 ? "Grau A / Impecável" : unit.grade === 2 ? "Grau B / Leve Uso" : "Grau C"}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {unit.batteryHealthPercentage !== null && unit.batteryHealthPercentage !== undefined ? (
+                          <span className="font-bold text-emerald-600">{unit.batteryHealthPercentage}%</span>
+                        ) : (
+                          <span className="text-slate-400">N/A</span>
+                        )}
+                      </td>
+                      {showCost && (
+                        <td className="py-3 px-4 font-mono text-rose-700 font-bold">
+                          {unit.acquisitionCost !== null && unit.acquisitionCost !== undefined
+                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.acquisitionCost)
+                            : "Sigiloso"}
+                        </td>
+                      )}
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          unit.operationalStatus === 3
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : unit.operationalStatus === 4
+                            ? "bg-rose-50 text-rose-700 border border-rose-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}>
+                          {getStatusName(unit.operationalStatus)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {unit.operationalStatus !== 3 && unit.operationalStatus !== 5 && (
+                          <button
+                            onClick={() => {
+                              setTargetUnit(unit);
+                              setIsApproveUnitOpen(true);
+                            }}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-2xs"
+                          >
+                            Aprovar Venda
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* Modal de Criação de Modelo */}
+        {/* Modal: Novo Modelo */}
         {isCreateModelOpen && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl space-y-4">
               <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                <h3 className="text-sm font-extrabold text-slate-900">Cadastrar Novo Modelo</h3>
-                <button
-                  onClick={() => setIsCreateModelOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-                >
-                  ✕
-                </button>
+                <h3 className="text-sm font-extrabold text-slate-900">Cadastrar Novo Modelo no Catálogo</h3>
+                <button onClick={() => setIsCreateModelOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
               </div>
 
               <form onSubmit={handleCreateModel} className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Marca</label>
-                    <input
-                      type="text"
+                    <label className="font-bold text-slate-700 block mb-1">Marca *</label>
+                    <select
                       required
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                      placeholder="Ex: Apple, Samsung, Xiaomi"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
-                    />
+                      value={selectedBrandId}
+                      onChange={(e) => setSelectedBrandId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-600 text-slate-800"
+                    >
+                      <option value="">Selecione...</option>
+                      {brands.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Categoria</label>
-                    <input
-                      type="text"
+                    <label className="font-bold text-slate-700 block mb-1">Categoria *</label>
+                    <select
                       required
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      placeholder="Ex: Smartphones, Peças, Acessórios"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
-                    />
+                      value={selectedCategoryId}
+                      onChange={(e) => setSelectedCategoryId(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-600 text-slate-800"
+                    >
+                      <option value="">Selecione...</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -410,43 +780,59 @@ export default function CatalogPage() {
                     required
                     value={modelName}
                     onChange={(e) => setModelName(e.target.value)}
-                    placeholder="Ex: iPhone 15 Pro, Tela OLED Galaxy S23"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 text-slate-800"
+                    placeholder="Ex: iPhone 15 Pro Max"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-600 text-slate-800"
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Código SKU *</label>
-                    <input
-                      type="text"
-                      required
-                      value={skuCode}
-                      onChange={(e) => setSkuCode(e.target.value)}
-                      placeholder="IPH15P-128-NAT"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Variação / Cor</label>
-                    <input
-                      type="text"
-                      value={skuName}
-                      onChange={(e) => setSkuName(e.target.value)}
-                      placeholder="128GB Titânio"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Preço Venda (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="5800.00"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none text-slate-800"
-                    />
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Descrição</label>
+                  <input
+                    type="text"
+                    value={modelDescription}
+                    onChange={(e) => setModelDescription(e.target.value)}
+                    placeholder="Descrição comercial e detalhes técnicos"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-purple-600 text-slate-800"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <span className="text-[11px] font-extrabold text-purple-700 uppercase tracking-wider block mb-2">
+                    Variante / SKU Inicial
+                  </span>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Código SKU *</label>
+                      <input
+                        type="text"
+                        required
+                        value={initialSkuCode}
+                        onChange={(e) => setInitialSkuCode(e.target.value)}
+                        placeholder="IPH15PM-256"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono uppercase text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Variante / Cor</label>
+                      <input
+                        type="text"
+                        value={initialVariantName}
+                        onChange={(e) => setInitialVariantName(e.target.value)}
+                        placeholder="256GB Titânio Azul"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Preço Venda (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={initialPrice}
+                        onChange={(e) => setInitialPrice(e.target.value)}
+                        placeholder="6500.00"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -454,8 +840,8 @@ export default function CatalogPage() {
                   <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
                     <input
                       type="checkbox"
-                      checked={policy === 1}
-                      onChange={(e) => setPolicy(e.target.checked ? 1 : 2)}
+                      checked={policy === 2}
+                      onChange={(e) => setPolicy(e.target.checked ? 2 : 0)}
                       className="rounded text-purple-600 focus:ring-purple-500"
                     />
                     Exigir Rastreamento Obrigatório por IMEI (Aparelhos)
@@ -474,7 +860,306 @@ export default function CatalogPage() {
                     type="submit"
                     className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
                   >
-                    Salvar Modelo
+                    Salvar no PostgreSQL
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Adicionar SKU */}
+        {isCreateSkuOpen && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Adicionar Novo SKU ao Modelo</h3>
+                <button onClick={() => setIsCreateSkuOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleAddSku} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Código SKU *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSkuCode}
+                    onChange={(e) => setNewSkuCode(e.target.value)}
+                    placeholder="Ex: IPH15PM-512-NAT"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono uppercase text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nome da Variante *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSkuVariantName}
+                    onChange={(e) => setNewSkuVariantName(e.target.value)}
+                    placeholder="Ex: 512GB Titânio Natural"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Preço Padrão (R$)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newSkuPrice}
+                    onChange={(e) => setNewSkuPrice(e.target.value)}
+                    placeholder="7500.00"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Código de Barras EAN</label>
+                  <input
+                    type="text"
+                    value={newSkuBarcode}
+                    onChange={(e) => setNewSkuBarcode(e.target.value)}
+                    placeholder="789..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateSkuOpen(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Criar SKU
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Atualizar Preço do SKU */}
+        {isUpdatePriceOpen && targetSku && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Atualizar Preço do SKU</h3>
+                <button onClick={() => setIsUpdatePriceOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleUpdatePrice} className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-mono font-bold text-slate-800 block">{targetSku.skuCode}</span>
+                  <span className="text-slate-500 text-[11px]">{targetSku.variantName}</span>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Novo Preço de Venda (R$) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={updatePriceValue}
+                    onChange={(e) => setUpdatePriceValue(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsUpdatePriceOpen(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Salvar Preço
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Registrar Unidade (IMEI) */}
+        {isRegisterUnitOpen && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Registrar Aparelho / Unidade Serializada</h3>
+                <button onClick={() => setIsRegisterUnitOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleRegisterUnit} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">SKU Vinculado *</label>
+                  <select
+                    required
+                    value={unitSkuId}
+                    onChange={(e) => setUnitSkuId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  >
+                    <option value="">Selecione o SKU...</option>
+                    {models.flatMap(m => m.skus).map((s) => (
+                      <option key={s.id} value={s.id}>{s.skuCode} - {s.variantName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">IMEI 1 (Principal)</label>
+                    <input
+                      type="text"
+                      value={unitImei1}
+                      onChange={(e) => setUnitImei1(e.target.value)}
+                      placeholder="354891828374651"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">IMEI 2 (Opcional)</label>
+                    <input
+                      type="text"
+                      value={unitImei2}
+                      onChange={(e) => setUnitImei2(e.target.value)}
+                      placeholder="354891828374652"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Condição</label>
+                    <select
+                      value={unitCondition}
+                      onChange={(e) => setUnitCondition(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    >
+                      <option value={1}>Novo Lacrado</option>
+                      <option value={2}>Seminovo / Usado</option>
+                      <option value={3}>Recondicionado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Grau Estético</label>
+                    <select
+                      value={unitGrade}
+                      onChange={(e) => setUnitGrade(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                    >
+                      <option value={1}>Grau A / Impecável</option>
+                      <option value={2}>Grau B / Leves Marcas</option>
+                      <option value={3}>Grau C / Marcas Visíveis</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Saúde Bateria (%)</label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="100"
+                      value={unitBattery}
+                      onChange={(e) => setUnitBattery(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Custo de Aquisição (R$) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={unitCost}
+                    onChange={(e) => setUnitCost(e.target.value)}
+                    placeholder="3500.00"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-rose-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Laudo de Inspeção / Observações</label>
+                  <input
+                    type="text"
+                    value={unitNotes}
+                    onChange={(e) => setUnitNotes(e.target.value)}
+                    placeholder="Aparelho aprovado em checklist de áudio, display e Face ID"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsRegisterUnitOpen(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Registrar no Estoque
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Aprovar Unidade para Venda */}
+        {isApproveUnitOpen && targetUnit && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 className="text-sm font-extrabold text-slate-900">Aprovar Unidade para Venda</h3>
+                <button onClick={() => setIsApproveUnitOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              </div>
+
+              <form onSubmit={handleApproveUnit} className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <span className="font-mono font-bold text-purple-700 block">
+                    {targetUnit.imei1 || targetUnit.serialNumber}
+                  </span>
+                  <span className="text-slate-500 text-[11px]">{targetUnit.modelName}</span>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Notas de Aprovação Comercial</label>
+                  <input
+                    type="text"
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    placeholder="Checklist de bancada 100% OK, liberado p/ vitrine"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsApproveUnitOpen(false)}
+                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                  >
+                    Confirmar Aprovação
                   </button>
                 </div>
               </form>
