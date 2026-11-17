@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, verifyPbkdf2Password } from "@/lib/serverless-db";
+import { requireJwtSessionSecret } from "@/lib/serverless-auth-config";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
@@ -7,17 +8,6 @@ import crypto from "crypto";
 const failedAttemptsMap = new Map<string, { attempts: number; lockedUntil: number }>();
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("CRITICAL_CONFIG_ERROR: A variável de ambiente JWT_SECRET ou AUTH_SECRET é obrigatória em produção.");
-    }
-    return "HBStudioDevJwtSecretKey2026Secure1234567890!";
-  }
-  return secret;
-}
 
 export async function POST(request: NextRequest) {
   const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
@@ -146,10 +136,26 @@ export async function POST(request: NextRequest) {
     }
 
     const permissions = permsRes.map((r: any) => r.PermissionKey);
+
+    // A ausência do segredo só era detectada após validar a senha e acabava
+    // convertida em HTTP 500 genérico. Classificar como configuração (503).
+    let jwtSecret: string;
+    try {
+      jwtSecret = requireJwtSessionSecret();
+    } catch {
+      console.error(`[${correlationId}] AUTH_CONFIGURATION_ERROR: Configure JWT_SECRET ou AUTH_SECRET na Vercel Production.`);
+      return NextResponse.json(
+        {
+          error: "Serviço de autenticação não configurado. Verifique as variáveis de ambiente na Vercel.",
+          code: "AUTH_CONFIGURATION_ERROR",
+        },
+        { status: 503, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
+
     const sessionId = crypto.randomUUID().replace(/-/g, "");
 
     // 6. Geração do token JWT assinado com claims corporativas
-    const jwtSecret = getJwtSecret();
     const token = jwt.sign(
       {
         sub: user.Id,
@@ -169,9 +175,22 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const partnerRoleName =
-      partner.Type === 1 ? "ManagingPartner" :
-      partner.Type === 2 ? "InvestorPartner" : "OperationalPartner";
+    // Enum canônico PartnersCapital.Domain.Entities.PartnerType:
+    // 1=ManagingPartner, 2=OperatingPartner, 3=SilentPartner, 4=AdvisoryPartner.
+    const partnerRoleName = ({
+      1: "ManagingPartner",
+      2: "OperatingPartner",
+      3: "SilentPartner",
+      4: "AdvisoryPartner",
+    } as Record<number, string>)[Number(partner.Type)];
+
+    if (!partnerRoleName) {
+      console.error(`[${correlationId}] PARTNER_TYPE_INVALID`);
+      return NextResponse.json(
+        { error: "Vínculo societário inválido.", code: "PARTNER_TYPE_INVALID" },
+        { status: 403, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     const userProfile = {
       id: user.Id,
