@@ -22,7 +22,7 @@ INSERT INTO roles ("Id", "TenantId", "Name", "Description", "CreatedAtUtc", "Upd
 VALUES ('c0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Administrador Master', 'Acesso Irrestrito Full a Todos os Modulos, Operacoes e Relatorios', NOW(), NOW())
 ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name", "Description" = EXCLUDED."Description";
 
--- 4. Insercao de Todas as Permissoes da Role Master (133 chaves com Version = 1)
+-- 4. Insercao de Todas as Permissoes da Role Master (133 chaves canonicas)
 INSERT INTO role_permissions ("Id", "TenantId", "RoleId", "PermissionKey", "Version", "CreatedAtUtc", "UpdatedAtUtc")
 VALUES (gen_random_uuid(), 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'access.manage', 1, NOW(), NOW())
 ON CONFLICT ("TenantId", "RoleId", "PermissionKey") DO NOTHING;
@@ -429,8 +429,8 @@ VALUES ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-0000000
 ON CONFLICT ("Id") DO UPDATE SET "PasswordHash" = EXCLUDED."PasswordHash", "JobTitle" = 'CEO', "IsActive" = true, "SecurityStamp" = users."SecurityStamp" + 1;
 
 -- 6. Vinculo do Usuario ao Perfil Master
-INSERT INTO user_roles ("TenantId", "UserId", "RoleId")
-VALUES ('a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001')
+INSERT INTO user_roles ("Id", "TenantId", "UserId", "RoleId", "Version", "CreatedAtUtc", "UpdatedAtUtc")
+VALUES (gen_random_uuid(), 'a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 1, NOW(), NOW())
 ON CONFLICT ("TenantId", "UserId", "RoleId") DO NOTHING;
 
 -- 7. Vinculo Societario Oficial no Modulo PartnersCapital (Socio-Administrador / ManagingPartner)
