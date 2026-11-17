@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/serverless-db";
+import { requireJwtSessionSecret } from "@/lib/serverless-auth-config";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("CRITICAL_CONFIG_ERROR: A variável de ambiente JWT_SECRET ou AUTH_SECRET é obrigatória em produção.");
-    }
-    return "HBStudioDevJwtSecretKey2026Secure1234567890!";
-  }
-  return secret;
-}
 
 export async function GET(request: NextRequest) {
   const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
@@ -25,12 +15,31 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  let jwtSecret: string;
   try {
-    const jwtSecret = getJwtSecret();
-    const decoded: any = jwt.verify(token, jwtSecret);
+    jwtSecret = requireJwtSessionSecret();
+  } catch {
+    console.error(`[${correlationId}] AUTH_CONFIGURATION_ERROR: Segredo da sessão ausente ou insuficiente.`);
+    return NextResponse.json(
+      { error: "Serviço de autenticação não configurado.", code: "AUTH_CONFIGURATION_ERROR" },
+      { status: 503, headers: { "X-Correlation-Id": correlationId } }
+    );
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, jwtSecret, {
+      algorithms: ["HS256"],
+      issuer: "HBStudioErp",
+      audience: "HBStudioErpClient",
+    });
     const userId = decoded.sub || decoded.nameid;
     const sessionId = decoded.session_id;
     const tokenSecurityStamp = String(decoded.security_stamp || "1");
+
+    if (typeof userId !== "string" || typeof sessionId !== "string" || !sessionId ||
+        typeof decoded.tenant_id !== "string") {
+      return clearSessionResponse(correlationId);
+    }
 
     let sql;
     try {
@@ -85,6 +94,10 @@ export async function GET(request: NextRequest) {
 
     const user = users[0];
 
+    if (decoded.tenant_id !== user.TenantId) {
+      return clearSessionResponse(correlationId);
+    }
+
     // Se o SecurityStamp mudou (permissões alteradas ou logout global), revogar
     if (String(user.SecurityStamp || "1") !== tokenSecurityStamp) {
       return clearSessionResponse(correlationId);
@@ -136,9 +149,16 @@ export async function GET(request: NextRequest) {
     }
 
     const permissions = permsRes.map((r: any) => r.PermissionKey);
-    const partnerRoleName =
-      partner.Type === 1 ? "ManagingPartner" :
-      partner.Type === 2 ? "InvestorPartner" : "OperationalPartner";
+    const partnerRoleName = ({
+      1: "ManagingPartner",
+      2: "OperatingPartner",
+      3: "SilentPartner",
+      4: "AdvisoryPartner",
+    } as Record<number, string>)[Number(partner.Type)];
+
+    if (!partnerRoleName) {
+      return clearSessionResponse(correlationId);
+    }
 
     return NextResponse.json(
       {
@@ -156,8 +176,16 @@ export async function GET(request: NextRequest) {
       },
       { headers: { "X-Correlation-Id": correlationId } }
     );
-  } catch (err: any) {
-    return clearSessionResponse(correlationId);
+  } catch (err: unknown) {
+    // Token inválido/expirado => 401; falha inesperada => 503, não logout falso.
+    if (err instanceof jwt.JsonWebTokenError) {
+      return clearSessionResponse(correlationId);
+    }
+    console.error(`[${correlationId}] AUTH_SESSION_ERROR:`, err instanceof Error ? err.name : "UNKNOWN");
+    return NextResponse.json(
+      { error: "Falha ao validar a sessão.", code: "SESSION_VALIDATION_ERROR" },
+      { status: 503, headers: { "X-Correlation-Id": correlationId } }
+    );
   }
 }
 
