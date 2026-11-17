@@ -1,61 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { forwardToBackend } from "@/lib/bff-client";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const token = request.cookies.get("hb_access_token")?.value;
-  const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:5021";
-
-  if (!token) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
-
   const { path } = await params;
-  const targetPath = path.join("/");
-
-  try {
-    const backendRes = await fetch(`${apiUrl}/api/fiscal/${targetPath}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await backendRes.json();
-    return NextResponse.json(data, { status: backendRes.status });
-  } catch {
-    return NextResponse.json({ error: "Erro de comunicação com o módulo fiscal." }, { status: 503 });
-  }
+  const targetPath = `/api/fiscal/${path.join("/")}`;
+  return forwardToBackend(request, targetPath);
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const token = request.cookies.get("hb_access_token")?.value;
-  const apiUrl = process.env.API_INTERNAL_URL || "http://localhost:5021";
-
-  if (!token) {
-    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  }
-
   const { path } = await params;
-  const targetPath = path.join("/");
+  const targetPath = `/api/fiscal/${path.join("/")}`;
+  return forwardToBackend(request, targetPath);
+}
 
-  try {
-    const body = await request.json();
-    const backendRes = await fetch(`${apiUrl}/api/fiscal/${targetPath}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    });
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const targetPath = `/api/fiscal/${path.join("/")}`;
+  return forwardToBackend(request, targetPath);
+}
 
-    const data = await backendRes.json();
-    return NextResponse.json(data, { status: backendRes.status });
-  } catch {
-    return NextResponse.json({ error: "Erro de comunicação com o módulo fiscal." }, { status: 503 });
-  }
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const targetPath = `/api/fiscal/${path.join("/")}`;
+  return forwardToBackend(request, targetPath);
 }
