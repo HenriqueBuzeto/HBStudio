@@ -66,7 +66,9 @@ export function LoginForm() {
         } else if (res.status === 429) {
           setFeedback(errData.error || "Muitas tentativas. Acesso temporariamente bloqueado por 15 minutos.");
         } else if (res.status === 503) {
-          setFeedback("Serviço de banco de dados Neon temporariamente indisponível. Verifique as configurações na Vercel.");
+          setFeedback(errData.error || "Serviço de banco de dados Neon temporariamente indisponível. Verifique a variável DATABASE_URL na Vercel.");
+        } else if (res.status === 500 && errData.code === "CONFIG_ERROR") {
+          setFeedback("Chave de sessão ausente. Configure a variável AUTH_SECRET no painel da Vercel.");
         } else {
           setFeedback(errData.error || "Não foi possível conectar ao servidor. Tente novamente.");
         }

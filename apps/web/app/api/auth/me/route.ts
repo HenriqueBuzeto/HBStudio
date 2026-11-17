@@ -4,14 +4,28 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
 function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
+  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
   if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("CRITICAL_CONFIG_ERROR: A variável de ambiente JWT_SECRET ou AUTH_SECRET é obrigatória em produção.");
-    }
-    return "HBStudioDevJwtSecretKey2026Secure1234567890!";
+    throw new Error(
+      "MISSING_AUTH_SECRET: A variável de ambiente AUTH_SECRET ou JWT_SECRET não está configurada no ambiente."
+    );
   }
   return secret;
+}
+
+function mapPartnerType(type: number): string {
+  switch (type) {
+    case 1:
+      return "ManagingPartner";
+    case 2:
+      return "OperatingPartner";
+    case 3:
+      return "SilentPartner";
+    case 4:
+      return "AdvisoryPartner";
+    default:
+      return "Partner";
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -37,7 +51,7 @@ export async function GET(request: NextRequest) {
       sql = getDb();
     } catch {
       return NextResponse.json(
-        { error: "Serviço indisponível.", code: "SERVICE_UNAVAILABLE" },
+        { error: "Serviço de banco indisponível.", code: "SERVICE_UNAVAILABLE" },
         { status: 503, headers: { "X-Correlation-Id": correlationId } }
       );
     }
@@ -85,23 +99,23 @@ export async function GET(request: NextRequest) {
 
     const user = users[0];
 
-    // Se o SecurityStamp mudou (permissões alteradas ou logout global), revogar
+    // Se o SecurityStamp mudou (logout global ou permissões revogadas), invalida imediatamente
     if (String(user.SecurityStamp || "1") !== tokenSecurityStamp) {
       return clearSessionResponse(correlationId);
     }
 
-    // 3. Validar se continua sendo sócio com acesso habilitado
+    // 3. Validar se continua sendo sócio com acesso habilitado (Validação formal por e-mail e tenant)
     let partners;
     try {
       partners = await sql.query(
-        `SELECT "Id", "Name", "Type", "Status", "IsErpAccessEnabled"
+        `SELECT "Id", "PartyId", "Name", "Email", "Type", "Status", "IsErpAccessEnabled", "TenantId"
          FROM partners
          WHERE "TenantId" = $1 
-           AND (LOWER("Email") = LOWER($2) OR LOWER("Name") = LOWER($3))
+           AND LOWER("Email") = LOWER($2)
            AND "Status" = 1 
            AND "IsErpAccessEnabled" = true
          LIMIT 1;`,
-        [user.TenantId, user.Email.toLowerCase(), user.FullName.toLowerCase()]
+        [user.TenantId, user.Email.toLowerCase()]
       );
     } catch (err: any) {
       console.error(`[${correlationId}] Erro ao validar status societário no Neon:`, err.message);
@@ -136,9 +150,7 @@ export async function GET(request: NextRequest) {
     }
 
     const permissions = permsRes.map((r: any) => r.PermissionKey);
-    const partnerRoleName =
-      partner.Type === 1 ? "ManagingPartner" :
-      partner.Type === 2 ? "InvestorPartner" : "OperationalPartner";
+    const partnerRoleName = mapPartnerType(partner.Type);
 
     return NextResponse.json(
       {

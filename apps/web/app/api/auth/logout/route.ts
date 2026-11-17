@@ -4,7 +4,13 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
 function getJwtSecret(): string {
-  return process.env.JWT_SECRET || process.env.AUTH_SECRET || "HBStudioDevJwtSecretKey2026Secure1234567890!";
+  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "MISSING_AUTH_SECRET: A variável de ambiente AUTH_SECRET ou JWT_SECRET não está configurada no ambiente."
+    );
+  }
+  return secret;
 }
 
 export async function POST(request: NextRequest) {
@@ -13,7 +19,8 @@ export async function POST(request: NextRequest) {
 
   if (token) {
     try {
-      const decoded: any = jwt.verify(token, getJwtSecret());
+      const jwtSecret = getJwtSecret();
+      const decoded: any = jwt.verify(token, jwtSecret);
       const sessionId = decoded.session_id;
       const userId = decoded.sub || decoded.nameid;
 
@@ -21,7 +28,7 @@ export async function POST(request: NextRequest) {
         const sql = getDb();
         const expiresAt = decoded.exp ? new Date(decoded.exp * 1000).toISOString() : new Date(Date.now() + 8 * 3600 * 1000).toISOString();
         
-        // Inserção estrita na tabela canônica revoked_sessions
+        // Inserção estrita na tabela canônica revoked_sessions (sem silenciar erros)
         await sql.query(
           `INSERT INTO revoked_sessions ("Id", "SessionId", "UserId", "Reason", "ExpiresAtUtc", "CreatedAtUtc", "Version")
            VALUES (gen_random_uuid(), $1, $2, 'UserSignOut', $3, NOW(), 1)
@@ -30,7 +37,12 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (err: any) {
-      console.warn(`[${correlationId}] Aviso durante revogação de sessão no logout:`, err.message);
+      console.error(`[${correlationId}] Erro ao revogar sessão no Neon durante logout:`, err.message);
+      // Se a falha for de banco ou configuração, retorna erro explícito para não enganar a auditoria
+      return NextResponse.json(
+        { error: "Não foi possível revogar a sessão no banco de dados. Tente novamente.", code: "LOGOUT_FAILED" },
+        { status: 500, headers: { "X-Correlation-Id": correlationId } }
+      );
     }
   }
 
