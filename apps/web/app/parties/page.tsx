@@ -220,279 +220,100 @@ const REWARDS_CATALOG: RewardItem[] = [
 ];
 
 export default function PartiesPage() {
-  const [parties, setParties] = useState<Party[]>([
-    {
-      id: "p-henrique-01",
-      type: 1,
-      name: "Henrique Barreto",
-      documentNumber: "48951871839",
-      rgNumber: "45.123.890-X",
-      birthDate: "1994-08-20",
-      gender: "Masculino",
-      maritalStatus: "Solteiro",
-      isActive: true,
-      isCustomer: true,
-      isSupplier: false,
-      notes: "Cliente VIP de balcão e entusiasta de tecnologia Apple. Sempre busca lançamentos, acessórios premium e revisões preventivas semestrais.",
-      creditLimit: 5000.00,
-      paymentTerms: "À Vista / Pix / Parcelamento 12x",
-      createdAtUtc: "2026-11-16T12:00:00Z",
-      contacts: [
-        {
-          id: "c-1",
-          name: "Henrique",
-          phone: "(17) 99265-1033",
-          whatsApp: "(17) 99265-1033",
-          email: "henrique@hbstudio.com.br",
-          role: "Titular",
-          isPrimary: true
-        }
-      ],
-      addresses: [
-        {
-          id: "a-1",
-          type: "Principal",
-          street: "Av. Paulista",
-          number: "1842",
-          complement: "Conjunto 14",
-          neighborhood: "Bela Vista",
-          city: "São Paulo",
-          state: "SP",
-          postalCode: "01310-200",
-          isPrimary: true
-        }
-      ],
-      equipments: [
-        {
-          id: "eq-1",
-          equipmentType: "Smartphone",
-          brand: "Apple",
-          model: "iPhone 16 Pro",
-          color: "Titânio Deserto",
-          imei1: "354928119028123",
-          imei2: "354928119028124",
-          batteryHealth: 100,
-          notes: "Aparelho adquirido na HB Studio com AppleCare ativa e película de cerâmica."
-        },
-        {
-          id: "eq-2",
-          equipmentType: "Smartwatch",
-          brand: "Apple",
-          model: "Apple Watch Ultra 2",
-          color: "Titânio Natural",
-          serialNumber: "XG9921KA19L",
-          notes: "Utilizado para corrida e treinos de alta performance."
-        }
-      ],
-      consents: [
-        {
-          id: "cs-1",
-          channel: "WhatsApp",
-          purpose: "Comunicação de Atendimento & Notificações de OS",
-          isOptIn: true,
-          origin: "Cadastro Balcão",
-          eventDateUtc: "2026-11-16T12:00:00Z"
-        },
-        {
-          id: "cs-2",
-          channel: "WhatsApp",
-          purpose: "Novidades, Alertas de Estoque, Upgrades & Clube Fidelidade",
-          isOptIn: true,
-          origin: "Termo Assinado",
-          eventDateUtc: "2026-11-16T12:00:00Z"
-        }
-      ],
-      gamification: {
-        pointsBalance: 1450,
-        tier: "Ouro",
-        totalSpent: 12890.00,
-        cashbackAvailable: 145.00,
-        ordersCount: 4,
-        repairsCount: 2,
-        lifetimeValue: 12890.00,
-        lastPointsEarnedDate: "2026-11-16"
-      },
-      history: [
-        {
-          id: "h-1",
-          type: "Venda",
-          title: "Compra no PDV Balcão - iPhone 16 Pro 256GB + Película 3D",
-          dateUtc: "2026-11-16T14:30:00Z",
-          amount: 8290.00,
-          pointsDelta: 829,
-          status: "Faturado",
-          details: "Venda #VD-202611-094. NF-e 4912 emitida e garantia estendida HB Studio de 1 ano."
-        },
-        {
-          id: "h-2",
-          type: "OS",
-          title: "Ordem de Serviço #OS-8841 - Troca de Bateria Original",
-          dateUtc: "2026-11-10T10:15:00Z",
-          amount: 450.00,
-          pointsDelta: 45,
-          status: "Concluído & Entregue",
-          details: "Serviço no iPhone 13 Pro. Calibração BMS 100% de saúde e vedação estanque IP68 refeita."
-        },
-        {
-          id: "h-3",
-          type: "Venda",
-          title: "Acessórios Originais - Cabo USB-C Apple + Fonte 20W",
-          dateUtc: "2026-10-25T16:00:00Z",
-          amount: 350.00,
-          pointsDelta: 35,
-          status: "Faturado",
-          details: "Pagamento confirmado via Pix no balcão."
-        },
-        {
-          id: "h-4",
-          type: "OS",
-          title: "Ordem de Serviço #OS-7910 - Recuperação Face ID",
-          dateUtc: "2026-09-14T11:20:00Z",
-          amount: 800.00,
-          pointsDelta: 80,
-          status: "Concluído",
-          details: "Microssoldagem no sensor Dot Projector com sucesso."
-        }
-      ]
-    },
-    {
-      id: "p-mariana-02",
-      type: 1,
-      name: "Mariana Vasconcelos",
-      documentNumber: "31948192801",
-      rgNumber: "38.901.442-1",
-      birthDate: "1998-03-12",
-      gender: "Feminino",
-      maritalStatus: "Casada",
-      isActive: true,
-      isCustomer: true,
-      isSupplier: false,
-      notes: "Cliente frequente do laboratório técnico. Possui 2 aparelhos cadastrados para a família.",
-      creditLimit: 3000.00,
-      paymentTerms: "Cartão de Crédito 6x sem juros",
-      createdAtUtc: "2026-10-05T09:00:00Z",
-      contacts: [
-        {
-          id: "c-2",
-          name: "Mariana",
-          phone: "(11) 98765-4321",
-          whatsApp: "(11) 98765-4321",
-          email: "mariana.vasc@gmail.com",
-          role: "Titular",
-          isPrimary: true
-        }
-      ],
-      addresses: [
-        {
-          id: "a-2",
-          type: "Principal",
-          street: "Rua Oscar Freire",
-          number: "520",
-          neighborhood: "Cerqueira César",
-          city: "São Paulo",
-          state: "SP",
-          postalCode: "01426-001",
-          isPrimary: true
-        }
-      ],
-      equipments: [
-        {
-          id: "eq-3",
-          equipmentType: "Smartphone",
-          brand: "Apple",
-          model: "iPhone 15 128GB",
-          color: "Azul Claro",
-          imei1: "359182390192837",
-          batteryHealth: 92,
-          notes: "Sem marcas de queda, uso com capa antichoque."
-        }
-      ],
-      consents: [
-        {
-          id: "cs-3",
-          channel: "WhatsApp",
-          purpose: "Avisos de OS e Promoções",
-          isOptIn: true,
-          origin: "Cadastro Balcão",
-          eventDateUtc: "2026-10-05T09:00:00Z"
-        }
-      ],
-      gamification: {
-        pointsBalance: 620,
-        tier: "Prata",
-        totalSpent: 4890.00,
-        cashbackAvailable: 48.90,
-        ordersCount: 2,
-        repairsCount: 1,
-        lifetimeValue: 4890.00,
-        lastPointsEarnedDate: "2026-11-02"
-      },
-      history: [
-        {
-          id: "h-21",
-          type: "Venda",
-          title: "Compra no PDV - AirPods Pro 2ª Geração",
-          dateUtc: "2026-11-02T15:20:00Z",
-          amount: 2190.00,
-          pointsDelta: 219,
-          status: "Faturado",
-          details: "Venda faturada com garantia estendida."
-        }
-      ]
-    },
-    {
-      id: "p-techdist-03",
-      type: 2,
-      name: "Tech Distribuidora & Importadora de Peças LTDA",
-      tradeName: "Tech Distribuição Brasil",
-      documentNumber: "19283746000189",
-      stateRegistration: "114.892.301.110",
-      municipalRegistration: "8.912.001-4",
-      isActive: true,
-      isCustomer: false,
-      isSupplier: true,
-      notes: "Fornecedor homologado classe A para telas OLED, baterias originais e componentes SMD.",
-      creditLimit: 50000.00,
-      paymentTerms: "Faturado 30/60 dias via boleto bancário",
-      createdAtUtc: "2026-08-15T10:00:00Z",
-      contacts: [
-        {
-          id: "c-3",
-          name: "Carlos Mendes (Representante)",
-          phone: "(11) 3210-9000",
-          whatsApp: "(11) 97711-2233",
-          email: "carlos.mendes@techdistribuidora.com.br",
-          role: "Gerente de Contas",
-          isPrimary: true
-        }
-      ],
-      addresses: [
-        {
-          id: "a-3",
-          type: "Faturamento",
-          street: "Av. do Estado",
-          number: "4500",
-          neighborhood: "Mooca",
-          city: "São Paulo",
-          state: "SP",
-          postalCode: "03105-000",
-          isPrimary: true
-        }
-      ],
-      equipments: [],
-      consents: [],
-      gamification: {
-        pointsBalance: 0,
-        tier: "Bronze",
-        totalSpent: 0,
-        cashbackAvailable: 0,
-        ordersCount: 0,
-        repairsCount: 0,
-        lifetimeValue: 0
-      },
-      history: []
+  const [parties, setParties] = useState<Party[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Carregar Clientes Reais do Backend via BFF
+  const loadParties = React.useCallback(async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/parties");
+      if (res.ok) {
+        const data = await res.json();
+        const mapped: Party[] = data.map((item: any) => ({
+          id: item.id,
+          type: item.type === 2 ? 2 : 1,
+          name: item.name,
+          tradeName: item.tradeName,
+          documentNumber: item.documentNumber,
+          stateRegistration: item.stateRegistration,
+          municipalRegistration: item.municipalRegistration,
+          birthDate: item.birthDate,
+          isActive: item.isActive ?? true,
+          isCustomer: item.isCustomer ?? true,
+          isSupplier: item.isSupplier ?? false,
+          notes: item.notes,
+          creditLimit: 5000.0,
+          paymentTerms: "À Vista / Pix / Cartão",
+          createdAtUtc: item.createdAtUtc,
+          contacts: (item.contacts || []).map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            phone: c.phone,
+            whatsApp: c.whatsApp || c.phone,
+            email: c.email,
+            role: "Principal",
+            isPrimary: c.isPrimary ?? false
+          })),
+          addresses: (item.addresses || []).map((a: any) => ({
+            id: a.id,
+            type: "Principal",
+            street: a.street,
+            number: a.number,
+            complement: a.complement,
+            neighborhood: a.neighborhood,
+            city: a.city,
+            state: a.state,
+            postalCode: a.postalCode,
+            isPrimary: a.isPrimary ?? false
+          })),
+          equipments: (item.equipments || []).map((e: any) => ({
+            id: e.id,
+            equipmentType: e.equipmentType || "Smartphone",
+            brand: e.brand,
+            model: e.model,
+            color: e.color,
+            imei1: e.ime1 || e.imei1,
+            notes: e.notes
+          })),
+          consents: (item.consents || []).map((cs: any) => ({
+            id: cs.id,
+            channel: cs.channel,
+            purpose: cs.purpose,
+            isOptIn: cs.isOptIn,
+            origin: cs.origin,
+            eventDateUtc: cs.eventDateUtc
+          })),
+          gamification: {
+            pointsBalance: 100,
+            tier: "Bronze",
+            totalSpent: 0,
+            cashbackAvailable: 0,
+            ordersCount: 0,
+            repairsCount: 0,
+            lifetimeValue: 0
+          },
+          history: []
+        }));
+        setParties(mapped);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Erro ao carregar clientes do servidor.");
+      }
+    } catch {
+      setErrorMsg("Falha na conexão com o servidor. Verifique se o backend está ativo.");
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  }, []);
+
+  React.useEffect(() => {
+    loadParties();
+  }, [loadParties]);
 
   // Filtros e busca
   const [search, setSearch] = useState("");
@@ -572,121 +393,118 @@ export default function PartiesPage() {
     setTimeout(() => setRedemptionSuccessMsg(null), 5000);
   };
 
-  // Salvar novo cadastro completo
-  const handleCreateParty = (e: React.FormEvent) => {
+  // Salvar novo cadastro completo com persistência real via BFF
+  const handleCreateParty = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    const newParty: Party = {
-      id: `p-${Date.now()}`,
+    setIsSaving(true);
+    setErrorMsg(null);
+
+    const payload = {
       type: newType,
-      name: newName,
-      tradeName: newType === 2 ? newTradeName : undefined,
-      documentNumber: newDoc || undefined,
-      rgNumber: newRg || undefined,
-      stateRegistration: newType === 2 ? newStateReg : undefined,
-      birthDate: newBirthDate || undefined,
-      gender: newGender || undefined,
-      maritalStatus: newMaritalStatus || undefined,
-      isActive: true,
-      isCustomer: isCustomerCheck,
-      isSupplier: isSupplierCheck,
-      creditLimit: parseFloat(newCreditLimit) || 1000.0,
+      name: newName.trim(),
+      tradeName: newType === 2 ? newTradeName.trim() : null,
+      documentNumber: newDoc.trim() || null,
+      stateRegistration: newType === 2 ? newStateReg.trim() : null,
+      municipalRegistration: null,
+      birthDate: newBirthDate ? new Date(newBirthDate).toISOString() : null,
+      notes: newNotes.trim() || null,
+      enableCustomer: isCustomerCheck,
+      enableSupplier: isSupplierCheck,
+      customerNotes: newNotes.trim() || null,
+      supplyCategories: null,
       paymentTerms: "À Vista / Pix / Cartão",
-      notes: newNotes || undefined,
-      createdAtUtc: new Date().toISOString(),
-      contacts: (newPhone || newEmail) ? [{
-        id: `c-${Date.now()}`,
-        name: newName,
-        phone: newPhone || undefined,
-        whatsApp: newPhone || undefined,
-        email: newEmail || undefined,
-        role: "Titular",
-        isPrimary: true
-      }] : [],
-      addresses: newStreet ? [{
-        id: `a-${Date.now()}`,
-        type: "Principal",
-        street: newStreet,
-        number: newNumber,
-        complement: newComplement || undefined,
-        neighborhood: newNeighborhood,
-        city: newCity,
-        state: newState,
-        postalCode: newPostalCode,
-        isPrimary: true
-      }] : [],
-      equipments: newEquipmentModel ? [{
-        id: `eq-${Date.now()}`,
-        equipmentType: "Smartphone",
-        brand: newEquipmentBrand,
-        model: newEquipmentModel,
-        color: newEquipmentColor || undefined,
-        imei1: newEquipmentImei || undefined
-      }] : [],
-      consents: [
-        {
-          id: `cs-${Date.now()}`,
-          channel: "WhatsApp",
-          purpose: "Comunicação de Atendimento, OS e Promoções",
-          isOptIn: true,
-          origin: "Cadastro Balcão",
-          eventDateUtc: new Date().toISOString()
-        }
-      ],
-      gamification: {
-        pointsBalance: 100, // Bônus de boas-vindas na adesão
-        tier: "Bronze",
-        totalSpent: 0,
-        cashbackAvailable: 0,
-        ordersCount: 0,
-        repairsCount: 0,
-        lifetimeValue: 0,
-        lastPointsEarnedDate: new Date().toISOString().split("T")[0]
-      },
-      history: [
-        {
-          id: `h-${Date.now()}`,
-          type: "Pontos",
-          title: "Bônus de Cadastro no Clube HB Studio",
-          dateUtc: new Date().toISOString(),
-          amount: 0,
-          pointsDelta: 100,
-          status: "Creditado",
-          details: "Crédito promocional de adesão."
-        }
-      ]
+      primaryPhone: newPhone.trim() || null,
+      primaryEmail: newEmail.trim() || null
     };
 
-    setParties([newParty, ...parties]);
-    setShowCreateModal(false);
-    
-    // Abre direto na visualização tela cheia
-    setFullScreenParty(newParty);
-    setActiveTab("cadastral");
+    try {
+      const res = await fetch("/api/parties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    // Limpeza de formulário
-    setNewName("");
-    setNewTradeName("");
-    setNewDoc("");
-    setNewRg("");
-    setNewStateReg("");
-    setNewBirthDate("");
-    setNewGender("");
-    setNewMaritalStatus("");
-    setNewPhone("");
-    setNewEmail("");
-    setNewPostalCode("");
-    setNewStreet("");
-    setNewNumber("");
-    setNewComplement("");
-    setNewNeighborhood("");
-    setNewCity("");
-    setNewEquipmentModel("");
-    setNewEquipmentImei("");
-    setNewEquipmentColor("");
-    setNewNotes("");
-    setFormStep("general");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error || "Erro ao salvar cliente no banco de dados.");
+        setIsSaving(false);
+        return;
+      }
+
+      const created = await res.json();
+
+      // Se informou equipamento, persiste no backend
+      if (newEquipmentModel.trim()) {
+        await fetch(`/api/parties/${created.id}/equipments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            equipmentType: "Smartphone",
+            brand: newEquipmentBrand,
+            model: newEquipmentModel.trim(),
+            color: newEquipmentColor.trim() || null,
+            imei1: newEquipmentImei.trim() || null,
+            imei2: null,
+            serialNumber: null,
+            notes: null
+          })
+        }).catch(() => {});
+      }
+
+      // Se informou endereço, persiste no backend
+      if (newStreet.trim()) {
+        await fetch(`/api/parties/${created.id}/addresses`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            street: newStreet.trim(),
+            number: newNumber.trim() || "S/N",
+            complement: newComplement.trim() || null,
+            neighborhood: newNeighborhood.trim() || "Centro",
+            city: newCity.trim() || "São Paulo",
+            state: newState.trim() || "SP",
+            postalCode: newPostalCode.trim() || "00000-000",
+            isPrimary: true
+          })
+        }).catch(() => {});
+      }
+
+      // Recarrega lista completa e abre o cliente salvo
+      await loadParties();
+      setSuccessMsg(`Cadastro de "${newName}" salvo e persistido com sucesso!`);
+      setTimeout(() => setSuccessMsg(null), 5000);
+
+      setShowCreateModal(false);
+
+      // Limpeza de formulário
+      setNewName("");
+      setNewTradeName("");
+      setNewDoc("");
+      setNewRg("");
+      setNewStateReg("");
+      setNewBirthDate("");
+      setNewGender("");
+      setNewMaritalStatus("");
+      setNewPhone("");
+      setNewEmail("");
+      setNewPostalCode("");
+      setNewStreet("");
+      setNewNumber("");
+      setNewComplement("");
+      setNewNeighborhood("");
+      setNewCity("");
+      setNewEquipmentModel("");
+      setNewEquipmentImei("");
+      setNewEquipmentColor("");
+      setNewNotes("");
+      setFormStep("general");
+    } catch {
+      setErrorMsg("Erro de comunicação ao salvar cliente.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Filtragem avançada

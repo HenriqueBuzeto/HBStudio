@@ -15,11 +15,25 @@ export default function proxy(request: NextRequest) {
 
   const isPublic = publicPaths.some((p) => pathname.startsWith(p));
   const token = request.cookies.get("hb_access_token")?.value;
+  const isApiRequest = pathname.startsWith("/api/");
 
   // 1. Usuário tenta acessar rota protegida sem cookie HttpOnly
   if (!isPublic && !token) {
+    // Se for uma requisição de API (/api/*), NUNCA redirecionar para HTML (/login)
+    // Retornar JSON 401 Unauthorized estruturado
+    if (isApiRequest) {
+      return NextResponse.json(
+        {
+          error: "Sessão não encontrada ou expirada.",
+          code: "UNAUTHORIZED",
+          message: "Faça login novamente para continuar."
+        },
+        { status: 401 }
+      );
+    }
+
+    // Se for página navegável, redireciona para a tela de login preservando returnUrl
     const loginUrl = new URL("/login", request.url);
-    // Preserva o caminho de retorno de forma segura (somente rotas relativas internas)
     if (pathname !== "/") {
       loginUrl.searchParams.set("returnUrl", pathname);
     }

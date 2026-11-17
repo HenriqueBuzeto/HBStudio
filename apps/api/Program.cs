@@ -469,25 +469,33 @@ partiesGroup.MapPut("/{id:guid}", async (Guid id, Parties.Application.UpdatePart
 
 
 partiesGroup.MapPost("/{id:guid}/equipments", async (Guid id, Parties.Application.AddEquipmentRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
-
 {
-
     var eq = await service.AddEquipmentAsync(id, req, ct);
-
     return Results.Created($"/api/parties/{id}/equipments/{eq.Id}", eq);
-
 }).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
-
-
 partiesGroup.MapPost("/{id:guid}/consents", async (Guid id, Parties.Application.RecordConsentRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
-
 {
-
     var consent = await service.RecordConsentAsync(id, req, ct);
-
     return Results.Created($"/api/parties/{id}/consents/{consent.Id}", consent);
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
+partiesGroup.MapPost("/{id:guid}/contacts", async (Guid id, Parties.Application.AddContactRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var contact = await service.AddContactAsync(id, req, ct);
+    return Results.Created($"/api/parties/{id}/contacts/{contact.Id}", contact);
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
+
+partiesGroup.MapPost("/{id:guid}/addresses", async (Guid id, Parties.Application.AddAddressRequest req, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    var address = await service.AddAddressAsync(id, req, ct);
+    return Results.Created($"/api/parties/{id}/addresses/{address.Id}", address);
+}).RequireAuthorization(PermissionCatalog.CustomersEdit);
+
+partiesGroup.MapPut("/{id:guid}/status", async (Guid id, bool isActive, Parties.Application.IPartiesService service, CancellationToken ct) =>
+{
+    await service.SetStatusAsync(id, isActive, ct);
+    return Results.Ok(new { id, isActive });
 }).RequireAuthorization(PermissionCatalog.CustomersEdit);
 
 
