@@ -18,7 +18,7 @@ const fuels:Record<number,string>={1:"Gasolina",2:"Etanol",3:"Flex",4:"Diesel",5
 const statuses:Record<number,string>={1:"Disponível",2:"Em viagem",3:"Manutenção",4:"Inativo",5:"Baixado"};
 const purposes:Record<number,string>={1:"Retirada de mercadoria",2:"Entrega de venda",3:"Transporte para assistência",4:"Visita a cliente",5:"Projeto digital",6:"Entrega de fabricação 3D",7:"Administrativo",8:"Múltiplas finalidades"};
 const tripStatus:Record<number,string>={1:"Rascunho",2:"Planejada",3:"Em andamento",4:"Concluída",5:"Cancelada",6:"Em revisão"};
-const defaultForm=():VehicleForm=>({name:"",plate:"",brand:"",model:"",year:String(new Date().getFullYear()),type:"1",ownership:"1",fuel:"1",ownerName:"",partnerId:"",tankLiters:"",kmPerLiter:"",odometer:"",notes:"",status:"1"});
+const defaultForm=():VehicleForm=>({name:"",plate:"",brand:"",model:"",year:"",type:"1",ownership:"1",fuel:"1",ownerName:"",partnerId:"",tankLiters:"",kmPerLiter:"",odometer:"",notes:"",status:"1"});
 const money=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
 const num=(v:number,d=1)=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:d}).format(v);
 const date=(v:string|null)=>v?new Intl.DateTimeFormat("pt-BR",{dateStyle:"short"}).format(new Date(v)):"—";
@@ -58,6 +58,9 @@ export default function FretesPage(){
  const [finalKm,setFinalKm]=useState(""),[completionNotes,setCompletionNotes]=useState("");
  const [odoForm,setOdoForm]=useState({odometer:"",reason:""});
  const [search,setSearch]=useState("");
+ const [currentMonth,setCurrentMonth]=useState<number|null>(null);
+ const [clock,setClock]=useState(0);
+ useEffect(()=>{const now=new Date();setCurrentMonth(now.getFullYear()*12+now.getMonth());setClock(now.getTime());},[]);
  const [pricing,setPricing]=useState({acquisition:"",freight:"",markup:""});
  const load=useCallback(async()=>{
   if(!canView){setLoading(false);return;}
@@ -73,7 +76,7 @@ export default function FretesPage(){
   catch(e){setError(e instanceof Error?e.message:"Operação não concluída.");return false;}
   finally{setSaving(false);}
  };
- const showCreate=()=>{setEditing(null);setForm(defaultForm());setModal("vehicle");};
+ const showCreate=()=>{setEditing(null);setForm({...defaultForm(),year:String(new Date().getFullYear())});setModal("vehicle");};
  const showEdit=(v:Vehicle)=>{setEditing(v);setForm({name:v.name,plate:v.plate,brand:v.brand,model:v.model,year:String(v.year),type:String(v.type),ownership:String(v.ownership),fuel:String(v.fuel),ownerName:v.ownerName||"",partnerId:v.partnerId||"",tankLiters:v.tankLiters===null?"":String(v.tankLiters),kmPerLiter:v.kmPerLiter===null?"":String(v.kmPerLiter),odometer:String(v.currentKm),notes:v.notes||"",status:String(v.status)});setModal("vehicle");};
  const saveVehicle=async(e:React.FormEvent)=>{e.preventDefault();
   const body={...form,year:Number(form.year),type:Number(form.type),ownership:Number(form.ownership),fuel:Number(form.fuel),tankLiters:form.tankLiters===""?null:Number(form.tankLiters),kmPerLiter:form.kmPerLiter===""?null:Number(form.kmPerLiter),odometer:Number(form.odometer),partnerId:form.partnerId||null,status:Number(form.status),version:editing?.version};
@@ -96,8 +99,8 @@ export default function FretesPage(){
  const vehicles=data.vehicles.filter(v=>[v.name,v.plate,v.brand,v.model,v.ownerName].some(s=>s?.toLowerCase().includes(search.toLowerCase())));
  const available=data.vehicles.filter(v=>v.status===1).length;
  const activeTrips=data.trips.filter(t=>t.status===3);
- const monthDistance=data.trips.filter(t=>t.status===4&&new Date(t.endedAt||t.startedAt).getMonth()===new Date().getMonth()&&new Date(t.endedAt||t.startedAt).getFullYear()===new Date().getFullYear()).reduce((s,t)=>s+t.distance,0);
- const nextMaintenance=data.maintenance.filter(p=>{const vehicle=data.vehicles.find(v=>v.id===p.vehicleId);return (p.nextKm!==null&&vehicle!==undefined&&p.nextKm-vehicle.currentKm<=1000)||(p.nextDate!==null&&new Date(p.nextDate).getTime()-Date.now()<=30*86400000)}).length;
+ const monthDistance=data.trips.filter(t=>t.status===4&&currentMonth!==null&&(new Date(t.endedAt||t.startedAt).getFullYear()*12+new Date(t.endedAt||t.startedAt).getMonth())===currentMonth).reduce((s,t)=>s+t.distance,0);
+ const nextMaintenance=data.maintenance.filter(p=>{const vehicle=data.vehicles.find(v=>v.id===p.vehicleId);return (p.nextKm!==null&&vehicle!==undefined&&p.nextKm-vehicle.currentKm<=1000)||(p.nextDate!==null&&clock>0&&new Date(p.nextDate).getTime()-clock<=30*86400000)}).length;
  const fuelTotal=data.fuelings.reduce((s,f)=>s+f.amount,0);
  const totalBase=Number(pricing.acquisition||0)+Number(pricing.freight||0);
  const listPrice=totalBase*(1+Number(pricing.markup||0)/100);
@@ -149,7 +152,7 @@ export default function FretesPage(){
    {!hasPermission("fleet.fueling.manage")&&!hasPermission("fleet.fueling.create")?<p className="mt-5 text-xs text-amber-700">Permissão de gerenciamento de combustível necessária para novos lançamentos.</p>:<p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-700">Lançamento de combustível ainda não habilitado neste serviço serverless. Nenhum custo financeiro fictício será criado.</p>}
    {data.fuelings.length===0?<p className="mt-6 rounded-xl border border-dashed border-slate-200 p-9 text-center text-sm text-slate-400">Nenhum abastecimento registrado.</p>:<div className="mt-4 divide-y divide-slate-100">{data.fuelings.map(t=><div key={t.id} className="flex justify-between py-3 text-xs"><span>{date(t.date)} • {t.station}</span><span>{canCosts?money(t.amount):"Restrito"} • {t.liters!==null?num(t.liters,2)+" L":"Litros não informados"}</span></div>)}</div>}
   </section>
-  :tab==="maintenance"?<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Planos preventivos</h3><p className="mt-1 text-xs text-slate-500">Alertas de revisão calculados com base no hodômetro e nas datas cadastradas.</p>{data.maintenance.length===0?<div className="mt-6 rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">Nenhum plano de manutenção persistido no Neon.</div>:<div className="mt-4 space-y-3">{data.maintenance.map(p=>{const v=data.vehicles.find(x=>x.id===p.vehicleId);const remaining=p.nextKm!==null&&v?p.nextKm-v.currentKm:null;const overdue=(remaining!==null&&remaining<0)||(p.nextDate!==null&&new Date(p.nextDate)<new Date());return <div key={p.id} className="flex flex-wrap justify-between gap-3 rounded-xl border border-slate-200 p-4"><div><strong className="text-sm">{p.name}</strong><p className="text-xs text-slate-500">{v?.name} • A cada {num(p.intervalKm)} km / {p.intervalDays} dias</p></div><div className={"text-xs font-bold "+(overdue?"text-rose-600":"text-violet-700")}>{remaining!==null?num(remaining)+" km restantes":"Sem previsão em km"} • {date(p.nextDate)}</div></div>;})}</div>}</section>
+  :tab==="maintenance"?<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Planos preventivos</h3><p className="mt-1 text-xs text-slate-500">Alertas de revisão calculados com base no hodômetro e nas datas cadastradas.</p>{data.maintenance.length===0?<div className="mt-6 rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">Nenhum plano de manutenção persistido no Neon.</div>:<div className="mt-4 space-y-3">{data.maintenance.map(p=>{const v=data.vehicles.find(x=>x.id===p.vehicleId);const remaining=p.nextKm!==null&&v?p.nextKm-v.currentKm:null;const overdue=(remaining!==null&&remaining<0)||(p.nextDate!==null&&clock>0&&new Date(p.nextDate).getTime()<clock);return <div key={p.id} className="flex flex-wrap justify-between gap-3 rounded-xl border border-slate-200 p-4"><div><strong className="text-sm">{p.name}</strong><p className="text-xs text-slate-500">{v?.name} • A cada {num(p.intervalKm)} km / {p.intervalDays} dias</p></div><div className={"text-xs font-bold "+(overdue?"text-rose-600":"text-violet-700")}>{remaining!==null?num(remaining)+" km restantes":"Sem previsão em km"} • {date(p.nextDate)}</div></div>;})}</div>}</section>
   :<section className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Simulação de precificação (não salva)</h3><p className="mt-1 text-xs text-slate-500">Calculadora ilustrativa, sem atualizar catálogo, estoque ou financeiro.</p>{(["acquisition","freight","markup"] as const).map(k=><label key={k} className="mt-4 block"><span className={label}>{k==="acquisition"?"Custo de aquisição (R$)":k==="freight"?"Frete comprovado (R$)":"Markup (%)"}</span><input type="number" min="0" step="0.01" className={f} value={pricing[k]} onChange={e=>setPricing({...pricing,[k]:e.target.value})}/></label>)}</div><div className="rounded-2xl border border-violet-200 bg-violet-50 p-6"><span className="text-xs font-bold text-violet-700">Preço sugerido (simulação)</span><div className="mt-2 text-3xl font-black text-violet-800">{money(listPrice)}</div><p className="mt-4 text-xs text-violet-700">Base: {money(totalBase)} • Markup informado: {pricing.markup||0}%</p><p className="mt-5 text-xs text-slate-600">Não inclui tributos, taxas comerciais ou composição contábil. Nenhum preço é aprovado automaticamente.</p></div></section>}
   </>}
  </div>
