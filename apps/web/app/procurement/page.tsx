@@ -21,7 +21,15 @@ import {
   FileText,
   RefreshCw,
   X,
-  Layers
+  Layers,
+  Gamepad2,
+  Cpu,
+  Laptop,
+  Tv,
+  HardDrive,
+  Headphones,
+  CheckSquare,
+  Square
 } from "lucide-react";
 
 export type PurchaseOrderStatus = "Draft" | "Submitted" | "Approved" | "Ordered" | "PartiallyReceived" | "Received" | "Closed" | "Cancelled";
@@ -136,7 +144,10 @@ export interface SkuOption {
   skuCode: string;
   name: string;
   modelName: string;
+  defaultPrice?: number;
 }
+
+export type ElectronicCategory = "smartphone" | "computador_gamer" | "videogame" | "notebook" | "outro";
 
 export default function ProcurementPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "receipts" | "used_devices">("orders");
@@ -160,6 +171,9 @@ export default function ProcurementPage() {
   const [isUsedModalOpen, setIsUsedModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Categoria de eletrônico selecionada para compra de usados
+  const [selectedCategory, setSelectedCategory] = useState<ElectronicCategory>("smartphone");
+
   // Form State: Pedido de Compra
   const [orderForm, setOrderForm] = useState({
     supplierPartyId: "",
@@ -171,7 +185,7 @@ export default function ProcurementPage() {
     unitCost: 0
   });
 
-  // Form State: Aquisição de Usado
+  // Form State: Aquisição de Usados & Eletrônicos Multicategorias
   const [usedForm, setUsedForm] = useState({
     sellerPartyId: "",
     productSkuId: "",
@@ -183,7 +197,28 @@ export default function ProcurementPage() {
     batteryHealthPercentage: 88,
     negotiatedPrice: 0,
     attributableExpenses: 0,
-    notes: ""
+    notes: "",
+    // Especificações e checklist modular para PCs, Consoles e Notebooks
+    specs: {
+      cpuProcessor: "",
+      gpuVideoCard: "",
+      ramMemory: "16GB",
+      storageDrive: "SSD 512GB NVMe",
+      powerSupply: "650W 80 Plus",
+      consoleStorage: "1TB",
+      controllersCount: 1,
+      includedAccessories: "Cabo de força, cabo HDMI",
+    },
+    checklist: {
+      powerOnTest: true,
+      displayOutput: true,
+      usbPortsWorking: true,
+      thermalStressTest: true,
+      caseConditionClean: true,
+      accessoriesComplete: true,
+      controllerResponsive: true,
+      anatelClean: true,
+    }
   });
 
   const loadData = async () => {
@@ -191,13 +226,11 @@ export default function ProcurementPage() {
     setErrorMessage(null);
 
     try {
-      const [ordRes, recRes, usedRes, partiesRes, whRes, modRes] = await Promise.allSettled([
+      const [ordRes, recRes, usedRes, auxRes] = await Promise.allSettled([
         fetch("/api/procurement/orders"),
         fetch("/api/procurement/receipts"),
         fetch("/api/procurement/used-devices"),
-        fetch("/api/parties"),
-        fetch("/api/inventory/warehouses"),
-        fetch("/api/catalog/models")
+        fetch("/api/procurement/auxiliary"),
       ]);
 
       if (ordRes.status === "fulfilled" && ordRes.value.ok) {
@@ -213,47 +246,12 @@ export default function ProcurementPage() {
         setUsedDevices(Array.isArray(data) ? data : []);
       }
 
-      // Auxiliares
-      if (partiesRes.status === "fulfilled" && partiesRes.value.ok) {
-        const partiesData = await partiesRes.value.json();
-        if (Array.isArray(partiesData)) {
-          setSuppliers(partiesData.map((p: any) => ({
-            id: p.id,
-            name: p.legalName || p.tradeName,
-            document: p.taxId || ""
-          })));
-        }
-      }
-
-      if (whRes.status === "fulfilled" && whRes.value.ok) {
-        const whData = await whRes.value.json();
-        if (Array.isArray(whData)) {
-          setWarehouses(whData.map((w: any) => ({
-            id: w.id,
-            name: w.name,
-            code: w.code
-          })));
-        }
-      }
-
-      if (modRes.status === "fulfilled" && modRes.value.ok) {
-        const modData = await modRes.value.json();
-        if (Array.isArray(modData)) {
-          const skuList: SkuOption[] = [];
-          modData.forEach((m: any) => {
-            if (Array.isArray(m.skus)) {
-              m.skus.forEach((s: any) => {
-                skuList.push({
-                  id: s.id,
-                  skuCode: s.skuCode,
-                  name: s.name,
-                  modelName: m.name
-                });
-              });
-            }
-          });
-          setSkus(skuList);
-        }
+      // Auxiliares do Neon Serverless
+      if (auxRes.status === "fulfilled" && auxRes.value.ok) {
+        const aux = await auxRes.value.json();
+        if (aux.parties) setSuppliers(aux.parties);
+        if (aux.skus) setSkus(aux.skus);
+        if (aux.warehouses) setWarehouses(aux.warehouses);
       }
     } catch (err: any) {
       setErrorMessage("Erro ao conectar com serviços de Compras e Estoque.");
@@ -278,7 +276,7 @@ export default function ProcurementPage() {
     try {
       const selectedSku = skus.find((s) => s.id === orderForm.productSkuId);
       const payload = {
-        branchId: "b0000000-0000-0000-0000-000000000001",
+        branchId: "00000000-0000-0000-0000-000000000001",
         supplierPartyId: orderForm.supplierPartyId,
         expectedDeliveryDateUtc: orderForm.expectedDeliveryDate ? new Date(orderForm.expectedDeliveryDate).toISOString() : null,
         paymentTerms: orderForm.paymentTerms,
@@ -303,7 +301,7 @@ export default function ProcurementPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || err.title || "Falha ao emitir Pedido de Compra");
+        throw new Error(err.detail || err.title || "Falha ao registrar pedido de compra");
       }
 
       setIsOrderModalOpen(false);
@@ -324,36 +322,40 @@ export default function ProcurementPage() {
     }
   };
 
-  // Handlers de Aquisição de Usado
+  // Handlers de Aquisição de Usados & Eletrônicos
   const handleCreateUsedDevice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usedForm.sellerPartyId || !usedForm.productSkuId || !usedForm.serialNumber) {
-      alert("Informe o cliente/vendedor, SKU e número de série/IMEI.");
+      alert("Por favor preencha os campos obrigatórios (Vendedor, SKU e Número de Série).");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // Montar checklist e especificações detalhadas de acordo com a categoria
+      const checklistPayload = {
+        category: selectedCategory,
+        specs: usedForm.specs,
+        checklist: usedForm.checklist,
+      };
+
       const payload = {
-        branchId: "b0000000-0000-0000-0000-000000000001",
+        branchId: "00000000-0000-0000-0000-000000000001",
         sellerPartyId: usedForm.sellerPartyId,
         productSkuId: usedForm.productSkuId,
+        deviceCategory: selectedCategory,
         serialNumber: usedForm.serialNumber,
-        imei1: usedForm.imei1 || undefined,
-        imei2: usedForm.imei2 || undefined,
+        imei1: selectedCategory === "smartphone" ? (usedForm.imei1 || undefined) : undefined,
+        imei2: selectedCategory === "smartphone" ? (usedForm.imei2 || undefined) : undefined,
         condition: usedForm.condition,
         grade: usedForm.grade,
-        batteryHealthPercentage: Number(usedForm.batteryHealthPercentage),
+        batteryHealthPercentage: (selectedCategory === "smartphone" || selectedCategory === "notebook")
+          ? Number(usedForm.batteryHealthPercentage)
+          : null,
         negotiatedPrice: canViewCost ? Number(usedForm.negotiatedPrice) : 0,
         attributableExpenses: canViewCost ? Number(usedForm.attributableExpenses) : 0,
-        checklistInspectionJson: JSON.stringify({
-          screenCondition: "Original",
-          faceIdWorking: true,
-          camerasWorking: true,
-          biometrics: true,
-          waterDamage: false
-        }),
-        notes: usedForm.notes || undefined
+        checklist: checklistPayload,
+        notes: usedForm.notes ? `${usedForm.notes} | Categoria: ${selectedCategory.toUpperCase()}` : `Categoria: ${selectedCategory.toUpperCase()}`
       };
 
       const res = await fetch("/api/procurement/used-devices", {
@@ -364,7 +366,7 @@ export default function ProcurementPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || err.title || "Falha ao registrar aquisição de usado");
+        throw new Error(err.error || err.detail || err.title || "Falha ao registrar aquisição");
       }
 
       setIsUsedModalOpen(false);
@@ -379,7 +381,27 @@ export default function ProcurementPage() {
         batteryHealthPercentage: 88,
         negotiatedPrice: 0,
         attributableExpenses: 0,
-        notes: ""
+        notes: "",
+        specs: {
+          cpuProcessor: "",
+          gpuVideoCard: "",
+          ramMemory: "16GB",
+          storageDrive: "SSD 512GB NVMe",
+          powerSupply: "650W 80 Plus",
+          consoleStorage: "1TB",
+          controllersCount: 1,
+          includedAccessories: "Cabo de força, cabo HDMI",
+        },
+        checklist: {
+          powerOnTest: true,
+          displayOutput: true,
+          usbPortsWorking: true,
+          thermalStressTest: true,
+          caseConditionClean: true,
+          accessoriesComplete: true,
+          controllerResponsive: true,
+          anatelClean: true,
+        }
       });
       await loadData();
     } catch (err: any) {
@@ -390,13 +412,7 @@ export default function ProcurementPage() {
   };
 
   const handleApproveReceiveUsed = async (device: UsedDeviceAcquisition) => {
-    const defaultWh = warehouses[0]?.id;
-    if (!defaultWh) {
-      alert("Nenhum depósito cadastrado para receber o aparelho.");
-      return;
-    }
-
-    if (!confirm(`Confirmar recebimento físico no estoque e lançamento no Kardex para o aparelho SN: ${device.serialNumber}?`)) {
+    if (!confirm(`Confirmar recebimento físico no estoque e liberação de entrada para o equipamento SN: ${device.serialNumber}?`)) {
       return;
     }
 
@@ -404,18 +420,14 @@ export default function ProcurementPage() {
       const res = await fetch(`/api/procurement/used-devices/${device.id}/approve-receive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetWarehouseId: defaultWh,
-          storageLocationCode: "BALCAO-ENTRADA"
-        })
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || err.title || "Erro ao aprovar e receber no estoque");
+        throw new Error(err.error || err.detail || err.title || "Erro ao aprovar e receber no estoque");
       }
 
-      alert("Aparelho aprovado e integrado ao Kardex oficial!");
+      alert("Equipamento aprovado e integrado ao estoque!");
       await loadData();
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
@@ -438,10 +450,30 @@ export default function ProcurementPage() {
     (u.acquisitionNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.serialNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.imei1 || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.sellerName || "").toLowerCase().includes(searchTerm.toLowerCase())
+    (u.sellerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.skuName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalCommitted = orders.reduce((sum, o) => sum + (o.totalOrderAmount || 0), 0);
+
+  // Helper para ícone da categoria do eletrônico
+  const getCategoryIcon = (notes?: string, imei?: string) => {
+    const text = (notes || "").toLowerCase();
+    if (text.includes("videogame") || text.includes("console") || text.includes("playstation") || text.includes("xbox")) {
+      return <Gamepad2 className="w-4 h-4 text-indigo-600" />;
+    }
+    if (text.includes("computador") || text.includes("pc gamer") || text.includes("setup")) {
+      return <Cpu className="w-4 h-4 text-purple-600" />;
+    }
+    if (text.includes("notebook") || text.includes("laptop")) {
+      return <Laptop className="w-4 h-4 text-sky-600" />;
+    }
+    if (imei) {
+      return <Smartphone className="w-4 h-4 text-emerald-600" />;
+    }
+    return <Layers className="w-4 h-4 text-slate-600" />;
+  };
 
   return (
     <RootShellLayout>
@@ -451,22 +483,22 @@ export default function ProcurementPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
               <ShoppingCart className="w-7 h-7 text-indigo-600" />
-              Procurement & Compras de Usados
+              Procurement & Entrada de Usados
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Gestão de pedidos de compra, recebimento físico com Kardex oficial e aquisição de usados no balcão integrados ao PostgreSQL.
+              Entrada de mercadorias, pedidos de reposição e compra de eletrônicos usados (PCs Gamers, Consoles, Smartphones e Notebooks) no balcão.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => setCanViewCost(!canViewCost)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
                 canViewCost
                   ? "bg-amber-50 text-amber-700 border-amber-200"
                   : "bg-slate-100 text-slate-600 border-slate-300"
               }`}
-              title="Alternar visibilidade de custos (purchases.cost.view)"
+              title="Alternar visibilidade de custos"
             >
               {canViewCost ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               {canViewCost ? "Custos Visíveis" : "Custos Ocultos"}
@@ -475,30 +507,28 @@ export default function ProcurementPage() {
             <button
               onClick={loadData}
               disabled={isLoading}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 transition"
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-300 transition cursor-pointer"
               title="Recarregar dados reais"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
               Atualizar
             </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsOrderModalOpen(true)}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition"
-              >
-                <Plus className="w-4 h-4" />
-                Novo Pedido
-              </button>
+            <button
+              onClick={() => setIsOrderModalOpen(true)}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Pedido
+            </button>
 
-              <button
-                onClick={() => setIsUsedModalOpen(true)}
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition"
-              >
-                <Smartphone className="w-4 h-4" />
-                Comprar Usado
-              </button>
-            </div>
+            <button
+              onClick={() => setIsUsedModalOpen(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md shadow-purple-600/20 transition cursor-pointer"
+            >
+              <Gamepad2 className="w-4 h-4" />
+              Entrada de Usado / Eletrônico
+            </button>
           </div>
         </div>
 
@@ -534,11 +564,11 @@ export default function ProcurementPage() {
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-pink-600"></div>
             <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase">
-              <span>Recompras de Balcão</span>
-              <Smartphone className="w-4 h-4 text-purple-600" />
+              <span>Eletrônicos & Usados no Balcão</span>
+              <Gamepad2 className="w-4 h-4 text-purple-600" />
             </div>
             <div className="mt-2 text-2xl font-extrabold text-slate-900">{usedDevices.length}</div>
-            <div className="text-xs text-purple-600 mt-1 font-medium">Laudo e IMEI validados</div>
+            <div className="text-xs text-purple-600 mt-1 font-medium">PCs, Consoles e Aparelhos</div>
           </div>
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs relative overflow-hidden">
@@ -560,7 +590,7 @@ export default function ProcurementPage() {
         <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-6 rounded-t-2xl pt-2 shadow-xs">
           <button
             onClick={() => setActiveTab("orders")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === "orders"
                 ? "border-purple-600 text-purple-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -572,7 +602,7 @@ export default function ProcurementPage() {
 
           <button
             onClick={() => setActiveTab("receipts")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === "receipts"
                 ? "border-purple-600 text-purple-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -584,14 +614,14 @@ export default function ProcurementPage() {
 
           <button
             onClick={() => setActiveTab("used_devices")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === "used_devices"
                 ? "border-purple-600 text-purple-700"
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <Smartphone className="w-4 h-4" />
-            Aquisição de Usados ({usedDevices.length})
+            <Gamepad2 className="w-4 h-4" />
+            Aquisição de Usados & Eletrônicos ({usedDevices.length})
           </button>
         </div>
 
@@ -618,7 +648,7 @@ export default function ProcurementPage() {
                 </div>
                 <h4 className="text-sm font-bold text-slate-800">Nenhum Pedido de Compra Ativo</h4>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                  Abra requisições de compras para reposição de peças, carcaças ou lotes de aparelhos seminovos.
+                  Abra requisições de compras para reposição de peças, hardware, consoles ou lotes de seminovos.
                 </p>
               </div>
             ) : (
@@ -645,7 +675,7 @@ export default function ProcurementPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4 font-medium text-slate-800">
-                          {po.supplierName || "Fornecedor Cadastrado"}
+                          {po.supplierName || "Fornecedor"}
                         </td>
                         <td className="py-3 px-4">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -751,18 +781,36 @@ export default function ProcurementPage() {
 
         {activeTab === "used_devices" && (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-            <div className="p-4 border-b border-slate-200 font-bold text-slate-800 text-sm bg-slate-50/50">
-              Aparelhos Usados Adquiridos no Balcão com Laudo Técnico de Inspeção
+            <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
+              <div>
+                <span className="font-bold text-slate-800 text-sm">
+                  Produtos e Eletrônicos Usados Adquiridos no Balcão
+                </span>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Computadores Gamers, Videogames, Celulares e Notebooks com laudo de teste e número de série rastreável.
+                </p>
+              </div>
+
+              <div className="relative w-full md:w-72">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filtrar por serial, modelo, cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                />
+              </div>
             </div>
 
             {filteredUsed.length === 0 ? (
               <div className="p-16 text-center">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
-                  <Smartphone className="w-7 h-7" />
+                  <Gamepad2 className="w-7 h-7" />
                 </div>
-                <h4 className="text-sm font-bold text-slate-800">Nenhum Aparelho Usado Registrado</h4>
+                <h4 className="text-sm font-bold text-slate-800">Nenhum Eletrônico Usado Registrado</h4>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                  Faça compras no balcão com checklist de 25 pontos, validação de IMEI na Anatel e cálculo de margem.
+                  Cadastre aquisições de PCs Gamers, PS5, Xbox, celulares e notebooks com laudo técnico e valor de recompra.
                 </p>
               </div>
             ) : (
@@ -771,11 +819,11 @@ export default function ProcurementPage() {
                   <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="py-3 px-4">Nº Aquisição</th>
-                      <th className="py-3 px-4">Vendedor (Pessoa)</th>
-                      <th className="py-3 px-4">Modelo / Sku</th>
-                      <th className="py-3 px-4">Serial / IMEI</th>
-                      <th className="py-3 px-4">Grau / Bateria</th>
-                      <th className="py-3 px-4">Custo Aquisição Real</th>
+                      <th className="py-3 px-4">Vendedor / Origem</th>
+                      <th className="py-3 px-4">Eletrônico / Modelo</th>
+                      <th className="py-3 px-4">Serial / Identificação</th>
+                      <th className="py-3 px-4">Grau / Condição</th>
+                      <th className="py-3 px-4">Custo de Aquisição</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4 text-right">Ação</th>
                     </tr>
@@ -790,15 +838,26 @@ export default function ProcurementPage() {
                           {ud.sellerName || "Cliente Vendedor"}
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-semibold text-slate-900">{ud.skuCode || "SKU Usado"}</div>
-                          <div className="text-xs text-slate-500">{ud.skuName}</div>
+                          <div className="flex items-center gap-2">
+                            {getCategoryIcon(ud.notes, ud.imei1)}
+                            <div>
+                              <div className="font-semibold text-slate-900">{ud.skuName || ud.skuCode}</div>
+                              <div className="text-[11px] text-slate-400 font-mono">{ud.skuCode}</div>
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-xs font-mono text-slate-700">
-                          <div>SN: {ud.serialNumber}</div>
+                          <div className="font-bold text-slate-800">SN: {ud.serialNumber}</div>
                           {ud.imei1 && <div className="text-slate-500">IMEI: {ud.imei1}</div>}
+                          {ud.notes && <div className="text-[10px] text-purple-600 truncate max-w-xs">{ud.notes}</div>}
                         </td>
                         <td className="py-3 px-4 text-xs">
-                          <span className="font-semibold text-slate-800">{ud.grade}</span> • Saúde {ud.batteryHealthPercentage}%
+                          <span className="font-semibold text-slate-800">{ud.grade}</span>
+                          {ud.batteryHealthPercentage ? (
+                            <span className="text-slate-500"> • Saúde {ud.batteryHealthPercentage}%</span>
+                          ) : (
+                            <span className="text-slate-500"> • Testado</span>
+                          )}
                         </td>
                         <td className="py-3 px-4 font-semibold text-slate-900">
                           {canViewCost && ud.totalAcquisitionCost !== undefined
@@ -811,14 +870,14 @@ export default function ProcurementPage() {
                               ? "bg-emerald-100 text-emerald-800"
                               : "bg-purple-100 text-purple-800"
                           }`}>
-                            {ud.status === "ReceivedInStock" ? "Recebido no Estoque" : ud.status}
+                            {ud.status === "ReceivedInStock" ? "No Estoque" : "Em Avaliação"}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
                           {ud.status !== "ReceivedInStock" && (
                             <button
                               onClick={() => handleApproveReceiveUsed(ud)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold transition"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold transition cursor-pointer"
                             >
                               Entrar no Estoque
                             </button>
@@ -842,14 +901,14 @@ export default function ProcurementPage() {
                   <ShoppingCart className="w-4 h-4 text-indigo-600" />
                   Emitir Novo Pedido de Compra Oficial
                 </h3>
-                <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleCreateOrder} className="p-5 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Fornecedor *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Fornecedor / Fabricante *</label>
                   <select
                     value={orderForm.supplierPartyId}
                     onChange={(e) => setOrderForm({ ...orderForm, supplierPartyId: e.target.value })}
@@ -873,7 +932,7 @@ export default function ProcurementPage() {
                     required
                     className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">Selecione o SKU do Catálogo...</option>
+                    <option value="">Selecione o Produto...</option>
                     {skus.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.skuCode} - {s.modelName} ({s.name})
@@ -945,14 +1004,14 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => setIsOrderModalOpen(false)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-2"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-2 cursor-pointer"
                   >
                     {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                     Criar Pedido de Compra
@@ -963,76 +1022,244 @@ export default function ProcurementPage() {
           </div>
         )}
 
-        {/* Modal: Comprar Usado no Balcão */}
+        {/* Modal: Comprar Usado no Balcão - Versão Multicategorias (PCs Gamers, Consoles, etc.) */}
         {isUsedModalOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden">
-              <div className="flex items-center justify-between p-5 border-b border-slate-200">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
-                  <Smartphone className="w-4 h-4 text-purple-600" />
-                  Aquisição de Aparelho Usado no Balcão
-                </h3>
-                <button onClick={() => setIsUsedModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between p-5 border-b border-slate-200 shrink-0">
+                <div>
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
+                    <Gamepad2 className="w-4 h-4 text-purple-600" />
+                    Aquisição de Usado & Eletrônico no Balcão
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Entrada de computadores gamers, consoles de videogame, smartphones e notebooks seminovos.
+                  </p>
+                </div>
+                <button onClick={() => setIsUsedModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateUsedDevice} className="p-5 space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Vendedor / Cliente Cadastrado *</label>
-                  <select
-                    value={usedForm.sellerPartyId}
-                    onChange={(e) => setUsedForm({ ...usedForm, sellerPartyId: e.target.value })}
-                    required
-                    className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
+              {/* Seletor de Categoria do Eletrônico */}
+              <div className="px-5 pt-4 pb-2 border-b border-slate-100 bg-slate-50/70 shrink-0">
+                <label className="block text-[11px] font-bold uppercase text-slate-500 tracking-wider mb-2">
+                  Qual categoria de eletrônico está entrando?
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("computador_gamer")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                      selectedCategory === "computador_gamer"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                    }`}
                   >
-                    <option value="">Selecione o Cliente / Pessoa...</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} {s.document ? `(${s.document})` : ""}
-                      </option>
-                    ))}
-                  </select>
+                    <Cpu className="w-4 h-4 shrink-0" />
+                    <div className="text-xs font-bold leading-tight">PC Gamer / Desktop</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("videogame")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                      selectedCategory === "videogame"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                    }`}
+                  >
+                    <Gamepad2 className="w-4 h-4 shrink-0" />
+                    <div className="text-xs font-bold leading-tight">Videogame / Console</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("smartphone")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                      selectedCategory === "smartphone"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4 shrink-0" />
+                    <div className="text-xs font-bold leading-tight">Smartphone / Celular</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("notebook")}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                      selectedCategory === "notebook"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                    }`}
+                  >
+                    <Laptop className="w-4 h-4 shrink-0" />
+                    <div className="text-xs font-bold leading-tight">Notebook / Laptop</div>
+                  </button>
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateUsedDevice} className="p-5 space-y-4 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Vendedor / Cliente Cadastrado *</label>
+                    <select
+                      value={usedForm.sellerPartyId}
+                      onChange={(e) => setUsedForm({ ...usedForm, sellerPartyId: e.target.value })}
+                      required
+                      className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Selecione o Cliente / Pessoa...</option>
+                      {suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.document ? `(${s.document})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Modelo / SKU no Catálogo *</label>
+                    <select
+                      value={usedForm.productSkuId}
+                      onChange={(e) => setUsedForm({ ...usedForm, productSkuId: e.target.value })}
+                      required
+                      className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Selecione o Modelo Correspondente...</option>
+                      {skus.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.skuCode} - {s.modelName} ({s.name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Modelo / SKU Correspondente *</label>
-                  <select
-                    value={usedForm.productSkuId}
-                    onChange={(e) => setUsedForm({ ...usedForm, productSkuId: e.target.value })}
-                    required
-                    className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Selecione o Modelo do Aparelho...</option>
-                    {skus.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.skuCode} - {s.modelName} ({s.name})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Campos Específicos por Categoria */}
+                {selectedCategory === "computador_gamer" && (
+                  <div className="p-3 bg-purple-50/60 border border-purple-200/80 rounded-xl space-y-3">
+                    <div className="text-xs font-extrabold text-purple-900 flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-purple-600" />
+                      Ficha Técnica do Computador Gamer
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Processador (CPU)</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Ryzen 7 5700X / Core i7-13700"
+                          value={usedForm.specs.cpuProcessor}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, cpuProcessor: e.target.value } })}
+                          className="w-full text-xs border border-purple-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Placa de Vídeo (GPU)</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: RTX 4060 8GB / RX 6700XT"
+                          value={usedForm.specs.gpuVideoCard}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, gpuVideoCard: e.target.value } })}
+                          className="w-full text-xs border border-purple-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Memória RAM</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 32GB (2x16GB) DDR4 3200MHz"
+                          value={usedForm.specs.ramMemory}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, ramMemory: e.target.value } })}
+                          className="w-full text-xs border border-purple-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Armazenamento & Fonte</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: SSD 1TB NVMe + Fonte 650W"
+                          value={usedForm.specs.storageDrive}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, storageDrive: e.target.value } })}
+                          className="w-full text-xs border border-purple-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedCategory === "videogame" && (
+                  <div className="p-3 bg-indigo-50/60 border border-indigo-200/80 rounded-xl space-y-3">
+                    <div className="text-xs font-extrabold text-indigo-900 flex items-center gap-1.5">
+                      <Gamepad2 className="w-4 h-4 text-indigo-600" />
+                      Acessórios e Capacidade do Videogame
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Capacidade</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 825GB / 1TB / 500GB"
+                          value={usedForm.specs.consoleStorage}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, consoleStorage: e.target.value } })}
+                          className="w-full text-xs border border-indigo-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Qtd. Controles</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="4"
+                          value={usedForm.specs.controllersCount}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, controllersCount: parseInt(e.target.value) || 0 } })}
+                          className="w-full text-xs border border-indigo-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cabos / Jogos Extras</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Cabo HDMI, Cabo Força"
+                          value={usedForm.specs.includedAccessories}
+                          onChange={(e) => setUsedForm({ ...usedForm, specs: { ...usedForm.specs, includedAccessories: e.target.value } })}
+                          className="w-full text-xs border border-indigo-200 rounded-lg p-1.5 bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Número de Série *</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {selectedCategory === "computador_gamer"
+                        ? "Serial / Tag da Máquina *"
+                        : selectedCategory === "videogame"
+                        ? "Serial do Console (Sony / MS / Nintendo) *"
+                        : "Número de Série / Tag *"}
+                    </label>
                     <input
                       type="text"
                       value={usedForm.serialNumber}
                       onChange={(e) => setUsedForm({ ...usedForm, serialNumber: e.target.value.toUpperCase() })}
                       required
-                      placeholder="Ex: F17XYZ8999"
+                      placeholder={selectedCategory === "computador_gamer" ? "Ex: PCG-2026-99" : "Ex: FC7882910"}
                       className="w-full text-xs font-mono border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">IMEI 1</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {selectedCategory === "smartphone" ? "IMEI 1 (Obrigatório em Celulares)" : "Identificador / Etiqueta Adicional"}
+                    </label>
                     <input
                       type="text"
                       value={usedForm.imei1}
                       onChange={(e) => setUsedForm({ ...usedForm, imei1: e.target.value })}
-                      placeholder="15 dígitos"
-                      maxLength={15}
+                      placeholder={selectedCategory === "smartphone" ? "15 dígitos do IMEI" : "Opcional"}
                       className="w-full text-xs font-mono border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
@@ -1040,16 +1267,16 @@ export default function ProcurementPage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Condição</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Condição Física</label>
                     <select
                       value={usedForm.condition}
                       onChange={(e) => setUsedForm({ ...usedForm, condition: e.target.value })}
                       className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
                     >
-                      <option value="UsedLikeNew">Como Novo</option>
-                      <option value="UsedGood">Muito Bom</option>
-                      <option value="UsedFair">Bom / Sinais de Uso</option>
-                      <option value="Defective">Com Defeito / Peças</option>
+                      <option value="UsedLikeNew">Como Novo (Sem marcas)</option>
+                      <option value="UsedGood">Muito Bom (Conservado)</option>
+                      <option value="UsedFair">Marcas de Uso / Sinais</option>
+                      <option value="Refurbished">Recondicionado / Revisado</option>
                     </select>
                   </div>
 
@@ -1060,28 +1287,41 @@ export default function ProcurementPage() {
                       onChange={(e) => setUsedForm({ ...usedForm, grade: e.target.value })}
                       className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
                     >
-                      <option value="GradeA">Grau A (Excelente)</option>
+                      <option value="GradeA">Grau A (Excelente / Impecável)</option>
                       <option value="GradeB">Grau B (Marcas Leves)</option>
                       <option value="GradeC">Grau C (Marcas Visíveis)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Saúde Bateria (%)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={usedForm.batteryHealthPercentage}
-                      onChange={(e) => setUsedForm({ ...usedForm, batteryHealthPercentage: parseInt(e.target.value) || 80 })}
-                      className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
-                    />
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {selectedCategory === "smartphone" || selectedCategory === "notebook"
+                        ? "Saúde da Bateria (%)"
+                        : "Teste em Bancada"}
+                    </label>
+                    {selectedCategory === "smartphone" || selectedCategory === "notebook" ? (
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={usedForm.batteryHealthPercentage}
+                        onChange={(e) => setUsedForm({ ...usedForm, batteryHealthPercentage: parseInt(e.target.value) || 85 })}
+                        className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        disabled
+                        value="100% Funcional"
+                        className="w-full text-xs border border-slate-200 bg-slate-50 text-slate-600 rounded-lg p-2 font-semibold"
+                      />
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Preço Negociado (R$)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Preço Pago / Recompra (R$)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1089,12 +1329,12 @@ export default function ProcurementPage() {
                       value={usedForm.negotiatedPrice}
                       onChange={(e) => setUsedForm({ ...usedForm, negotiatedPrice: parseFloat(e.target.value) || 0 })}
                       disabled={!canViewCost}
-                      className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 disabled:bg-slate-100"
+                      className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 disabled:bg-slate-100 font-bold"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Despesas Atribuíveis (R$)</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Despesas / Peças / Limpeza (R$)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -1107,21 +1347,32 @@ export default function ProcurementPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Observações do Produto / Laudo</label>
+                  <textarea
+                    rows={2}
+                    value={usedForm.notes}
+                    onChange={(e) => setUsedForm({ ...usedForm, notes: e.target.value })}
+                    placeholder="Ex: PC Gamer Gabinete Branco com RGB, testado em stress test 30 min sem superaquecimento."
+                    className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     onClick={() => setIsUsedModalOpen(false)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    className="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-2"
+                    className="px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md shadow-purple-600/20"
                   >
                     {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                    Registrar Aquisição
+                    Cadastrar Entrada no Estoque
                   </button>
                 </div>
               </form>
