@@ -1,32 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
+import { authorizeFleet, guardOrigin, FleetError } from "@/lib/fleet-session";
 import crypto from "crypto";
-
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
-}
 
 // GET /api/parties - Listar clientes e fornecedores do tenant com contatos, endereços e equipamentos
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search")?.trim() || "";
-    const onlyCustomers = searchParams.get("onlyCustomers") === "true";
     const onlySuppliers = searchParams.get("onlySuppliers") === "true";
+    const onlyCustomers = searchParams.get("onlyCustomers") === "true";
+    // Authorize through the canonical session, effective permissions and tenant scope.
+    const ctx = await authorizeFleet(request, onlySuppliers && !onlyCustomers ? "suppliers.view" : "customers.view");
+    const tenantId = ctx.tenantId;
+
+    const search = searchParams.get("search")?.trim() || "";
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10)));
     const offset = (page - 1) * pageSize;
 
-    const sql = getDb();
+    const sql = ctx.db;
 
     // Query principal de Parties com perfis
     let query = `
@@ -57,7 +49,7 @@ export async function GET(request: NextRequest) {
       query += ` AND (LOWER(p."Name") LIKE $${idx} OR LOWER(COALESCE(p."TradeName", '')) LIKE $${idx} OR p."DocumentNumber" LIKE $${idx})`;
     }
 
-    if (onlyCustomers) {
+    if (onlyCustomers || !ctx.permissions.has("suppliers.view")) {
       query += ` AND cp."Id" IS NOT NULL`;
     }
     if (onlySuppliers) {
@@ -148,7 +140,7 @@ export async function GET(request: NextRequest) {
       type: p.Type,
       name: p.Name,
       tradeName: p.TradeName,
-      documentNumber: p.DocumentNumber,
+      documentNumber: ctx.permissions.has("customers.sensitive.view") ? p.DocumentNumber : null,
       stateRegistration: p.StateRegistration,
       municipalRegistration: p.MunicipalRegistration,
       birthDate: p.BirthDate,
@@ -164,22 +156,31 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: any) {
+    if (err instanceof FleetError) {
+      return NextResponse.json({ code: err.code, error: err.message }, { status: err.status });
+    }
     console.error("Erro ao listar parties:", err);
-    return NextResponse.json({ error: "Erro ao listar clientes", detail: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao listar cadastros." }, { status: 500 });
   }
 }
 
 // POST /api/parties - Salva o cadastro completo atomicamente no Neon.
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
+    guardOrigin(request);
+    const body = await request.json();
+    const needsCustomer = body.enableCustomer !== false;
+    const needsSupplier = body.enableSupplier === true;
+    if (!needsCustomer && !needsSupplier) {
+      return NextResponse.json({ error: "Selecione cliente ou fornecedor para o cadastro." }, { status: 400 });
+    }
+    const ctx = await authorizeFleet(request, needsCustomer ? "customers.create" : "suppliers.create");
+    if (needsSupplier && !ctx.permissions.has("suppliers.create")) {
+      throw new FleetError(403, "FORBIDDEN", "Permissão suppliers.create necessária.");
+    }
+    const tenantId = ctx.tenantId;
     if (!tenantId) return NextResponse.json({ error: "Sessão sem empresa válida." }, { status: 403 });
 
-    const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return NextResponse.json({ error: "O nome completo ou razão social é obrigatório." }, { status: 400 });
 
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Modelo do aparelho é obrigatório." }, { status: 400 });
     }
 
-    const sql = getDb();
+    const sql = ctx.db;
     if (cleanDoc) {
       const existing = await sql(
         'SELECT "Id" FROM parties WHERE "TenantId" = $1 AND "DocumentNumber" = $2 LIMIT 1',
@@ -271,6 +272,9 @@ export async function POST(request: NextRequest) {
     await sql.transaction(operations);
     return NextResponse.json({ id: partyId, name, message: "Cadastro completo salvo com sucesso." }, { status: 201 });
   } catch (err: any) {
+    if (err instanceof FleetError) {
+      return NextResponse.json({ code: err.code, error: err.message }, { status: err.status });
+    }
     console.error("Erro ao criar cadastro completo:", err);
     if (err?.code === "23505") {
       return NextResponse.json({ error: "Já existe um registro com esses dados exclusivos." }, { status: 409 });
