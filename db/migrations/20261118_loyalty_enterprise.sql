@@ -173,9 +173,9 @@ BEGIN
   SELECT * INTO previous_earn FROM loyalty_ledger
     WHERE "TenantId"=NEW."TenantId" AND "EventKey"='SALE_EARN:'||NEW."Id"::text;
   IF FOUND THEN
-   PERFORM 1 FROM loyalty_accounts WHERE "TenantId"=NEW."TenantId" AND "PartyId"=NEW."CustomerPartyId" FOR UPDATE;
+   PERFORM 1 FROM loyalty_accounts WHERE "TenantId"=NEW."TenantId" AND "PartyId"=previous_earn."PartyId" FOR UPDATE;
    INSERT INTO loyalty_ledger ("TenantId","PartyId","SaleId","EventKey","Kind","PointsDelta","CashbackCentsDelta","EligibleSpendCents","RulesSnapshot","ActorId")
-    VALUES (NEW."TenantId",NEW."CustomerPartyId",NEW."Id",'SALE_REVERSAL:'||NEW."Id"::text,
+    VALUES (NEW."TenantId",previous_earn."PartyId",NEW."Id",'SALE_REVERSAL:'||NEW."Id"::text,
       'SALE_REVERSAL',-previous_earn."PointsDelta",-previous_earn."CashbackCentsDelta",
       -previous_earn."EligibleSpendCents",jsonb_build_object('reason','sale cancelled or fully returned'),NEW."CreatedByUserId")
      ON CONFLICT ("TenantId","EventKey") DO NOTHING RETURNING "Id" INTO reversal_id;
@@ -184,7 +184,7 @@ BEGIN
       "CashbackCentsAccrued"="CashbackCentsAccrued"-previous_earn."CashbackCentsDelta",
       "EligibleSpendCents"=GREATEST(0,"EligibleSpendCents"-previous_earn."EligibleSpendCents"),
       "PurchasesCount"=GREATEST(0,"PurchasesCount"-1),"UpdatedAtUtc"=now()
-      WHERE "TenantId"=NEW."TenantId" AND "PartyId"=NEW."CustomerPartyId";
+      WHERE "TenantId"=NEW."TenantId" AND "PartyId"=previous_earn."PartyId";
    END IF;
   END IF;
  END IF;
@@ -229,6 +229,8 @@ BEGIN
    RAISE EXCEPTION 'LOYALTY_REWARD_UNAVAILABLE' USING ERRCODE='P0001'; END IF;
  IF rw."Kind" NOT IN ('GIFT','SERVICE') THEN
    RAISE EXCEPTION 'LOYALTY_VOUCHER_REQUIRES_CHECKOUT_GATE' USING ERRCODE='P0001'; END IF;
+ IF NOT EXISTS (SELECT 1 FROM loyalty_programs WHERE "TenantId"=v_tenant AND "Enabled"=true) THEN
+   RAISE EXCEPTION 'LOYALTY_PROGRAM_DISABLED' USING ERRCODE='P0001'; END IF;
  IF acct."PointsBalance"<rw."PointsCost" THEN
    RAISE EXCEPTION 'LOYALTY_INSUFFICIENT_POINTS' USING ERRCODE='P0001'; END IF;
  IF rw."StockAvailable" IS NOT NULL AND rw."StockAvailable"<1 THEN
