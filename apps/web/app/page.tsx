@@ -50,14 +50,14 @@ export default function Home() {
               Visão Estratégica da Operação
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Painel de indicadores em tempo real, status operacional e módulos certificados prontos para cadastro.
+              Painel em integração com Neon. Indicadores indisponíveis até obter dados persistidos.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Sistema Pronto para Produção
+              Integração com Neon em andamento
             </span>
           </div>
         </div>
@@ -67,7 +67,7 @@ export default function Home() {
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-purple-600" />
-              Indicadores da Loja (Tempo Real)
+              Indicadores Operacionais (Integração Pendente)
             </span>
           </div>
 
@@ -84,10 +84,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-2xl font-extrabold text-slate-900 mt-2">
-                R$ 0,00
+                —
               </div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                Aguardando primeiras vendas do dia
+                Vendas ainda não integradas ao painel
               </p>
             </div>
 
@@ -103,10 +103,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-2xl font-extrabold text-slate-900 mt-2">
-                0 Unidades
+                —
               </div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                Cadastre aparelhos via Catálogo ou Compras
+                Estoque ainda não integrado ao painel
               </p>
             </div>
 
@@ -122,10 +122,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-2xl font-extrabold text-slate-900 mt-2">
-                0 Reparos
+                —
               </div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                Nenhum equipamento aguardando triagem
+                Ordens de serviço ainda não integradas ao painel
               </p>
             </div>
 
@@ -141,10 +141,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="text-2xl font-extrabold text-slate-900 mt-2">
-                0 Compatíveis
+                —
               </div>
               <p className="text-[11px] text-slate-400 font-medium mt-1">
-                Motor de matching ativo aguardando fila
+                CRM ainda não integrado ao painel
               </p>
             </div>
           </div>

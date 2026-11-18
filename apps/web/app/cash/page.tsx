@@ -33,21 +33,7 @@ export default function CashPage() {
 
   const handleOpenShift = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseFloat(floatInput) || 0;
-    setInitialFloat(val);
-    setCashBalance(val);
-    setIsShiftOpen(true);
-    setShowOpenModal(false);
-    setMovements([
-      {
-        id: `m-${Date.now()}`,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        type: "Abertura / Fundo",
-        amount: val,
-        doc: "TURNO-01",
-        reason: "Fundo de troco inicial para abertura do caixa"
-      }
-    ]);
+    window.alert("Abertura de caixa indisponível até a integração transacional com Neon.");
   };
 
   return (
@@ -68,14 +54,14 @@ export default function CashPage() {
               Caixa & Gestão de Turnos
             </h1>
             <p className="text-xs text-slate-500">
-              Terminal operacional balcão, conferência cega de valores, sangrias e suprimentos.
+              Módulo de caixa aguardando integração transacional com Neon. Dados operacionais indisponíveis.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             {!isShiftOpen ? (
               <button
-                onClick={() => setShowOpenModal(true)}
+                disabled title="Aguardando integração do Caixa com Neon"
                 className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
               >
                 <Lock className="w-3.5 h-3.5" />

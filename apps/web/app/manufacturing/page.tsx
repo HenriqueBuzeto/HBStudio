@@ -51,29 +51,8 @@ interface ManufacturingOrderView {
 export default function ManufacturingPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "printers" | "quote" | "library">("orders");
 
-  // Mock-free state: starts with real initial system state
-  const [printers, setPrinters] = useState<PrinterItem[]>([
-    {
-      id: "1",
-      name: "Bambu Lab X1-Carbon Combo #01",
-      code: "PRN-BAMBU-01",
-      technology: "FDM / CoreXY",
-      nominalPowerWatts: 350,
-      hourlyRateCost: 4.50,
-      status: "Available",
-      currentJobNote: "Livre para nova fila de fatiamento"
-    },
-    {
-      id: "2",
-      name: "Creality K1 Max #02",
-      code: "PRN-K1-02",
-      technology: "FDM / CoreXY",
-      nominalPowerWatts: 400,
-      hourlyRateCost: 3.80,
-      status: "Available",
-      currentJobNote: "Calibração de mesa concluída"
-    }
-  ]);
+  // Nenhuma impressora demonstrativa: equipamento só pode existir após cadastro persistido.
+  const [printers] = useState<PrinterItem[]>([]);
 
   const [orders, setOrders] = useState<ManufacturingOrderView[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ManufacturingOrderView | null>(null);
@@ -83,28 +62,28 @@ export default function ManufacturingPage() {
   const [newOrderAsset, setNewOrderAsset] = useState("");
   const [newOrderCustomer, setNewOrderCustomer] = useState("");
   const [newOrderQty, setNewOrderQty] = useState(1);
-  const [newOrderMass, setNewOrderMass] = useState(80);
+  const [newOrderMass, setNewOrderMass] = useState(0);
 
   // Modal para Registro de Falha / Refugo
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [failureReason, setFailureReason] = useState("");
-  const [failureWastedGrams, setFailureWastedGrams] = useState(30);
-  const [failureWastedMinutes, setFailureWastedMinutes] = useState(45);
+  const [failureWastedGrams, setFailureWastedGrams] = useState(0);
+  const [failureWastedMinutes, setFailureWastedMinutes] = useState(0);
 
   // Motor de Cálculo de Orçamento 3D
-  const [calcMassGrams, setCalcMassGrams] = useState(120);
-  const [calcPrintHours, setCalcPrintHours] = useState(4.5);
-  const [calcSpoolPriceKg, setCalcSpoolPriceKg] = useState(110);
-  const [calcKwhTariff, setCalcKwhTariff] = useState(1.10);
-  const [calcMachineRateHour, setCalcMachineRateHour] = useState(4.00);
-  const [calcLaborRateHour, setCalcLaborRateHour] = useState(30.00);
-  const [calcLaborMinutes, setCalcLaborMinutes] = useState(20);
-  const [calcPlannedWastePct, setCalcPlannedWastePct] = useState(5);
-  const [calcMarkupMarginPct, setCalcMarkupMarginPct] = useState(60);
+  const [calcMassGrams, setCalcMassGrams] = useState(0);
+  const [calcPrintHours, setCalcPrintHours] = useState(0);
+  const [calcSpoolPriceKg, setCalcSpoolPriceKg] = useState(0);
+  const [calcKwhTariff, setCalcKwhTariff] = useState(0);
+  const [calcMachineRateHour, setCalcMachineRateHour] = useState(0);
+  const [calcLaborRateHour, setCalcLaborRateHour] = useState(0);
+  const [calcLaborMinutes, setCalcLaborMinutes] = useState(0);
+  const [calcPlannedWastePct, setCalcPlannedWastePct] = useState(0);
+  const [calcMarkupMarginPct, setCalcMarkupMarginPct] = useState(0);
 
   // Decomposição de Custos Calculada
   const materialCost = (calcMassGrams / 1000) * calcSpoolPriceKg;
-  const energyCost = (0.25 * calcPrintHours) * calcKwhTariff; // 250W médios
+  const energyCost = 0; // Consumo real exige potência cadastrada; não inventar 250W médios.
   const machineCost = calcPrintHours * calcMachineRateHour;
   const laborCost = (calcLaborMinutes / 60) * calcLaborRateHour;
   const plannedWasteCost = materialCost * (calcPlannedWastePct / 100);
@@ -112,62 +91,20 @@ export default function ManufacturingPage() {
   const suggestedSellingPrice = directCost * (1 + calcMarkupMarginPct / 100);
   const grossProfit = suggestedSellingPrice - directCost;
 
+  // Escritas operacionais bloqueadas até integração com o banco Neon.
   const handleCreateOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOrderAsset) return;
-
-    const newOp: ManufacturingOrderView = {
-      id: crypto.randomUUID(),
-      orderNumber: `OP-${new Date().getFullYear()}-${String(orders.length + 1).padStart(3, "0")}`,
-      assetName: newOrderAsset,
-      stlVersion: "v1.2",
-      customerName: newOrderCustomer || "Estoque Geral / Prateleira",
-      quantity: newOrderQty,
-      status: "Planned",
-      plannedMassGrams: newOrderMass * newOrderQty,
-      actualMassGrams: 0,
-      wastedMassGrams: 0,
-      totalCost: directCost * newOrderQty,
-      unitCost: directCost,
-      targetDate: new Date(Date.now() + 86400000 * 2).toLocaleDateString("pt-BR")
-    };
-
-    setOrders([newOp, ...orders]);
-    setSelectedOrder(newOp);
-    setShowNewOrderModal(false);
-    setNewOrderAsset("");
-    setNewOrderCustomer("");
+    window.alert("Ordens de produção aguardam integração real com Neon; nenhum registro foi criado.");
   };
-
-  const handleStartOrder = (opId: string) => {
-    setOrders(orders.map(o => o.id === opId ? { ...o, status: "InProduction" } : o));
-    if (selectedOrder?.id === opId) {
-      setSelectedOrder({ ...selectedOrder, status: "InProduction" });
-    }
+  const handleStartOrder = (_opId: string) => {
+    window.alert("Operação indisponível sem persistência no Neon.");
   };
-
-  const handleCompleteOrder = (opId: string) => {
-    setOrders(orders.map(o => o.id === opId ? { ...o, status: "Completed", actualMassGrams: o.plannedMassGrams } : o));
-    if (selectedOrder?.id === opId) {
-      setSelectedOrder({ ...selectedOrder, status: "Completed", actualMassGrams: selectedOrder.plannedMassGrams });
-    }
+  const handleCompleteOrder = (_opId: string) => {
+    window.alert("Operação indisponível sem persistência no Neon.");
   };
-
   const handleRegisterFailure = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrder) return;
-
-    const wasteCost = (failureWastedGrams / 1000) * 110;
-    const updated = {
-      ...selectedOrder,
-      wastedMassGrams: selectedOrder.wastedMassGrams + failureWastedGrams,
-      totalCost: selectedOrder.totalCost + wasteCost
-    };
-
-    setOrders(orders.map(o => o.id === selectedOrder.id ? updated : o));
-    setSelectedOrder(updated);
-    setShowFailureModal(false);
-    setFailureReason("");
+    window.alert("Refugos aguardam integração com o Neon.");
   };
 
   return (
@@ -181,7 +118,7 @@ export default function ManufacturingPage() {
                 MOD-10 • Indústria 4.0
               </span>
               <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> Custos Reais Integrados
+                <ShieldCheck className="w-3.5 h-3.5" /> Integração de Custos Pendente
               </span>
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
@@ -189,7 +126,7 @@ export default function ManufacturingPage() {
               Fábrica 3D & Apuração de Custos
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Gestão de filamentos, fatiamento, ordens de produção (OP), refugos contábeis e integração atômica ao estoque oficial.
+              Simulação de orçamento disponível. Operações e estoques exigem integração real com Neon.
             </p>
           </div>
 
@@ -202,7 +139,7 @@ export default function ManufacturingPage() {
               Calculadora 3D
             </button>
             <button
-              onClick={() => setShowNewOrderModal(true)}
+              disabled title="Aguardando integração com Neon"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 shadow-purple-600/20 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -283,7 +220,7 @@ export default function ManufacturingPage() {
                         Crie uma nova OP vinculando insumos de filamento para acompanhar o tempo de máquina e custo real.
                       </p>
                       <button
-                        onClick={() => setShowNewOrderModal(true)}
+                        disabled title="Aguardando integração com Neon"
                         className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />

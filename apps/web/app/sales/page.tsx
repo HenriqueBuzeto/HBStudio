@@ -141,7 +141,7 @@ export interface SaleReturn {
 
 export default function SalesPage() {
   const [activeTab, setActiveTab] = useState<"pos" | "sales" | "quotes" | "returns">("pos");
-  const [showCostPermission, setShowCostPermission] = useState(true);
+  const [showCostPermission] = useState(false);
 
   // Cart / PDV State - Inicializado limpo (sem dados mock)
   const [cartItems, setCartItems] = useState<Array<{
@@ -160,7 +160,7 @@ export default function SalesPage() {
   const [discountTotal, setDiscountTotal] = useState<number>(0.00);
   const [chargesTotal, setChargesTotal] = useState<number>(0.00);
   const [customerName, setCustomerName] = useState<string>("");
-  const [sellerName, setSellerName] = useState<string>("Henrique Barreto");
+  const [sellerName, setSellerName] = useState<string>("");
 
   // Vendas, Cotações e Devoluções limpas (sem mocks fictícios)
   const [salesList] = useState<Sale[]>([]);
@@ -194,7 +194,7 @@ export default function SalesPage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowCostPermission(!showCostPermission)}
+              disabled title="Permissão de custo requer Effective Access real"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
               {showCostPermission ? <Eye className="w-3.5 h-3.5 text-purple-600" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
@@ -472,7 +472,7 @@ export default function SalesPage() {
 
                 {/* Ação de Finalização */}
                 <button
-                  onClick={() => alert("Transação processada com sucesso! Reserva consumida e baixa efetuada no Kardex oficial.")}
+                  disabled title="Venda indisponível até integração real com Neon e Kardex"
                   className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors"
                 >
                   <CheckCircle2 className="w-5 h-5" />

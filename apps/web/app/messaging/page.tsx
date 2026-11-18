@@ -67,161 +67,43 @@ export default function MessagingPage() {
   // Estados de dados reais
   const [messages, setMessages] = useState<MessageRequestItem[]>([]);
   const [notifications, setNotifications] = useState<InAppNotificationItem[]>([]);
-  const [templates, setTemplates] = useState<MessageTemplateItem[]>([
-    {
-      id: "tpl-1",
-      name: "crm_opportunity_match",
-      category: "MARKETING",
-      language: "pt_BR",
-      bodyText: "Olá {{1}}, uma unidade de {{2}} acabou de chegar ao nosso estoque da HB Studio! Deseja reservar?",
-      isMetaApproved: true,
-    },
-    {
-      id: "tpl-2",
-      name: "repair_os_status_update",
-      category: "UTILITY",
-      language: "pt_BR",
-      bodyText: "Olá {{1}}, sua OS {{2}} teve o status atualizado para: {{3}}. Acompanhe seu aparelho em nossa loja.",
-      isMetaApproved: true,
-    },
-    {
-      id: "tpl-3",
-      name: "sales_receipt_delivery",
-      category: "UTILITY",
-      language: "pt_BR",
-      bodyText: "Obrigado pela sua compra na HB Studio! O comprovante e garantia da venda {{1}} estão disponíveis.",
-      isMetaApproved: true,
-    },
-    {
-      id: "tpl-4",
-      name: "stock_reservation_expiring",
-      category: "UTILITY",
-      language: "pt_BR",
-      bodyText: "Aviso HB Studio: Sua reserva para o item {{1}} expira em 4 horas. Confirme para não perder a unidade.",
-      isMetaApproved: true,
-    },
-  ]);
+  // Template somente após homologação oficial na Meta e persistência no Neon.
+  const [templates, setTemplates] = useState<MessageTemplateItem[]>([]);
 
   // Modal de envio rápido / teste de mensagem
   const [showSendModal, setShowSendModal] = useState(false);
   const [newRecipient, setNewRecipient] = useState("");
-  const [newTemplate, setNewTemplate] = useState("crm_opportunity_match");
+  const [newTemplate, setNewTemplate] = useState("");
   const [sendCategory, setSendCategory] = useState<"UTILITY" | "MARKETING">("UTILITY");
-  const [customParam1, setCustomParam1] = useState("Cliente");
-  const [customParam2, setCustomParam2] = useState("iPhone 14 Pro 128GB");
+  const [customParam1, setCustomParam1] = useState("");
+  const [customParam2, setCustomParam2] = useState("");
 
   // Provedor WhatsApp Cloud API Status
   const [metaConfig, setMetaConfig] = useState({
     phoneNumberId: "",
     wabaId: "",
     accessTokenConfigured: false,
-    webhookCallbackUrl: "https://erp.hbstudio.com.br/api/webhooks/whatsapp",
-    verifyTokenConfigured: true,
-    hmacVerificationActive: true,
+    webhookCallbackUrl: "",
+    verifyTokenConfigured: false,
+    hmacVerificationActive: false,
   });
 
   const loadData = async () => {
     setLoading(true);
-    try {
-      // Simulação inicial caso endpoints ainda estejam sendo chamados sem token de sessão no browser
-      // Em produção busca de /api/messaging/queue e /api/messaging/notifications
-      setMessages([
-        {
-          id: "msg-001",
-          recipientPhone: "5511987654321",
-          recipientPartyName: "Carlos Eduardo Silva",
-          channel: "WhatsApp",
-          templateName: "crm_opportunity_match",
-          bodyPreview: "Olá Carlos, uma unidade de iPhone 14 Pro acabou de chegar ao nosso estoque da HB Studio!",
-          category: "MARKETING",
-          status: "Sent",
-          retryCount: 0,
-          createdAt: "Hoje às 10:45",
-          sentAt: "Hoje às 10:45:03",
-        },
-        {
-          id: "msg-002",
-          recipientPhone: "551133334444",
-          recipientPartyName: "Tech Parts & Serviços LTDA",
-          channel: "WhatsApp",
-          templateName: "sales_receipt_delivery",
-          bodyPreview: "Obrigado pela sua compra na HB Studio! Comprovante da venda VDA-2026-081 emitido.",
-          category: "UTILITY",
-          status: "Sent",
-          retryCount: 0,
-          createdAt: "Hoje às 09:12",
-          sentAt: "Hoje às 09:12:02",
-        },
-        {
-          id: "msg-003",
-          recipientPhone: "5517992651033",
-          recipientPartyName: "Henrique Barreto",
-          channel: "WhatsApp",
-          templateName: "repair_os_status_update",
-          bodyPreview: "Olá Henrique, sua OS 1042 teve o status atualizado para: Reparo Concluído / Testes Aprovados.",
-          category: "UTILITY",
-          status: "Sent",
-          retryCount: 0,
-          createdAt: "Ontem às 18:30",
-          sentAt: "Ontem às 18:30:05",
-        },
-      ]);
-
-      setNotifications([
-        {
-          id: "notif-01",
-          title: "Expiração de Reserva CRM",
-          message: "A reserva RES-CRM-924 expirou após 48h. 1 unidade de Apple Watch Ultra foi devolvida ao saldo disponível do Depósito.",
-          severity: "Warning",
-          isRead: false,
-          createdAt: "Há 12 minutos",
-        },
-        {
-          id: "notif-02",
-          title: "Novo Match de Fila de Desejo",
-          message: "Chegou no almoxarifado o SKU iPhone 14 Pro Dourado correspondente ao interesse do cliente Lucas Rocha.",
-          severity: "Success",
-          isRead: true,
-          createdAt: "Há 1 hora",
-        },
-        {
-          id: "notif-03",
-          title: "Opt-Out Recebido via WhatsApp",
-          message: "O contato 551199998888 respondeu 'SAIR'. Consentimento de Marketing revogado canonicamente no PartyConsentRecord.",
-          severity: "Info",
-          isRead: true,
-          createdAt: "Há 3 horas",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+    // Serviço de mensageria não migrado para Neon: não apresentar mensagens
+    // e notificações fictícias como operações concluídas.
+    setMessages([]);
+    setNotifications([]);
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const handleSendTestMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRecipient) return;
-
-    const newMessage: MessageRequestItem = {
-      id: `msg-${Date.now().toString().slice(-4)}`,
-      recipientPhone: newRecipient,
-      recipientPartyName: customParam1,
-      channel: "WhatsApp",
-      templateName: newTemplate,
-      bodyPreview: `Olá ${customParam1}, novidade sobre ${customParam2} na HB Studio!`,
-      category: sendCategory,
-      status: "Queued",
-      retryCount: 0,
-      createdAt: "Agora mesmo",
-    };
-
-    setMessages([newMessage, ...messages]);
-    setShowSendModal(false);
-    setNewRecipient("");
+    window.alert("Envio indisponível até integração do serviço com Neon e Meta Cloud API.");
   };
 
   const filteredMessages = messages.filter((m) => {
@@ -248,7 +130,7 @@ export default function MessagingPage() {
             Mensageria & WhatsApp Cloud API
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Fila persistente com expiração automática de reservas, validação LGPD/Consentimentos e Meta Graph API oficial.
+            Mensageria aguardando integração com Neon e validação oficial da Meta. Nenhuma mensagem fictícia é exibida.
           </p>
         </div>
 
@@ -262,7 +144,7 @@ export default function MessagingPage() {
             Atualizar
           </button>
           <button
-            onClick={() => setShowSendModal(true)}
+            disabled title="Integração oficial pendente"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-sm font-bold shadow-md shadow-purple-600/25 transition-all"
           >
             <Send className="w-4 h-4" />
@@ -280,7 +162,7 @@ export default function MessagingPage() {
               {messages.filter((m) => m.status === "Queued" || m.status === "Leased").length}
             </p>
             <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Worker ativo (Lease 60s)
+              <CheckCircle2 className="w-3.5 h-3.5" /> Worker não integrado
             </p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
@@ -317,7 +199,7 @@ export default function MessagingPage() {
         <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400">LGPD & Consentimentos</p>
-            <p className="text-2xl font-extrabold text-slate-900 mt-1">100%</p>
+            <p className="text-2xl font-extrabold text-slate-900 mt-1">—</p>
             <p className="text-[11px] text-indigo-600 font-semibold mt-1">Fonte: PartyConsentRecord</p>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold">
