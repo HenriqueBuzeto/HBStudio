@@ -17,6 +17,23 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Installment correctness (BRL centavos, 1x–12x)
+        run: |
+          node --experimental-strip-types --input-type=module -e '
+          import assert from "node:assert/strict";
+          import {distributeInstallments as split} from "./lib/pos-installments.ts";
+          assert.deepEqual(split(120000,12),Array(12).fill(10000));
+          assert.deepEqual(split(120000,10),Array(10).fill(12000));
+          assert.deepEqual(split(100000,3),[33334,33333,33333]);
+          for(let n=1;n<=12;n++){
+            const parts=split(120001,n);
+            assert.equal(parts.reduce((a,b)=>a+b,0),120001);
+            assert.ok(Math.max(...parts)-Math.min(...parts)<=1);
+          }
+          assert.throws(()=>split(-1,2),RangeError);
+          assert.throws(()=>split(100,13),RangeError);
+          console.log("Installment math: PASS");
+          '
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build
