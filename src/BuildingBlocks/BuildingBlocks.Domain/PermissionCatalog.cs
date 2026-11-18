@@ -19,6 +19,12 @@ public static class PermissionCatalog
     public const string CatalogProductsManage = "catalog.products.manage";
     public const string CatalogCostView = "catalog.cost.view";
 
+    // Clube de Vantagens / Fidelidade (MOD Loyalty Enterprise)
+    public const string LoyaltyView = "loyalty.view";
+    public const string LoyaltyManage = "loyalty.manage";
+    public const string LoyaltyRedeem = "loyalty.redeem";
+    public const string LoyaltyFulfill = "loyalty.fulfill";
+
     // Estoque
     public const string InventoryView = "inventory.view";
     public const string InventoryMove = "inventory.move";
