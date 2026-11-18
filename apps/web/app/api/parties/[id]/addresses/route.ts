@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const sql = ctx.db;
     // A FK simples de PartyId não substitui a checagem de isolamento por tenant.
-    const party = await sql(
+    const party = await sql.query(
       'SELECT "Id" FROM parties WHERE "Id" = $1 AND "TenantId" = $2 LIMIT 1',
       [id, tenantId]
     );
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const addrId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    await sql(
+    await sql.query(
       `INSERT INTO party_addresses (
         "Id", "TenantId", "PartyId", "Street", "Number", "Complement",
         "Neighborhood", "City", "State", "PostalCode", "IsPrimary", "CreatedAtUtc"
