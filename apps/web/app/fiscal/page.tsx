@@ -196,10 +196,19 @@ export default function FiscalPage() {
       return;
     }
 
+    if (pfxFile.size > 2_000_000) {
+      setStatusMsg({type:"error",text:"O certificado PFX excede 2 MB."});
+      return;
+    }
     setSaving(true);
     setStatusMsg(null);
 
     const reader = new FileReader();
+    reader.onerror = () => {
+      setSaving(false);
+      setPfxPassword("");
+      setStatusMsg({type:"error",text:"Falha ao ler o certificado. Nenhum arquivo foi armazenado."});
+    };
     reader.onload = async () => {
       const base64 = (reader.result as string).split(",")[1];
       try {
@@ -224,10 +233,28 @@ export default function FiscalPage() {
       } catch {
         setStatusMsg({ type: "error", text: "Falha ao enviar certificado digital." });
       } finally {
+        setPfxPassword("");
         setSaving(false);
       }
     };
     reader.readAsDataURL(pfxFile);
+  };
+
+  const handleTestSefaz = async () => {
+    setSaving(true);
+    setStatusMsg({type:"info",text:"Consultando o webservice oficial da SEFAZ-SP em homologação por TLS com certificado A1..."});
+    try {
+      const response=await fetch("/api/fiscal/connection-test",{method:"POST",cache:"no-store"});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||"Falha no teste de conexão SEFAZ.");
+      setStatusMsg({
+        type:result.online?"success":"info",
+        text:"Resposta oficial SEFAZ: cStat "+result.statusCode+" — "+result.statusReason+
+          ". Este teste não autoriza notas nem libera a emissão."
+      });
+    }catch(error){
+      setStatusMsg({type:"error",text:error instanceof Error?error.message:"Conexão SEFAZ indisponível."});
+    }finally{setSaving(false);}
   };
 
   const hasConfig = fiscalData?.configured;
@@ -260,7 +287,12 @@ export default function FiscalPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={handleTestSefaz}
+              disabled={saving || !fiscalData?.readiness?.vaultConfigured || !fiscalData?.certificate?.storedSecurely || !hasConfig}
+              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-bold text-amber-800 disabled:cursor-not-allowed disabled:opacity-40">
+              Testar conexão SEFAZ (homologação)
+            </button>
             <button
               onClick={loadFiscalStatus}
               className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl transition-all cursor-pointer"
@@ -768,6 +800,7 @@ export default function FiscalPage() {
                       type="text"
                       placeholder="000001"
                       value={cscId}
+                      maxLength={6}
                       onChange={(e) => setCscId(e.target.value)}
                       className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
                     />
@@ -779,6 +812,7 @@ export default function FiscalPage() {
                       type="password"
                       placeholder="Cole o código gerado no CADESP"
                       value={cscToken}
+                      maxLength={36}
                       onChange={(e) => setCscToken(e.target.value)}
                       className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
                     />
