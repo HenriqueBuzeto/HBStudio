@@ -70,6 +70,7 @@ const navSections: NavSection[] = [
   {
     title: "COMERCIAL & INTELIGÊNCIA",
     items: [
+      { name: "Clube & Gamificação", href: "/loyalty", icon: Sparkles, badge: "Pontos" },
       { name: "CRM & Fila de Desejo", href: "/crm", icon: Target, badge: "Smart" },
       { name: "Mensageria & WhatsApp", href: "/messaging", icon: MessageSquare, badge: "Meta" },
     ],
