@@ -270,7 +270,17 @@ export async function POST(request: NextRequest) {
       ));
     }
 
-    // Uma falha em qualquer entidade causa rollback de todo o cadastro.
+    // Inclui auditoria na mesma transação: nenhum cadastro sem trilha de autoria.
+    const auditCorrelationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
+    operations.push(sql.query(
+      `INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action",
+        "ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version")
+       VALUES ($1,$2,$3,'Party',$4,'PartyCreate',$5,$6,$7,$8::jsonb,$9,1)`,
+      [crypto.randomUUID(), tenantId, ctx.branchId, partyId, ctx.userId, ctx.email,
+        auditCorrelationId, JSON.stringify({ type, isCustomer: needsCustomer, isSupplier: needsSupplier }), now]
+    ));
+
+    // Uma falha em qualquer entidade (inclusive auditoria) reverte o cadastro inteiro.
     await sql.transaction(operations);
     return NextResponse.json({ id: partyId, name, message: "Cadastro completo salvo com sucesso." }, { status: 201 });
   } catch (err: any) {
