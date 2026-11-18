@@ -140,7 +140,7 @@ CREATE OR REPLACE FUNCTION loyalty_reverse_sale(p_sale_id uuid) RETURNS void LAN
 DECLARE v_sale sales%ROWTYPE; v_points bigint; v_written uuid;
 BEGIN
  SELECT * INTO v_sale FROM sales WHERE "Id"=p_sale_id;
- IF NOT FOUND OR (v_sale."Status" NOT IN (6,8) AND v_sale."PaymentStatus" NOT IN (6,7)) OR v_sale."CustomerPartyId" IS NULL THEN RETURN; END IF;
+ IF NOT FOUND OR (v_sale."Status" NOT IN (6,8) AND v_sale."PaymentStatus"<>7) OR v_sale."CustomerPartyId" IS NULL THEN RETURN; END IF;
  SELECT COALESCE(SUM("PointsDelta"),0)::bigint INTO v_points FROM loyalty_ledger
  WHERE "TenantId"=v_sale."TenantId" AND "SaleId"=p_sale_id AND "Kind" IN ('SALE_EARN','RETURN_REVERSAL');
  IF v_points<=0 THEN RETURN; END IF;
@@ -156,7 +156,7 @@ END;$$;
 CREATE OR REPLACE FUNCTION loyalty_sale_event() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF NEW."Status" IN (4,5) AND NEW."PaymentStatus"=4 THEN PERFORM loyalty_accrue_sale(NEW."Id"); END IF;
- IF NEW."Status" IN (6,8) OR NEW."PaymentStatus" IN (6,7) THEN PERFORM loyalty_reverse_sale(NEW."Id"); END IF;
+ IF NEW."Status" IN (6,8) OR NEW."PaymentStatus"=7 THEN PERFORM loyalty_reverse_sale(NEW."Id"); END IF;
  RETURN NEW;
 END;$$;
 DROP TRIGGER IF EXISTS "TR_loyalty_sale_event" ON sales;
