@@ -33,21 +33,22 @@ export default function FiscalPage() {
   const [fiscalData, setFiscalData] = useState<any>(null);
 
   // Formulário: Dados da Empresa / Estabelecimento
-  const [corporateName, setCorporateName] = useState("HB STUDIO LTDA");
-  const [tradeName, setTradeName] = useState("HB Studio");
-  const [cnpj, setCnpj] = useState("48.951.871/0001-80");
-  const [stateRegistration, setStateRegistration] = useState("111.222.333.444");
+  const [corporateName, setCorporateName] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [cnpj, setCnpj] = useState("");
+  const [stateRegistration, setStateRegistration] = useState("");
   const [municipalRegistration, setMunicipalRegistration] = useState("");
-  const [cnae, setCnae] = useState("4751-2/01");
+  const [cnae, setCnae] = useState("");
   const [regime, setRegime] = useState("1"); // 1 = Simples Nacional
-  const [environment, setEnvironment] = useState("1"); // 1 = Produção
-  const [street, setStreet] = useState("Av. Paulista");
-  const [number, setNumber] = useState("1000");
+  const [environment, setEnvironment] = useState("2"); // Homologação somente
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
   const [complement, setComplement] = useState("");
-  const [neighborhood, setNeighborhood] = useState("Bela Vista");
-  const [cityName, setCityName] = useState("São Paulo");
-  const [state, setState] = useState("SP");
-  const [postalCode, setPostalCode] = useState("01310-100");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [cityName, setCityName] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [cityCodeIbge, setCityCodeIbge] = useState("");
   const [nfceDefaultSeries, setNfceDefaultSeries] = useState("1");
   const [nfceNextNumber, setNfceNextNumber] = useState("1");
 
@@ -56,7 +57,7 @@ export default function FiscalPage() {
   const [pfxPassword, setPfxPassword] = useState("");
 
   // Formulário: Código de Segurança do Contribuinte (CSC)
-  const [cscId, setCscId] = useState("000001");
+  const [cscId, setCscId] = useState("");
   const [cscToken, setCscToken] = useState("");
 
   // Carregar status fiscal diretamente do Neon
@@ -73,12 +74,19 @@ export default function FiscalPage() {
           setTradeName(e.tradeName || "");
           setCnpj(e.cnpj || "");
           setStateRegistration(e.stateRegistration || "");
+          setMunicipalRegistration(e.municipalRegistration || "");
+          setCnae(e.cnae || "");
+          setRegime(String(e.regime || ""));
+          setEnvironment(String(e.environment || 2));
+          setCityCodeIbge(e.cityCodeIbge || "");
+          setComplement(e.complement || "");
           setStreet(e.street || "");
           setNumber(e.number || "");
           setNeighborhood(e.neighborhood || "");
-          setCityName(e.cityName || "São Paulo");
-          setState(e.state || "SP");
+          setCityName(e.cityName || "");
+          setState(e.state || "");
           setPostalCode(e.postalCode || "");
+          setCscId(data.csc?.cscId || "");
           setNfceDefaultSeries(String(e.nfceDefaultSeries || 1));
           setNfceNextNumber(String(e.nfceNextNumber || 1));
         }
@@ -118,6 +126,7 @@ export default function FiscalPage() {
           neighborhood,
           cityName,
           state,
+          cityCodeIbge,
           postalCode,
           environment: Number(environment),
           nfceDefaultSeries: Number(nfceDefaultSeries),
@@ -127,7 +136,7 @@ export default function FiscalPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setStatusMsg({ type: "success", text: "Estabelecimento fiscal salvo com sucesso no banco de dados Neon!" });
+        setStatusMsg({ type: "success", text: "Estabelecimento registrado em homologação. Emissão permanece bloqueada até autorização real da SEFAZ." });
         loadFiscalStatus();
       } else {
         setStatusMsg({ type: "error", text: data.error || "Erro ao salvar estabelecimento fiscal." });
@@ -160,7 +169,7 @@ export default function FiscalPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setStatusMsg({ type: "success", text: "Código CSC registrado e criptografado com sucesso!" });
+        setStatusMsg({ type: "success", text: "CSC protegido no cofre fiscal. A validação oficial da SEFAZ continua pendente." });
         setCscToken("");
         loadFiscalStatus();
       } else {
@@ -199,7 +208,7 @@ export default function FiscalPage() {
 
         const data = await res.json();
         if (res.ok) {
-          setStatusMsg({ type: "success", text: "Certificado A1 enviado, criptografado e validado no Neon!" });
+          setStatusMsg({ type: "success", text: "PFX armazenado. Ainda não habilitado para emissão: requer validação ICP-Brasil e homologação." });
           setPfxFile(null);
           setPfxPassword("");
           loadFiscalStatus();
@@ -231,10 +240,10 @@ export default function FiscalPage() {
                 Módulo Fiscal & Tributário
               </span>
               <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-                MOD-14 • SEFAZ-SP & Zeus DFe
+                MOD-14 • Integração SEFAZ pendente
               </span>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Sem Custo por Nota
+                Transmissão ainda bloqueada
               </span>
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 mt-2">
@@ -345,13 +354,13 @@ export default function FiscalPage() {
               <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
                 <div className="flex items-center justify-between text-slate-400">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider">Certificado A1</span>
-                  <ShieldCheck className={`w-4 h-4 ${cert ? "text-emerald-500" : "text-amber-500"}`} />
+                  <ShieldCheck className={`w-4 h-4 $"text-amber-500"`} />
                 </div>
                 <div className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
                   {cert ? (
                     <>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      <span>Ativo & Carregado</span>
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>Armazenado • validação pendente</span>
                     </>
                   ) : (
                     <>
@@ -372,7 +381,7 @@ export default function FiscalPage() {
                   <QrCode className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div className="font-extrabold text-slate-900 text-sm">
-                  {csc ? "Versão 2.0 (NT 2025.001)" : "CSC Pendente"}
+                  {csc ? "CSC cadastrado • não verificado na SEFAZ" : "CSC Pendente"}
                 </div>
                 <div className="text-[11px] text-slate-500">
                   {csc ? `Token ID: ${csc.cscId} (${csc.cscTokenMasked})` : "Exige CSC da SEFAZ"}
@@ -386,10 +395,10 @@ export default function FiscalPage() {
                   <FileCode className="w-4 h-4 text-purple-600" />
                 </div>
                 <div className="font-extrabold text-slate-900 text-sm font-mono">
-                  Série {hasConfig ? est.nfceDefaultSeries : 1} • Nº {hasConfig ? est.nfceNextNumber : 1}
+                  Série {hasConfig ? est.nfceDefaultSeries : "—"} • Nº {hasConfig ? est.nfceNextNumber : "—"}
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  {hasConfig ? est.environment : "SEFAZ-SP Produção"}
+                  {hasConfig ? (est.environment === 2 ? "Homologação" : "Produção bloqueada") : "Não configurado"}
                 </div>
               </div>
             </div>
@@ -398,28 +407,28 @@ export default function FiscalPage() {
             <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
               <div className="flex items-center gap-2 text-purple-300 font-extrabold text-xs uppercase tracking-wider">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Motor Fiscal Próprio com Zeus DFe .NET</span>
+                <span>Integração Fiscal Vercel + Neon • Em desenvolvimento</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                 <div className="space-y-1.5">
-                  <h4 className="font-bold text-sm text-white">1. Custo Zero por Emissão</h4>
+                  <h4 className="font-bold text-sm text-white">1. Comunicação SEFAZ pendente</h4>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Diferente de APIs pagas que cobram R$ 0,10 a R$ 0,50 por nota emitida, o HB Studio conecta diretamente ao webservice oficial da SEFAZ-SP sem intermediários.
+                    Ainda não existe transmissão autenticada homologada. Nenhuma NFC-e pode ser considerada autorizada sem resposta oficial da SEFAZ.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <h4 className="font-bold text-sm text-white">2. Contingência Offline Automática</h4>
+                  <h4 className="font-bold text-sm text-white">2. Contingência indisponível</h4>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Em caso de instabilidade na SEFAZ estadual, o balcão emite a NFC-e em modo de contingência offline instantaneamente e transmite assim que o sinal for restabelecido.
+                    Contingência fiscal ainda não homologada. Nunca serão gerados protocolos ou eventos fictícios.
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <h4 className="font-bold text-sm text-white">3. Armazenamento Blindado no Neon</h4>
+                  <h4 className="font-bold text-sm text-white">3. Cofre fiscal AES-256-GCM</h4>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Certificados A1 e tokens CSC são criptografados com algoritmo AES-256 no banco de dados Neon, garantindo conformidade com a LGPD e sigilo fiscal.
+                    Novas credenciais são protegidas com AES-256-GCM e chave separada de autenticação. A ativação exige validação e homologação externa.
                   </p>
                 </div>
               </div>
@@ -525,7 +534,7 @@ export default function FiscalPage() {
                       onChange={(e) => setEnvironment(e.target.value)}
                       className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-700"
                     >
-                      <option value="1">Produção (Validade Jurídica)</option>
+                      <option value="1" disabled>Produção indisponível até homologação SEFAZ</option>
                       <option value="2">Homologação (Testes sem valor fiscal)</option>
                     </select>
                   </div>
@@ -652,13 +661,13 @@ export default function FiscalPage() {
                 </div>
 
                 <p className="text-xs text-slate-500">
-                  O certificado A1 assina digitalmente as NFC-es perante a SEFAZ. O arquivo é criptografado com chave AES-256 no Neon.
+                  O PFX fica criptografado com AES-256-GCM e inativo até validação ICP-Brasil e homologação. Nunca envie sua senha pelo chat.
                 </p>
 
                 {cert ? (
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 space-y-1">
                     <div className="font-bold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Certificado Instalado
+                      <AlertTriangle className="w-4 h-4 text-amber-600" /> Certificado armazenado, NÃO habilitado
                     </div>
                     <div className="text-[11px] text-slate-600 font-mono truncate">
                       Thumbprint: {cert.thumbprint}
@@ -670,7 +679,7 @@ export default function FiscalPage() {
                 ) : (
                   <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Nenhum certificado A1 ativo. Envie abaixo.</span>
+                    <span>Nenhum certificado A1 verificado. Emissão indisponível.</span>
                   </div>
                 )}
 
@@ -721,7 +730,7 @@ export default function FiscalPage() {
                 {csc ? (
                   <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-xs text-indigo-900 space-y-1">
                     <div className="font-bold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-indigo-600" /> CSC Registrado no Neon
+                      <AlertTriangle className="w-4 h-4 text-amber-600" /> CSC armazenado, não verificado na SEFAZ
                     </div>
                     <div className="text-[11px] font-mono text-slate-600">
                       ID: {csc.cscId} • Token: {csc.cscTokenMasked}
@@ -747,7 +756,7 @@ export default function FiscalPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[11px] font-bold text-slate-700">Código Token CSC (36 caracteres)</label>
+                    <label className="block text-[11px] font-bold text-slate-700">Código Token CSC (16 a 36 caracteres)</label>
                     <input
                       type="password"
                       placeholder="Cole o código gerado no CADESP"
@@ -789,7 +798,7 @@ export default function FiscalPage() {
               <FileCheck2 className="w-10 h-10 text-slate-300 mx-auto" />
               <div className="font-bold text-sm text-slate-600">Nenhum cupom fiscal emitido ainda</div>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Assim que você concluir uma venda no PDV ou no balcão com o estabelecimento e certificado configurados, a NFC-e será autorizada e listada aqui.
+                A autorização real ainda exige XML assinado, transmissão, validação e protocolo oficial confirmado na SEFAZ-SP.
               </p>
             </div>
           </div>
