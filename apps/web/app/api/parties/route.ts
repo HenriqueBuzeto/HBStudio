@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     query += ` ORDER BY p."CreatedAtUtc" DESC LIMIT ${pageSize} OFFSET ${offset};`;
 
-    const parties = await sql.query(query, params);
+    const parties = await sql(query, params);
 
     if (parties.length === 0) {
       return NextResponse.json([]);
@@ -76,19 +76,19 @@ export async function GET(request: NextRequest) {
 
     // Buscar Contatos, Endereços e Equipamentos para os clientes retornados
     const [contacts, addresses, equipments] = await Promise.all([
-      sql.query(
+      sql(
         `SELECT "Id", "PartyId", "Name", "Email", "Phone", "WhatsApp", "IsPrimary"
          FROM party_contacts
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
         [tenantId, partyIds]
       ),
-      sql.query(
+      sql(
         `SELECT "Id", "PartyId", "Street", "Number", "Complement", "Neighborhood", "City", "State", "PostalCode", "IsPrimary"
          FROM party_addresses
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
         [tenantId, partyIds]
       ),
-      sql.query(
+      sql(
         `SELECT "Id", "PartyId", "EquipmentType", "Brand", "Model", "Color", "SerialNumber", "Imei1", "Imei2", "Notes"
          FROM customer_equipments
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/parties - Cadastrar novo cliente ou fornecedor no Neon
+// POST /api/parties - Salva o cadastro completo atomicamente no Neon.
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("hb_access_token")?.value;
@@ -177,134 +177,104 @@ export async function POST(request: NextRequest) {
 
     const decoded: any = jwt.verify(token, getJwtSecret());
     const tenantId = decoded.tenant_id;
+    if (!tenantId) return NextResponse.json({ error: "Sessão sem empresa válida." }, { status: 403 });
 
     const body = await request.json();
-    const {
-      type,
-      name,
-      tradeName,
-      documentNumber,
-      stateRegistration,
-      municipalRegistration,
-      birthDate,
-      notes,
-      enableCustomer,
-      enableSupplier,
-      customerNotes,
-      supplyCategories,
-      paymentTerms,
-      primaryPhone,
-      primaryEmail
-    } = body;
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return NextResponse.json({ error: "O nome completo ou razão social é obrigatório." }, { status: 400 });
 
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: "O nome completo ou razão social é obrigatório." }, { status: 400 });
+    const type = body.type === 2 ? 2 : 1;
+    const cleanDoc = typeof body.documentNumber === "string"
+      ? body.documentNumber.replace(/\D/g, "") || null
+      : null;
+    if (cleanDoc && cleanDoc.length !== (type === 2 ? 14 : 11)) {
+      return NextResponse.json({ error: "CPF ou CNPJ com quantidade inválida de dígitos." }, { status: 400 });
+    }
+    const address = body.address && typeof body.address === "object" ? body.address : null;
+    const equipment = body.equipment && typeof body.equipment === "object" ? body.equipment : null;
+    if (address && (!address.street?.trim() || !address.city?.trim() || !address.state?.trim()
+      || !address.postalCode?.trim() || !address.neighborhood?.trim())) {
+      return NextResponse.json({ error: "Endereço incompleto: informe rua, bairro, cidade, estado e CEP." }, { status: 400 });
+    }
+    if (equipment && !equipment.model?.trim()) {
+      return NextResponse.json({ error: "Modelo do aparelho é obrigatório." }, { status: 400 });
     }
 
-    const cleanDoc = documentNumber?.trim() ? documentNumber.trim().replace(/\D/g, "") : null;
-    const cleanType = type === 2 ? 2 : 1;
-
     const sql = getDb();
-
-    // Validar duplicidade de documento se informado
     if (cleanDoc) {
-      const existingDoc = await sql.query(
-        `SELECT "Id", "Name" FROM parties 
-         WHERE "TenantId" = $1 AND "DocumentNumber" = $2 LIMIT 1;`,
+      const existing = await sql(
+        'SELECT "Id" FROM parties WHERE "TenantId" = $1 AND "DocumentNumber" = $2 LIMIT 1',
         [tenantId, cleanDoc]
       );
-      if (existingDoc.length > 0) {
-        return NextResponse.json(
-          { error: `Já existe um cadastro com o documento '${documentNumber}' (${existingDoc[0].Name}).` },
-          { status: 400 }
-        );
-      }
+      if (existing.length) return NextResponse.json({ error: "Já existe um cadastro com este CPF/CNPJ." }, { status: 409 });
     }
 
     const partyId = crypto.randomUUID();
     const now = new Date().toISOString();
-
-    // 1. Inserir Party
-    await sql.query(
-      `INSERT INTO parties (
-        "Id", "TenantId", "Type", "Name", "TradeName", "DocumentNumber",
-        "StateRegistration", "MunicipalRegistration", "BirthDate", "IsActive",
-        "Notes", "CreatedAtUtc"
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8, $9, true,
-        $10, $11
-      );`,
+    const operations = [
+      sql(`INSERT INTO parties (
+        "Id","TenantId","Type","Name","TradeName","DocumentNumber",
+        "StateRegistration","MunicipalRegistration","BirthDate","IsActive","Notes","CreatedAtUtc"
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11)`,
       [
-        partyId,
-        tenantId,
-        cleanType,
-        name.trim(),
-        tradeName?.trim() || null,
-        cleanDoc,
-        stateRegistration?.trim() || null,
-        municipalRegistration?.trim() || null,
-        birthDate ? new Date(birthDate).toISOString() : null,
-        notes?.trim() || null,
-        now
-      ]
-    );
-
-    // 2. Criar CustomerProfile se habilitado (padrão true para clientes)
-    if (enableCustomer !== false) {
-      const cpId = crypto.randomUUID();
-      await sql.query(
-        `INSERT INTO customer_profiles (
-          "Id", "TenantId", "PartyId", "InternalNotes", "TotalSalesValue", "CompletedRepairsCount", "CreatedAtUtc"
-        ) VALUES (
-          $1, $2, $3, $4, 0, 0, $5
-        );`,
-        [cpId, tenantId, partyId, customerNotes?.trim() || null, now]
-      );
+        partyId, tenantId, type, name, type === 2 ? body.tradeName?.trim() || null : null,
+        cleanDoc, type === 2 ? body.stateRegistration?.trim() || null : null,
+        body.municipalRegistration?.trim() || null,
+        body.birthDate || null, body.notes?.trim() || null, now
+      ])
+    ];
+    if (body.enableCustomer !== false) {
+      operations.push(sql(
+        `INSERT INTO customer_profiles ("Id","TenantId","PartyId","InternalNotes","TotalSalesValue","CompletedRepairsCount","CreatedAtUtc")
+         VALUES ($1,$2,$3,$4,0,0,$5)`,
+        [crypto.randomUUID(), tenantId, partyId, body.customerNotes?.trim() || null, now]
+      ));
+    }
+    if (body.enableSupplier === true) {
+      operations.push(sql(
+        `INSERT INTO supplier_profiles ("Id","TenantId","PartyId","PaymentTerms","SupplyCategories","LeadTimeDays","CreatedAtUtc")
+         VALUES ($1,$2,$3,$4,$5,0,$6)`,
+        [crypto.randomUUID(), tenantId, partyId, body.paymentTerms?.trim() || null, body.supplyCategories?.trim() || null, now]
+      ));
+    }
+    if (body.primaryPhone?.trim() || body.primaryEmail?.trim()) {
+      operations.push(sql(
+        `INSERT INTO party_contacts ("Id","TenantId","PartyId","Name","Email","Phone","WhatsApp","IsPrimary","CreatedAtUtc")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
+        [crypto.randomUUID(), tenantId, partyId, name, body.primaryEmail?.trim() || null,
+          body.primaryPhone?.trim() || null, body.primaryPhone?.trim() || null, now]
+      ));
+    }
+    if (address) {
+      operations.push(sql(
+        `INSERT INTO party_addresses ("Id","TenantId","PartyId","Street","Number","Complement","Neighborhood",
+          "City","State","PostalCode","IsPrimary","CreatedAtUtc")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
+        [crypto.randomUUID(), tenantId, partyId, address.street.trim(), address.number?.trim() || "S/N",
+          address.complement?.trim() || null, address.neighborhood.trim(), address.city.trim(),
+          address.state.trim().toUpperCase(), address.postalCode.trim(), now]
+      ));
+    }
+    if (equipment) {
+      operations.push(sql(
+        `INSERT INTO customer_equipments ("Id","TenantId","PartyId","EquipmentType","Brand","Model","Color",
+          "SerialNumber","Imei1","Imei2","Notes","CreatedAtUtc")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [crypto.randomUUID(), tenantId, partyId, equipment.equipmentType || "Smartphone",
+          equipment.brand || "Outro", equipment.model.trim(), equipment.color?.trim() || null,
+          equipment.serialNumber?.trim() || null, equipment.imei1?.trim() || null,
+          equipment.imei2?.trim() || null, equipment.notes?.trim() || null, now]
+      ));
     }
 
-    // 3. Criar SupplierProfile se habilitado
-    if (enableSupplier) {
-      const spId = crypto.randomUUID();
-      await sql.query(
-        `INSERT INTO supplier_profiles (
-          "Id", "TenantId", "PartyId", "PaymentTerms", "SupplyCategories", "LeadTimeDays", "CreatedAtUtc"
-        ) VALUES (
-          $1, $2, $3, $4, $5, 0, $6
-        );`,
-        [spId, tenantId, partyId, paymentTerms?.trim() || null, supplyCategories?.trim() || null, now]
-      );
-    }
-
-    // 4. Inserir Contato Primário se informado
-    if (primaryPhone?.trim() || primaryEmail?.trim()) {
-      const contactId = crypto.randomUUID();
-      await sql.query(
-        `INSERT INTO party_contacts (
-          "Id", "TenantId", "PartyId", "Name", "Email", "Phone", "WhatsApp", "IsPrimary", "CreatedAtUtc"
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, true, $8
-        );`,
-        [
-          contactId,
-          tenantId,
-          partyId,
-          name.trim(),
-          primaryEmail?.trim() || null,
-          primaryPhone?.trim() || null,
-          primaryPhone?.trim() || null,
-          now
-        ]
-      );
-    }
-
-    return NextResponse.json({
-      id: partyId,
-      name: name.trim(),
-      message: "Cliente/Pessoa cadastrado com sucesso!",
-    });
+    // Uma falha em qualquer entidade causa rollback de todo o cadastro.
+    await sql.transaction(operations);
+    return NextResponse.json({ id: partyId, name, message: "Cadastro completo salvo com sucesso." }, { status: 201 });
   } catch (err: any) {
-    console.error("Erro ao criar party:", err);
-    return NextResponse.json({ error: "Erro ao cadastrar cliente", detail: err.message }, { status: 500 });
+    console.error("Erro ao criar cadastro completo:", err);
+    if (err?.code === "23505") {
+      return NextResponse.json({ error: "Já existe um registro com esses dados exclusivos." }, { status: 409 });
+    }
+    return NextResponse.json({ error: "Falha ao salvar cadastro. Nenhum registro parcial foi confirmado." }, { status: 500 });
   }
 }

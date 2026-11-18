@@ -35,10 +35,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const sql = getDb();
+    // A FK simples de PartyId não substitui a checagem de isolamento por tenant.
+    const party = await sql(
+      'SELECT "Id" FROM parties WHERE "Id" = $1 AND "TenantId" = $2 LIMIT 1',
+      [id, tenantId]
+    );
+    if (party.length === 0) return NextResponse.json({ error: "Cadastro não encontrado." }, { status: 404 });
+    // Neon HTTP client is a callable query function (not a pg Pool).
     const addrId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    await sql.query(
+    await sql(
       `INSERT INTO party_addresses (
         "Id", "TenantId", "PartyId", "Street", "Number", "Complement",
         "Neighborhood", "City", "State", "PostalCode", "IsPrimary", "CreatedAtUtc"
