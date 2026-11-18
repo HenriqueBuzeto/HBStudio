@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { PasswordField } from "./PasswordField";
 import { AuthFeedback } from "./AuthFeedback";
 import { Loader2, Mail, ArrowRight, ShieldCheck } from "lucide-react";
 
 export function LoginForm() {
-  const router = useRouter();
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -46,6 +44,8 @@ export function LoginForm() {
       // Chamada à rota interna BFF do Next.js (grava Cookie HttpOnly no navegador)
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
@@ -55,8 +55,45 @@ export function LoginForm() {
 
       if (res.ok) {
         const data = await res.json();
-        login(data.user);
-        router.push("/");
+        if (!data?.user?.id) {
+          setFeedback("O servidor retornou uma resposta de login incompleta. Tente novamente.");
+          return;
+        }
+
+        // Um POST 200 nao garante que o cookie ficou disponivel no navegador.
+        // Validar a sessao real no mesmo dominio antes de acessar o painel.
+        const sessionRes = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Cache-Control": "no-store" },
+        });
+        const sessionData = await sessionRes.json().catch(() => ({}));
+
+        if (!sessionRes.ok) {
+          const sessionCode = typeof sessionData.code === "string" ? sessionData.code : "SESSION_ERROR";
+          const requestId = sessionRes.headers.get("x-correlation-id");
+          const traceInfo = requestId ? ` Referência: ${requestId}.` : "";
+
+          if (sessionRes.status === 401) {
+            setFeedback(`Suas credenciais foram aceitas, mas a sessão não foi reconhecida. Verifique os cookies e a configuração de autenticação.${traceInfo}`);
+          } else if (sessionRes.status === 503) {
+            setFeedback(`Login aceito, porém não foi possível validar a sessão (código: ${sessionCode}).${traceInfo}`);
+          } else {
+            setFeedback(`Falha ao confirmar a sessão (HTTP ${sessionRes.status}; ${sessionCode}).${traceInfo}`);
+          }
+          return;
+        }
+
+        if (!sessionData?.user?.id || sessionData.user.id !== data.user.id) {
+          setFeedback("A confirmação da sessão retornou um usuário inconsistente. O acesso não foi concluído.");
+          return;
+        }
+
+        login(sessionData.user);
+        // Navegacao completa evita estado React obsoleto e faz o servidor
+        // receber o novo cookie HttpOnly em uma requisicao real ao painel.
+        window.location.replace("/");
       } else {
         const errData = await res.json().catch(() => ({}));
         if (res.status === 401) {
