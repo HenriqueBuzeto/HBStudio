@@ -139,7 +139,7 @@ BEGIN
   SELECT * INTO p FROM loyalty_programs
    WHERE "TenantId"=NEW."TenantId" AND "Enabled"=true;
   IF NOT FOUND THEN RETURN NEW; END IF;
-  IF NOT EXISTS (SELECT 1 FROM parties WHERE "TenantId"=NEW."TenantId" AND "Id"=NEW."CustomerPartyId" AND "IsActive"=true) THEN RETURN NEW; END IF;
+  IF NOT EXISTS (SELECT 1 FROM parties p JOIN customer_profiles cp ON cp."PartyId"=p."Id" AND cp."TenantId"=p."TenantId" WHERE p."TenantId"=NEW."TenantId" AND p."Id"=NEW."CustomerPartyId" AND p."IsActive"=true) THEN RETURN NEW; END IF;
   SELECT COALESCE(round(sum(i."Quantity"*i."UnitPrice"-i."Discount")*100),0)::bigint
     INTO gross_cents FROM sale_items i WHERE i."TenantId"=NEW."TenantId" AND i."SaleId"=NEW."Id";
   eligible_cents:=GREATEST(0,gross_cents-COALESCE(round(NEW."DiscountTotal"*100),0)::bigint);
