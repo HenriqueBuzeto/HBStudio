@@ -233,7 +233,7 @@ BEGIN
    RAISE EXCEPTION 'LOYALTY_INSUFFICIENT_POINTS' USING ERRCODE='P0001'; END IF;
  IF rw."StockAvailable" IS NOT NULL AND rw."StockAvailable"<1 THEN
    RAISE EXCEPTION 'LOYALTY_REWARD_OUT_OF_STOCK' USING ERRCODE='P0001'; END IF;
- new_id:=gen_random_uuid();new_code:='HB-'||upper(encode(gen_random_bytes(9),'hex'));
+ new_id:=gen_random_uuid();new_code:='HB-'||upper(substr(replace(gen_random_uuid()::text,'-',''),1,18));
  INSERT INTO loyalty_redemptions ("Id","TenantId","BranchId","PartyId","RewardId","RequestKey","Code",
    "Kind","RewardTitle","PointsSpent","ValueCents","Status","CreatedByUserId")
  VALUES (new_id,v_tenant,v_branch,v_party,v_reward,v_request,new_code,rw."Kind",rw."Title",rw."PointsCost",rw."ValueCents",'RESERVED',v_actor);
