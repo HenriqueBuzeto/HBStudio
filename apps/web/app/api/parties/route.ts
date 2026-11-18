@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     const type = body.type === 2 ? 2 : 1;
     const cleanDoc = typeof body.documentNumber === "string"
-      ? body.documentNumber.replace(/\\D/g, "") || null
+      ? body.documentNumber.replace(/\D/g, "") || null
       : null;
     if (cleanDoc && cleanDoc.length !== (type === 2 ? 14 : 11)) {
       return NextResponse.json({ error: "CPF ou CNPJ com quantidade inválida de dígitos." }, { status: 400 });
