@@ -36,30 +36,7 @@ export default function PartnersPage() {
 
   const handleAddPartner = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
-
-    const pVal = parseFloat(percentage) || 0;
-    const cVal = parseFloat(capital) || 0;
-
-    const newP: PartnerView = {
-      id: `p-${Date.now()}`,
-      name,
-      document: doc,
-      role,
-      equityPercentage: pVal,
-      quotas: cVal,
-      nominalValue: cVal,
-      monthlyProLaboreCap: 0,
-      active: true,
-      notes: "Registrado no contrato social"
-    };
-
-    setPartners([...partners, newP]);
-    setShowModal(false);
-    setName("");
-    setDoc("");
-    setPercentage("");
-    setCapital("");
+    window.alert("Cadastro societário indisponível até integração com Neon e validação do contrato social.");
   };
 
   return (
@@ -83,7 +60,7 @@ export default function PartnersPage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowModal(true)}
+              disabled title="Aguardando integração societária com Neon"
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -198,7 +175,7 @@ export default function PartnersPage() {
                   <td colSpan={7} className="py-16 text-center text-slate-400">
                     <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-slate-700">Nenhum sócio cadastrado</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Cadastrar Sócio" para registrar o quadro societário da empresa.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Quadro societário aguardando integração com Neon. O vínculo de autenticação atual foi preservado.</p>
                   </td>
                 </tr>
               )}
