@@ -140,7 +140,7 @@ export default function CatalogPage() {
   const [unitImei2, setUnitImei2] = useState("");
   const [unitSerial, setUnitSerial] = useState("");
   const [unitGrade, setUnitGrade] = useState(1); // Grade A
-  const [unitBattery, setUnitBattery] = useState("95");
+  const [unitBattery, setUnitBattery] = useState("");
   const [unitNotes, setUnitNotes] = useState("");
 
   // Estado para Aprovar Unidade
@@ -223,7 +223,7 @@ export default function CatalogPage() {
   // Handler: Criar Modelo com SKU inicial em Transação Atômica no Backend
   const handleCreateModel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modelName.trim() || !selectedBrandId || !selectedCategoryId || !initialSkuCode.trim()) {
+    if (!modelName.trim() || !selectedBrandId || !selectedCategoryId || !initialSkuCode.trim() || !initialPrice.trim()) {
       setErrorMsg("Preencha todos os campos obrigatórios do modelo e SKU.");
       return;
     }
@@ -239,7 +239,7 @@ export default function CatalogPage() {
         initialSku: {
           skuCode: initialSkuCode.trim().toUpperCase(),
           variantName: initialVariantName.trim() || modelName.trim(),
-          defaultPrice: parseFloat(initialPrice) || 0,
+          defaultPrice: Number(initialPrice),
           barcodeEan: null,
           technicalSpecsJson: null
         }
@@ -275,13 +275,13 @@ export default function CatalogPage() {
   // Handler: Adicionar SKU a modelo existente
   const handleAddSku = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetModelId || !newSkuCode.trim()) return;
+    if (!targetModelId || !newSkuCode.trim() || !newSkuPrice.trim()) {setErrorMsg("Informe o SKU e preço de venda real.");return;}
 
     try {
       const payload = {
         skuCode: newSkuCode.trim().toUpperCase(),
         variantName: newSkuVariantName.trim() || newSkuCode.trim().toUpperCase(),
-        defaultPrice: parseFloat(newSkuPrice) || 0,
+        defaultPrice: Number(newSkuPrice),
         barcodeEan: newSkuBarcode.trim() || null,
         technicalSpecsJson: null
       };
@@ -357,7 +357,7 @@ export default function CatalogPage() {
       const payload = {
         productSkuId: unitSkuId,
         condition: unitCondition,
-        acquisitionCost: parseFloat(unitCost) || 0,
+        acquisitionCost: Number(unitCost),
         serialNumber: unitSerial.trim() || null,
         imei1: unitImei1.trim() || null,
         imei2: unitImei2.trim() || null,
@@ -564,6 +564,7 @@ export default function CatalogPage() {
           </div>
 
           <div className="relative w-full sm:w-80">
+            {lastLoadedAt && <span className="absolute -top-4 right-0 text-[9px] text-slate-400">Última consulta: {lastLoadedAt.toLocaleTimeString("pt-BR")}</span>}
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -592,7 +593,7 @@ export default function CatalogPage() {
               <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center text-slate-400 shadow-xs">
                 <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                 <p className="font-bold text-slate-700 text-sm">{search.trim() ? "Nenhum modelo encontrado na busca" : "Nenhum modelo cadastrado no catálogo"}</p>
-                <p className="text-xs text-slate-400 mt-1">Cadastre novos modelos de smartphones, acessórios ou peças de reposição.</p>
+                <p className="text-xs text-slate-400 mt-1">{search.trim()?"Experimente outro nome ou SKU.":"Cadastre novos modelos de smartphones, acessórios ou peças de reposição."}</p>
                 <button
                   onClick={() => setIsCreateModelOpen(true)}
                   className="mt-4 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
@@ -737,10 +738,10 @@ export default function CatalogPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-slate-800">
-                          {unit.condition === 1 ? "Novo Lacrado" : unit.condition === 2 ? "Seminovo / Usado" : "Recondicionado"}
+                          {unit.condition === 1 ? "Novo Lacrado" : unit.condition === 2 ? "Seminovo / Usado" : unit.condition === 3 ? "Recondicionado" : "Caixa aberta"}
                         </div>
                         <div className="text-[10px] text-slate-500">
-                          {unit.grade === 1 ? "Grau A / Impecável" : unit.grade === 2 ? "Grau B / Leve Uso" : "Grau C"}
+                          {unit.grade === 0 ? "Não aplicável" : unit.grade === 1 ? "Grau A / Impecável" : unit.grade === 2 ? "Grau B / Leve Uso" : "Grau C"}
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -976,6 +977,7 @@ export default function CatalogPage() {
                   </button>
                   <button
                     type="submit"
+                    disabled={!canManage}
                     className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
                   >
                     Salvar no PostgreSQL
@@ -1050,6 +1052,7 @@ export default function CatalogPage() {
                   </button>
                   <button
                     type="submit"
+                    disabled={!canManage}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs"
                   >
                     Criar SKU
