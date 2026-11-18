@@ -77,25 +77,7 @@ export default function CrmPage() {
 
   const handleCreateOpp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!oppTitle) return;
-
-    const newOpp: OpportunityView = {
-      id: `opp-${Date.now()}`,
-      title: oppTitle,
-      leadName: oppLead || "Cliente Balcão",
-      stageId: "stage-1",
-      stageName: "Prospecção / Lead",
-      estimatedValue: parseFloat(oppValue) || 0,
-      confidenceScore: 50,
-      expectedClosingDate: new Date().toLocaleDateString("pt-BR"),
-      assignedUserName: "Henrique Barreto"
-    };
-
-    setOpportunities([...opportunities, newOpp]);
-    setShowModal(false);
-    setOppTitle("");
-    setOppLead("");
-    setOppValue("");
+    window.alert("Cadastro de oportunidades indisponível até integração com Neon.");
   };
 
   const totalEstimatedPipeline = opportunities.reduce((acc, curr) => acc + curr.estimatedValue, 0);
@@ -115,13 +97,13 @@ export default function CrmPage() {
               Funil de Vendas & Intenções de Compra
             </h1>
             <p className="text-xs text-slate-500">
-              Matching algorítmico automatizado com aparelhos serializados reais (IMEI) e follow-ups comerciais.
+              Módulo de CRM aguardando integração real com Neon.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowModal(true)}
+              disabled title="Aguardando integração com Neon"
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
