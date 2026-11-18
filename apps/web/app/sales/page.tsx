@@ -3,6 +3,7 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
+import {distributeInstallments} from "@/lib/pos-installments";
 import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
  CreditCard,Wallet,Banknote,QrCode,UserRound,Wrench,ShieldAlert,CheckCircle2,
  AlertTriangle,X,Printer,ScanBarcode,ChevronRight,Calculator,Info,Clock,Package,
@@ -26,12 +27,6 @@ const button="inline-flex items-center justify-center gap-2 rounded-xl border bo
 const primary="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 px-4 py-3 text-xs font-extrabold text-white shadow-md shadow-violet-200 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40";
 const field="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100";
 const pill="rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700";
-function installmentsFor(totalCents:number,count:number){
- if(!Number.isSafeInteger(totalCents)||totalCents<0||!Number.isInteger(count)||count<1||count>12)return [];
- const base=Math.floor(totalCents/count);
- const remainder=totalCents%count;
- return Array.from({length:count},(_,i)=>base+(i<remainder?1:0));
-}
 function dateText(value:string){const dt=new Date(value);return Number.isFinite(dt.valueOf())?dt.toLocaleDateString("pt-BR"):"—";}
 async function api<T>(url:string,method:"GET"|"POST"="GET",body?:unknown):Promise<T>{
  const res=await fetch(url,{method,cache:"no-store",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:undefined,body:body?JSON.stringify(body):undefined});
@@ -83,8 +78,8 @@ export default function SalesPage(){
  const discountCents=Math.min(subtotalCents,Math.round(maxDiscount));
  const totalCents=Math.max(0,subtotalCents-discountCents);
  const total=totalCents/100;
- const selectedParts=installmentsFor(totalCents,method==="CreditCard"?installments:1);
- const visibleParts=installmentsFor(totalCents,installments);
+ const selectedParts=distributeInstallments(totalCents,method==="CreditCard"?installments:1);
+ const visibleParts=distributeInstallments(totalCents,installments);
  const change=Math.max(0,cents(Number(cashReceived||0))-totalCents)/100;
  const isDiscountValid=Number.isFinite(requestedDiscount)&&requestedDiscount>=0&&(discountMode!=="percent"||requestedDiscount<=100)&&maxDiscount<=subtotalCents;
  const canQuote=permitted&&aux.capabilities.saveQuote&&hasPermission("sales.create")&&items.length>0&&!!sellerId&&totalCents>0&&isDiscountValid&&(discountCents===0||aux.capabilities.discountOverride);
@@ -170,7 +165,7 @@ export default function SalesPage(){
       {discountCents>0&&!aux.capabilities.discountOverride&&<p className="mt-1 text-[10px] text-rose-600">Sua permissão não permite conceder descontos.</p>}</div>
      <div><span className="mb-2 block text-[11px] font-bold text-slate-600">Forma prevista de pagamento</span><div className="grid grid-cols-2 gap-2">{([{id:"Pix",label:"Pix",icon:QrCode},{id:"CreditCard",label:"Crédito",icon:CreditCard},{id:"DebitCard",label:"Débito",icon:Wallet},{id:"Cash",label:"Dinheiro",icon:Banknote}] as const).map(p=><button key={p.id} type="button" onClick={()=>{setMethod(p.id);setInstallments(1);}} className={"flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold "+(method===p.id?"border-violet-500 bg-violet-50 text-violet-700":"border-slate-200 bg-slate-50 text-slate-600")}><p.icon className="h-4 w-4"/>{p.label}</button>)}</div></div>
      {method==="CreditCard"&&<div><label className="mb-2 block text-[11px] font-bold text-slate-600">Parcelamento de 1x a 12x (simulação sem taxas)</label>
-      <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">{Array.from({length:12},(_,i)=>i+1).map(n=>{const values=installmentsFor(totalCents,n);return <button key={n} type="button" onClick={()=>setInstallments(n)} className={"rounded-xl border px-2 py-2 text-left transition-colors "+(installments===n?"border-violet-500 bg-violet-50":"border-slate-200 bg-slate-50 hover:bg-white")}><strong className="block text-xs text-slate-900">{n}x</strong><span className="text-[11px] font-bold text-violet-700">{money((values[0]||0)/100)}</span></button>;})}</div>
+      <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">{Array.from({length:12},(_,i)=>i+1).map(n=>{const values=distributeInstallments(totalCents,n);return <button key={n} type="button" onClick={()=>setInstallments(n)} className={"rounded-xl border px-2 py-2 text-left transition-colors "+(installments===n?"border-violet-500 bg-violet-50":"border-slate-200 bg-slate-50 hover:bg-white")}><strong className="block text-xs text-slate-900">{n}x</strong><span className="text-[11px] font-bold text-violet-700">{money((values[0]||0)/100)}</span></button>;})}</div>
       {selectedParts.length>0&&<div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between font-bold"><span>Plano selecionado</span><span>{installments}x</span></div><p className="mt-1 text-slate-500">{selectedParts.every(x=>x===selectedParts[0])?installments+" parcelas de "+money(selectedParts[0]/100):selectedParts.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p><p className="mt-1 text-[10px] text-slate-400">Taxas e condições reais dependem da adquirente. Nenhuma transação foi autorizada.</p></div>}
      </div>}
      {method==="Cash"&&<div><label className="mb-1 block text-[11px] font-bold text-slate-600">Valor recebido (simulação)</label><input type="number" min="0" step="0.01" className={field} value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/><p className="mt-1 text-xs font-bold text-emerald-700">Troco previsto: {money(change)}</p></div>}
