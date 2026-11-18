@@ -32,7 +32,8 @@ import {
   Clock,
   ArrowRightLeft,
   Truck,
-  FileText
+  FileText,
+  Gift
 } from "lucide-react";
 
 interface NavSection {
@@ -71,6 +72,7 @@ const navSections: NavSection[] = [
     title: "COMERCIAL & INTELIGÊNCIA",
     items: [
       { name: "CRM & Fila de Desejo", href: "/crm", icon: Target, badge: "Smart" },
+      { name: "Gamificação & Fidelidade", href: "/loyalty", icon: Gift, badge: "Clube HB" },
       { name: "Mensageria & WhatsApp", href: "/messaging", icon: MessageSquare, badge: "Meta" },
     ],
   },
