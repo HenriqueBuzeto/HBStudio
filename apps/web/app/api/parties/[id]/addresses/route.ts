@@ -35,10 +35,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const sql = getDb();
+    // Neon HTTP client is a callable query function (not a pg Pool).
     const addrId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    await sql.query(
+    await sql(
       `INSERT INTO party_addresses (
         "Id", "TenantId", "PartyId", "Street", "Number", "Complement",
         "Neighborhood", "City", "State", "PostalCode", "IsPrimary", "CreatedAtUtc"
