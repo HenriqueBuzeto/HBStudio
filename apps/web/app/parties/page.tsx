@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import CustomerLoyaltyPanel from "@/components/CustomerLoyaltyPanel";
 import { 
   Users, 
   UserPlus, 
@@ -153,71 +154,7 @@ export interface Party {
   createdAtUtc: string;
 }
 
-const REWARDS_CATALOG: RewardItem[] = [
-  {
-    id: "rw-1",
-    title: "Película de Vidro 3D / Cerâmica",
-    category: "Acessório",
-    pointsRequired: 300,
-    estimatedValue: 40.0,
-    description: "Aplicação profissional inclusa com garantia de alinhamento.",
-    inStock: true
-  },
-  {
-    id: "rw-2",
-    title: "Cabo USB-C Trançado Reforçado 1m",
-    category: "Acessório",
-    pointsRequired: 500,
-    estimatedValue: 65.0,
-    description: "Compatível com recarga ultrarrápida Power Delivery (PD).",
-    inStock: true
-  },
-  {
-    id: "rw-3",
-    title: "Vale-Compras Balcão R$ 50,00",
-    category: "Vale-Compras",
-    pointsRequired: 600,
-    estimatedValue: 50.0,
-    description: "Válido para qualquer compra ou abatimento em acessórios e produtos.",
-    inStock: true
-  },
-  {
-    id: "rw-4",
-    title: "Limpeza Técnica & Higienização Interna",
-    category: "Serviço",
-    pointsRequired: 800,
-    estimatedValue: 90.0,
-    description: "Limpeza de conectores, microfones, alto-falantes e desoxidação preventiva.",
-    inStock: true
-  },
-  {
-    id: "rw-5",
-    title: "Vale-Compras Balcão R$ 100,00",
-    category: "Vale-Compras",
-    pointsRequired: 1100,
-    estimatedValue: 100.0,
-    description: "Cupom de desconto abatido direto no PDV em produtos ou consertos.",
-    inStock: true
-  },
-  {
-    id: "rw-6",
-    title: "Carregador Turbo 20W USB-C Homologado",
-    category: "Acessório",
-    pointsRequired: 1250,
-    estimatedValue: 120.0,
-    description: "Carregador com proteção contra sobretensão e chip inteligente.",
-    inStock: true
-  },
-  {
-    id: "rw-7",
-    title: "Desconto de 50% em Mão de Obra de Reparo",
-    category: "Serviço",
-    pointsRequired: 1500,
-    estimatedValue: 180.0,
-    description: "Válido para troca de tela, bateria ou reparo em placa mãe.",
-    inStock: true
-  }
-];
+// Rewards are loaded from Neon by CustomerLoyaltyPanel; no static rewards.
 
 export default function PartiesPage() {
   const [parties, setParties] = useState<Party[]>([]);
@@ -308,7 +245,7 @@ export default function PartiesPage() {
             origin: cs.origin,
             eventDateUtc: cs.eventDateUtc
           })),
-          gamification: undefined,
+          gamification: item.gamification ?? undefined,
           history: []
         }));
         setParties(mapped);
@@ -364,13 +301,6 @@ export default function PartiesPage() {
   const [newNotes, setNewNotes] = useState("");
   const [isCustomerCheck, setIsCustomerCheck] = useState(true);
   const [isSupplierCheck, setIsSupplierCheck] = useState(false);
-
-  // Resgate de Brindes no Módulo de Gamificação (Pendente de motor transacional no backend)
-  const handleRedeemReward = (reward: RewardItem) => {
-    alert(
-      `O resgate do brinde "${reward.title}" requer processamento transacional pelo módulo de Fidelidade do backend, que se encontra em fase de homologação. Nenhuma dedução simulada foi realizada.`
-    );
-  };
 
   // Salvar novo cadastro completo com persistência real via BFF
   const handleCreateParty = async (e: React.FormEvent) => {
@@ -561,14 +491,14 @@ export default function PartiesPage() {
                 Gestão 360º de Clientes & Pessoas
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Clube HB & Gamificação Ativos
+                Clube HB • Fidelidade integrada ao Neon
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
               Clientes & Fornecedores Enterprise
             </h1>
             <p className="text-xs text-slate-500">
-              Visualização tabular unificada, cadastro em tela cheia, histórico de vendas e compras por CPF com acúmulo de pontos e resgate de brindes.
+              Cadastro de clientes, pontos e extrato auditável; somente vendas confirmadas e pagas geram benefícios.
             </p>
           </div>
 
@@ -886,7 +816,7 @@ export default function PartiesPage() {
                         {fullScreenParty.name}
                       </h2>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getTierColor(fullScreenParty.gamification?.tier || "Bronze")}`}>
-                        Clube {fullScreenParty.gamification?.tier || "Bronze (Pendente)"}
+                        {fullScreenParty.gamification?.tier ? "Clube "+fullScreenParty.gamification.tier : "Saldo na aba Gamificação"}
                       </span>
                       <button
                         type="button"
@@ -1252,119 +1182,7 @@ export default function PartiesPage() {
                 {/* ABA 2: MÓDULO GAMIFICAÇÃO & RESGATE DE BRINDES            */}
                 {/* ========================================================= */}
                 {activeTab === "gamification" && (
-                  <div className="space-y-6">
-                    {/* Header do Clube de Fidelidade */}
-                    <div className="p-6 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl text-white shadow-xl relative overflow-hidden">
-                      <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-purple-500/20 to-transparent pointer-events-none" />
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Award className="w-5 h-5 text-amber-400" />
-                            <span className="text-xs font-extrabold uppercase tracking-wider text-purple-300">
-                              Clube de Vantagens & Fidelidade HB Studio
-                            </span>
-                          </div>
-                          <h3 className="text-2xl font-black mt-1">
-                            {fullScreenParty.name} — Nível {fullScreenParty.gamification?.tier || "Bronze"}
-                          </h3>
-                          <p className="text-xs text-purple-200 mt-1 max-w-xl">
-                            Todas as compras e ordens de serviço faturadas neste CPF acumulam 1 ponto a cada R$ 10,00 gastos. Pontos podem ser trocados a qualquer momento por brindes e vales-compra no balcão.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
-                          <div>
-                            <span className="text-[10px] font-bold text-purple-200 block uppercase">Saldo Disponível</span>
-                            <span className="text-3xl font-black font-mono text-amber-300">{fullScreenParty.gamification?.pointsBalance ?? 0}</span>
-                            <span className="text-xs font-bold text-purple-200 ml-1">pts</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Barra de Progressão de Nível */}
-                      <div className="mt-6 pt-4 border-t border-white/15">
-                        <div className="flex justify-between text-xs font-bold mb-1.5 text-purple-200">
-                          <span>Nível Atual: {fullScreenParty.gamification?.tier || "Bronze"}</span>
-                          <span>Próximo Nível: {fullScreenParty.gamification?.tier === "Ouro" ? "Diamante (Faltam 550 pts)" : "Ouro"}</span>
-                        </div>
-                        <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full" style={{ width: "72%" }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Catálogo de Brindes para Resgate */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div>
-                          <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                            <Gift className="w-4 h-4 text-purple-600" />
-                            Catálogo de Brindes & Recompensas Resgatáveis
-                          </h4>
-                          <p className="text-xs text-slate-500">
-                            Selecione o brinde desejado para o cliente e realize a baixa imediata no saldo de pontos.
-                          </p>
-                        </div>
-                        <span className="text-xs font-extrabold text-purple-700 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200">
-                          Saldo do Cliente: {fullScreenParty.gamification?.pointsBalance ?? 0} pts
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {REWARDS_CATALOG.map((reward) => {
-                          const canRedeem = (fullScreenParty.gamification?.pointsBalance ?? 0) >= reward.pointsRequired;
-                          return (
-                            <div 
-                              key={reward.id} 
-                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                                canRedeem 
-                                  ? "bg-white border-purple-200/90 hover:border-purple-500 hover:shadow-md" 
-                                  : "bg-slate-50 border-slate-200 opacity-60"
-                              }`}
-                            >
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-700">
-                                    {reward.category}
-                                  </span>
-                                  <span className="text-xs font-black font-mono text-amber-600 flex items-center gap-1">
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    {reward.pointsRequired} pts
-                                  </span>
-                                </div>
-                                <h5 className="font-extrabold text-slate-900 text-sm">{reward.title}</h5>
-                                <p className="text-xs text-slate-500 mt-1">{reward.description}</p>
-                                <div className="text-[11px] text-slate-400 mt-2 font-mono">
-                                  Valor estimado: R$ {reward.estimatedValue.toFixed(2)}
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={() => handleRedeemReward(reward)}
-                                disabled={!canRedeem}
-                                className={`w-full mt-4 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                                  canRedeem
-                                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
-                                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                }`}
-                              >
-                                {canRedeem ? (
-                                  <>
-                                    <Gift className="w-3.5 h-3.5" />
-                                    Resgatar Brinde Agora
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>Faltam {reward.pointsRequired - (fullScreenParty.gamification?.pointsBalance ?? 0)} pts</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                  <CustomerLoyaltyPanel partyId={fullScreenParty.id} />
                 )}
 
                 {/* ========================================================= */}
