@@ -107,7 +107,7 @@ export default function SalesPage(){
   try{
    const paymentTerms=method==="CreditCard"?("Cartão de crédito "+installments+"x ("+selectedParts.map(v=>money(v/100)).join(" + ")+")").slice(0,100):methodName[method]+" à vista";
    const response=await api<{quote:{id:string;number:string};message:string}>("/api/sales/quotes","POST",{
-    customerId:customerId||null,sellerId,items:items.map(x=>({id:x.product.id,quantity:x.quantity})),
+    customerId:customerId||null,sellerId,items:items.map(x=>({id:x.product.id,quantity:x.quantity,expectedPriceCents:cents(x.product.price)})),
     discountCents,method:methodCode[method],installments:method==="CreditCard"?installments:1,
     paymentTerms,
    });
