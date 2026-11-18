@@ -118,7 +118,7 @@ export default function SalesPage(){
   }catch(e){setError(e instanceof Error?e.message:"Orçamento não foi salvo.");}
   finally{setSaving(false);}
  };
- return <RootShellLayout><div className="space-y-5 pb-12">
+ return <RootShellLayout><style>{`@media print { body * { visibility: hidden !important; } #quote-print, #quote-print * { visibility: visible !important; } #quote-print { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 24px !important; background: white !important; box-shadow: none !important; border: 0 !important; } .no-print { display: none !important; } }`}</style><div className="space-y-5 pb-12">
   <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
    <div><div className="flex flex-wrap items-center gap-2"><span className={pill}>FRENTE DE CAIXA • PDV</span><span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">Emissão fiscal ainda não homologada</span></div>
     <h1 className="mt-2 text-xl font-black tracking-tight text-slate-900">Terminal de vendas, orçamentos & pagamentos</h1>
@@ -191,10 +191,11 @@ export default function SalesPage(){
   </section>}
   </div>
   {selectedQuote&&<Modal title={"Orçamento "+selectedQuote.number} onClose={()=>setSelectedQuote(null)}>
-   <div className="space-y-4"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-black text-amber-800">ORÇAMENTO — NÃO É CUPOM FISCAL, NÃO COMPROVA PAGAMENTO E NÃO RESERVA ESTOQUE.</div>
+   <div id="quote-print" className="space-y-4"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-black text-amber-800">ORÇAMENTO — NÃO É CUPOM FISCAL, NÃO COMPROVA PAGAMENTO E NÃO RESERVA ESTOQUE.</div>
     <p className="text-xs text-slate-500">Cliente: {selectedQuote.customer||"Consumidor não identificado"} • Vendedor: {selectedQuote.seller||"—"} • Validade: {dateText(selectedQuote.validUntil)}</p>
     <div className="divide-y divide-slate-100">{selectedQuote.items.map((i,idx)=><div key={idx} className="flex justify-between py-3 text-xs"><span>{i.quantity}x {i.description} <small className="text-slate-400">{i.sku}</small></span><strong>{money(i.quantity*i.price)}</strong></div>)}</div>
     <div className="rounded-xl bg-slate-50 p-4"><div className="flex justify-between text-xs"><span>Desconto</span><span>{money(selectedQuote.discount)}</span></div><div className="mt-2 flex justify-between text-lg font-black"><span>Total do orçamento</span><span>{money(selectedQuote.total)}</span></div><p className="mt-2 text-xs text-slate-500">Condição pretendida: {selectedQuote.paymentTerms}</p></div>
+   <button className={button+" no-print w-full"} type="button" onClick={()=>window.print()}><Printer className="h-4 w-4"/> Imprimir orçamento</button>
    </div>
   </Modal>}
   {selectedSale&&<Modal title={"Venda "+selectedSale.saleNumber} onClose={()=>setSelectedSale(null)}>
