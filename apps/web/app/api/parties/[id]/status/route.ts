@@ -10,7 +10,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const tenantId = ctx.tenantId;
 
     const body = await request.json();
-    const isActive = Boolean(body.isActive);
+    if (typeof body.isActive !== "boolean") {
+      return NextResponse.json({ error: "O estado ativo/inativo deve ser um valor booleano." }, { status: 400 });
+    }
+    const isActive = body.isActive;
 
     const sql = ctx.db;
     const res = await sql(
