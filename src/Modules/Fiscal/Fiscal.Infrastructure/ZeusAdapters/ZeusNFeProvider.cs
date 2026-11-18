@@ -122,20 +122,10 @@ public class ZeusNFeProvider : IFiscalProvider
         }
         else
         {
-            // QR Code Versão 2.00 (Legado com CSC e cHashQRCode via SHA-1)
-            string cIdToken = csc?.CscId ?? "000001";
-            string rawCsc = csc != null ? Encoding.UTF8.GetString(csc.EncryptedCscToken) : "CSC_PLACEHOLDER";
-            string dhEmiHex = Convert.ToHexString(Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:sszzz")));
-            string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-            string digValHex = Convert.ToHexString(Encoding.UTF8.GetBytes("MasterHB"));
-            string cDest = string.IsNullOrEmpty(recipientCpf) ? "" : recipientCpf.Replace(".", "").Replace("-", "");
-
-            string qrStringWithoutHash = $"{accessKey}|2|{amb}|{cDest}|{dhEmiHex}|{vNf}|0.00|{digValHex}|{cIdToken}";
-            string stringToHash = $"{qrStringWithoutHash}{rawCsc}";
-            string cHash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(stringToHash))).ToLowerInvariant();
-
-            string fullPayload = $"{qrStringWithoutHash}|{cHash}";
-            return $"{baseUrl}?p={fullPayload}";
+            // Legacy V2 must never use placeholder CSC, fabricated digest or
+            // encrypted CSC bytes as cleartext. Real QR assembly belongs to a
+            // fully validated SEFAZ provider with a decrypted scoped secret.
+            throw new NotSupportedException("FISCAL_QR_V2_NOT_HOMOLOGATED");
         }
     }
 
@@ -150,11 +140,7 @@ public class ZeusNFeProvider : IFiscalProvider
             return Convert.ToBase64String(signature);
         }
 
-        // Quando a chave privada RSA real ainda não está carregada (simulação / testes sem PFX físico real),
-        // calcula o hash SHA-1 canônico de 20 bytes e codifica em Base64 determinístico
-        using var rsaTemp = RSA.Create(2048);
-        byte[] deterministicSig = rsaTemp.SignData(dataBytes, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
-        return Convert.ToBase64String(deterministicSig);
+        throw new InvalidOperationException("Chave privada do certificado A1 é obrigatória para assinatura do QR Code.");
     }
 
     private static int CalculateMod11(string input)
