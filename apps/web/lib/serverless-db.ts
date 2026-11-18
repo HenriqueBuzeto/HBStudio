@@ -1,13 +1,7 @@
 import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 import crypto from "crypto";
 
-// Legacy routes use db.query(sql, params); new routes use db(sql, params)
-// and db.transaction([...]). Provide one compatible, typed client for all three.
-export type ServerlessDb = NeonQueryFunction<false, false> & {
-  query: (statement: string, params?: any[]) => Promise<any[]>;
-};
-
-export function getDb(): ServerlessDb {
+export function getDb(): NeonQueryFunction<false, false> {
   const connectionString =
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL ||
@@ -17,13 +11,7 @@ export function getDb(): ServerlessDb {
     throw new Error("DATABASE_URL_NOT_CONFIGURED: A variável DATABASE_URL é obrigatória no ambiente da Vercel.");
   }
 
-  const sql = neon(connectionString);
-  return Object.assign(sql, {
-    query: async (statement: string, params: any[] = []): Promise<any[]> => {
-      // The Neon HTTP client is callable; it does not expose a pg-style query method.
-      return await sql(statement, params);
-    },
-  });
+  return neon(connectionString);
 }
 
 // Hasher canônico compatível com o Pbkdf2PasswordHasher (.NET 10) do HB Studio ERP
