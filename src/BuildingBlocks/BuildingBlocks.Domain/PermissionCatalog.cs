@@ -40,6 +40,11 @@ public static class PermissionCatalog
     public const string SalesCancel = "sales.cancel";
     public const string SalesCostView = "sales.cost.view";
 
+    // Clube de Fidelidade / Gamificação / Cashback (Neon Serverless)
+    public const string LoyaltyView = "loyalty.view";
+    public const string LoyaltyManage = "loyalty.manage";
+    public const string LoyaltyRedeem = "loyalty.redeem";
+
     // Caixa & Turnos (CashManagement)
     public const string CashOpen = "cash.open";
     public const string CashSupply = "cash.supply";
