@@ -41,83 +41,32 @@ interface ProjectItem {
 export default function DigitalProjectsPage() {
   const [activeTab, setActiveTab] = useState<"projects" | "timesheet" | "deliverables" | "contracts" | "rentability">("projects");
 
-  const [projects, setProjects] = useState<ProjectItem[]>([
-    {
-      id: "1",
-      projectCode: "PRJ-2026-001",
-      name: "Portal Institucional & E-commerce HB Studio",
-      description: "Desenvolvimento de frontend Next.js 16, backend .NET 10 e checkout integrado",
-      type: "CustomSoftware",
-      pricingModel: "FixedPrice",
-      status: "InProgress",
-      customerName: "Henrique Barreto",
-      leadTechnicianName: "Henrique Barreto",
-      contractedPrice: 8500.00,
-      estimatedHours: 60.0,
-      totalActualLaborCost: 1250.00,
-      invoicedAmount: 3000.00,
-      paidAmount: 3000.00
-    }
-  ]);
-
-  const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(projects[0]);
+  // Nenhum projeto demonstrativo: a lista operacional aguarda integração real.
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
 
   // Modal Novo Projeto
   const [showNewModal, setShowNewModal] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [price, setPrice] = useState(5000);
-  const [hours, setHours] = useState(40);
+  const [price, setPrice] = useState(0);
+  const [hours, setHours] = useState(0);
   const [client, setClient] = useState("");
 
   // Modal Apontamento de Horas (Timesheet)
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [timeHours, setTimeHours] = useState(4);
-  const [hourlyRate, setHourlyRate] = useState(55);
+  const [timeHours, setTimeHours] = useState(0);
+  const [hourlyRate, setHourlyRate] = useState(0);
   const [timeDesc, setTimeDesc] = useState("");
 
   const handleCreateProject = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
-
-    const newPrj: ProjectItem = {
-      id: crypto.randomUUID(),
-      projectCode: `PRJ-2026-${String(projects.length + 1).padStart(3, "0")}`,
-      name,
-      description: desc || "Projeto de software e serviços digitais",
-      type: "CustomSoftware",
-      pricingModel: "FixedPrice",
-      status: "Draft",
-      customerName: client || "Cliente Geral",
-      leadTechnicianName: "Henrique Barreto",
-      contractedPrice: Number(price),
-      estimatedHours: Number(hours),
-      totalActualLaborCost: 0,
-      invoicedAmount: 0,
-      paidAmount: 0
-    };
-
-    setProjects([newPrj, ...projects]);
-    setSelectedProject(newPrj);
-    setShowNewModal(false);
-    setName("");
-    setDesc("");
+    window.alert("Projetos ainda não estão integrados ao Neon. Nenhum cadastro foi realizado.");
   };
 
   const handleRecordTime = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProject) return;
-
-    const addedCost = timeHours * hourlyRate;
-    const updated = {
-      ...selectedProject,
-      totalActualLaborCost: selectedProject.totalActualLaborCost + addedCost
-    };
-
-    setProjects(projects.map(p => p.id === selectedProject.id ? updated : p));
-    setSelectedProject(updated);
-    setShowTimeModal(false);
-    setTimeDesc("");
+    window.alert("Apontamento de horas indisponível até persistência real no Neon.");
   };
 
   return (
@@ -139,20 +88,22 @@ export default function DigitalProjectsPage() {
               Gestão de Projetos Digitais & Contratos
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Escopos versionados, tarefas técnicas, timesheet real com custo histórico e apuração contínua de rentabilidade.
+              Módulo aguardando integração de projetos e timesheets com o Neon. Nenhum registro demonstrativo é exibido.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setShowTimeModal(true)}
+              disabled
+              title="Integração com Neon pendente"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg shadow-sm hover:bg-slate-50 hover:border-slate-400 transition-all"
             >
               <Clock className="w-3.5 h-3.5 text-purple-600" />
               Apontar Horas (Timesheet)
             </button>
             <button
-              onClick={() => setShowNewModal(true)}
+              disabled
+              title="Integração com Neon pendente"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 shadow-purple-600/20 transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
