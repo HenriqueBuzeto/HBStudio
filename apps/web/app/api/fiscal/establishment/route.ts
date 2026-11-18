@@ -12,7 +12,7 @@ export async function POST(request:NextRequest){
   const v=validateFiscalEstablishment(await request.json().catch(()=>null));
   const [existing,history]=await Promise.all([
    session.db.query('SELECT "Id"::text AS id,"Cnpj" AS cnpj FROM fiscal_establishments WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid LIMIT 2',[session.tenantId,session.branchId]),
-   session.db.query('SELECT COUNT(*)::int AS count FROM fiscal_documents WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid',[session.tenantId,session.branchId])
+   session.db.query('SELECT COUNT(*)::int AS count FROM fiscal_documents d JOIN fiscal_establishments e ON e."Id"=d."EstablishmentId" AND e."TenantId"=d."TenantId" WHERE d."TenantId"=$1::uuid AND e."BranchId"=$2::uuid',[session.tenantId,session.branchId])
   ]);
   if(existing.length>1)throw new FleetError(409,"ESTABLISHMENT_DUPLICATED","Mais de um estabelecimento nesta filial. Revisão fiscal necessária.");
   if(Number(history[0]?.count)>0)throw new FleetError(409,"FISCAL_HISTORY_LOCKED","Existem documentos fiscais. Alteração de emissor/número requer processo fiscal de migração auditável.");
@@ -27,7 +27,7 @@ export async function POST(request:NextRequest){
   let rows;
   if(existing.length){
    rows=await session.db.query(
-    'WITH updated AS (UPDATE fiscal_establishments SET "CorporateName"=$3,"TradeName"=$4,"Cnpj"=$5,"StateRegistration"=$6,"MunicipalRegistration"=$7,"Cnae"=$8,"Regime"=$9::int,"Street"=$10,"Number"=$11,"Complement"=$12,"Neighborhood"=$13,"CityCodeIbge"=$14,"CityName"=$15,"State"=$16,"PostalCode"=$17,"Environment"=$18::int,"NfceDefaultSeries"=$19::int,"NfceNextNumber"=$20::int,"QrVersion"=3,"IsNfceEnabled"=false,"IsActive"=true,"UpdatedAtUtc"=now() WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid AND "Id"=$24::uuid AND NOT EXISTS(SELECT 1 FROM fiscal_documents d WHERE d."TenantId"=$1::uuid AND d."BranchId"=$2::uuid) RETURNING "Id"),' +
+    'WITH updated AS (UPDATE fiscal_establishments SET "CorporateName"=$3,"TradeName"=$4,"Cnpj"=$5,"StateRegistration"=$6,"MunicipalRegistration"=$7,"Cnae"=$8,"Regime"=$9::int,"Street"=$10,"Number"=$11,"Complement"=$12,"Neighborhood"=$13,"CityCodeIbge"=$14,"CityName"=$15,"State"=$16,"PostalCode"=$17,"Environment"=$18::int,"NfceDefaultSeries"=$19::int,"NfceNextNumber"=$20::int,"QrVersion"=3,"IsNfceEnabled"=false,"IsActive"=true,"UpdatedAtUtc"=now() WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid AND "Id"=$24::uuid AND NOT EXISTS(SELECT 1 FROM fiscal_documents d JOIN fiscal_establishments e ON e."Id"=d."EstablishmentId" AND e."TenantId"=d."TenantId" WHERE d."TenantId"=$1::uuid AND e."BranchId"=$2::uuid) RETURNING "Id"),' +
     ' audited AS (INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action","ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version") SELECT gen_random_uuid(),$1::uuid,$2::uuid,\'FiscalEstablishment\',s."Id"::text,\'Updated\',$21::uuid,$22,$23,jsonb_build_object(\'cnpj\',$5,\'environment\',$18,\'isNfceEnabled\',false),now(),1 FROM updated s RETURNING "Id") SELECT s."Id"::text AS id FROM updated s CROSS JOIN audited',
     [...args,existing[0].id]
    );
