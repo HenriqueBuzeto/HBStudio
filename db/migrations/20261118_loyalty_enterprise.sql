@@ -114,9 +114,11 @@ BEGIN
  RAISE EXCEPTION 'LOYALTY_LEDGER_IMMUTABLE: corrections must be recorded as compensating events';
 END;$body$;
 -- @statement
-DROP TRIGGER IF EXISTS "loyalty_ledger_no_change" ON loyalty_ledger;
--- @statement
-CREATE TRIGGER "loyalty_ledger_no_change" BEFORE UPDATE OR DELETE ON loyalty_ledger FOR EACH ROW EXECUTE FUNCTION loyalty_ledger_immutable();
+DO $body$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='loyalty_ledger_no_change' AND tgrelid='loyalty_ledger'::regclass) THEN
+  CREATE TRIGGER "loyalty_ledger_no_change" BEFORE UPDATE OR DELETE ON loyalty_ledger FOR EACH ROW EXECUTE FUNCTION loyalty_ledger_immutable();
+ END IF;
+END $body$;
 -- @statement
 CREATE OR REPLACE FUNCTION loyalty_on_sale_settled() RETURNS trigger LANGUAGE plpgsql AS $body$
 DECLARE
@@ -189,10 +191,12 @@ BEGIN
  RETURN NEW;
 END;$body$;
 -- @statement
-DROP TRIGGER IF EXISTS "loyalty_sale_settled" ON sales;
--- @statement
-CREATE TRIGGER "loyalty_sale_settled" AFTER INSERT OR UPDATE OF "Status","PaymentStatus","ConfirmedAtUtc" ON sales
- FOR EACH ROW EXECUTE FUNCTION loyalty_on_sale_settled();
+DO $body$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='loyalty_sale_settled' AND tgrelid='sales'::regclass) THEN
+  CREATE TRIGGER "loyalty_sale_settled" AFTER INSERT OR UPDATE OF "Status","PaymentStatus","ConfirmedAtUtc" ON sales
+   FOR EACH ROW EXECUTE FUNCTION loyalty_on_sale_settled();
+ END IF;
+END $body$;
 -- @statement
 CREATE OR REPLACE FUNCTION loyalty_redeem_reward(
  v_tenant uuid,v_branch uuid,v_party uuid,v_reward uuid,v_request uuid,
