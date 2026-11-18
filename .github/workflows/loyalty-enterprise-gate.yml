@@ -46,6 +46,8 @@ jobs:
         run: |
           dotnet tool install --global dotnet-ef --version 10.0.0
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Restore .NET solution before EF tooling
+        run: dotnet restore apps/api
       - name: Migrate disposable PostgreSQL test database
         env:
           ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5433;Database=hbstudio_erp_test;Username=postgres;Password=;
