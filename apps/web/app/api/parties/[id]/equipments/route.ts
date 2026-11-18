@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
+import { authorizeFleet, guardOrigin, FleetError, uuid } from "@/lib/fleet-session";
 import crypto from "crypto";
-
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
+    guardOrigin(request);
+    uuid(id, "Cadastro");
+    const ctx = await authorizeFleet(request, "customers.edit");
+    const tenantId = ctx.tenantId;
 
     const body = await request.json();
     const {
@@ -34,7 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Modelo do equipamento é obrigatório." }, { status: 400 });
     }
 
-    const sql = getDb();
+    const sql = ctx.db;
     // A FK simples de PartyId não substitui a checagem de isolamento por tenant.
     const party = await sql(
       'SELECT "Id" FROM parties WHERE "Id" = $1 AND "TenantId" = $2 LIMIT 1',
@@ -77,7 +69,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       message: "Equipamento vinculado com sucesso!"
     });
   } catch (err: any) {
+    if (err instanceof FleetError) {
+      return NextResponse.json({ code: err.code, error: err.message }, { status: err.status });
+    }
     console.error("Erro ao vincular equipamento ao cliente:", err);
-    return NextResponse.json({ error: "Erro ao cadastrar equipamento", detail: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao cadastrar equipamento" }, { status: 500 });
   }
 }
