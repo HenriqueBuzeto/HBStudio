@@ -1,110 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { authorizeFleet, FleetError } from "@/lib/fleet-session";
 
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
+function failure(error:unknown, correlationId:string){
+  if(error instanceof FleetError)return NextResponse.json({code:error.code,error:error.message},{status:error.status,headers:{"X-Correlation-Id":correlationId}});
+  console.error("[PDV]["+correlationId+"] Auxiliary load failure:",error instanceof Error?error.name:"Unknown");
+  return NextResponse.json({code:"AUXILIARY_UNAVAILABLE",error:"Não foi possível consultar dados reais do PDV no Neon."},{status:503,headers:{"X-Correlation-Id":correlationId}});
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-
-    const sql = getDb();
-
-    // 1. Clientes com pontuação de fidelidade calculada
-    const parties = await sql.query(
-      `SELECT "Id", "Name", "TradeName", "DocumentNumber"
-       FROM parties
-       WHERE "TenantId" = $1 AND "IsActive" = true
-       ORDER BY "Name" ASC
-       LIMIT 100;`,
-      [tenantId]
-    );
-
-    // 2. Vendedores da equipe
-    const users = await sql.query(
-      `SELECT "Id", "FullName", "Email", "JobTitle"
-       FROM users
-       WHERE "TenantId" = $1 AND "IsActive" = true
-       ORDER BY "FullName" ASC;`,
-      [tenantId]
-    );
-
-    // 3. Produtos e Serviços (SKUs com preço e estoque)
-    const skus = await sql.query(
-      `SELECT "Id", "SkuCode", "VariantName", "DefaultPrice", "BarcodeEan"
-       FROM product_skus
-       WHERE "TenantId" = $1 AND "IsActive" = true
-       ORDER BY "VariantName" ASC
-       LIMIT 150;`,
-      [tenantId]
-    );
-
-    // 4. Ordens de Serviço Prontas para Faturamento no Caixa
-    const repairs = await sql.query(
-      `SELECT "Id", "OrderNumber", "ReportedDefect", "FinalPrice", "CustomerId"
-       FROM repair_orders
-       WHERE "TenantId" = $1 AND "Status" IN (10, 11)
-       ORDER BY "CreatedAtUtc" DESC
-       LIMIT 50;`,
-      [tenantId]
-    );
-
-    // 5. Dados do Estabelecimento Fiscal para o Cabeçalho do Cupom
-    const establishments = await sql.query(
-      `SELECT "CorporateName", "TradeName", "Cnpj", "StateRegistration", "Street", "Number", "Neighborhood", "CityName", "State", "PostalCode"
-       FROM fiscal_establishments
-       WHERE "TenantId" = $1
-       LIMIT 1;`,
-      [tenantId]
-    );
-
-    return NextResponse.json({
-      customers: parties.map((p: any) => ({
-        id: p.Id,
-        name: p.Name || p.TradeName || "Cliente sem nome",
-        document: p.DocumentNumber || "",
-        points: Math.floor(Math.random() * 450) + 50, // Gamificação / Pontos acumulados
-      })),
-      sellers: users.map((u: any) => ({
-        id: u.Id,
-        name: u.FullName,
-        jobTitle: u.JobTitle,
-      })),
-      products: skus.map((s: any) => ({
-        id: s.Id,
-        skuCode: s.SkuCode,
-        name: s.VariantName || s.SkuCode,
-        price: Number(s.DefaultPrice || 0),
-        barcode: s.BarcodeEan || "",
-      })),
-      repairs: repairs.map((r: any) => ({
-        id: r.Id,
-        orderNumber: r.OrderNumber,
-        defect: r.ReportedDefect,
-        finalPrice: Number(r.FinalPrice || 0),
-      })),
-      establishment: establishments[0] || {
-        CorporateName: "HB STUDIO INOVAÇÃO E TECNOLOGIA LTDA",
-        TradeName: "HB Studio",
-        Cnpj: "48.951.871/0001-80",
-        StateRegistration: "111.222.333.444",
-        Street: "Av. Paulista",
-        Number: "1000",
-        Neighborhood: "Bela Vista",
-        CityName: "São Paulo",
-        State: "SP",
-        PostalCode: "01310-100",
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: "Erro ao buscar dados auxiliares do caixa." }, { status: 500 });
-  }
+export async function GET(request:NextRequest){
+ const correlationId=request.headers.get("x-correlation-id")||crypto.randomUUID();
+ try{
+  const context=await authorizeFleet(request,"sales.pos.use");
+  const [customers,sellers,products,repairs,cash]=await Promise.all([
+    context.db.query('SELECT p."Id"::text AS id,p."Name" AS name,p."DocumentNumber" AS document FROM parties p WHERE p."TenantId"=$1::uuid AND p."IsActive"=true ORDER BY p."Name" LIMIT 300',[context.tenantId]),
+    context.db.query('SELECT u."Id"::text AS id,u."FullName" AS name,u."JobTitle" AS "jobTitle" FROM users u WHERE u."TenantId"=$1::uuid AND u."IsActive"=true ORDER BY u."FullName"',[context.tenantId]),
+    context.db.query('SELECT s."Id"::text AS id,s."SkuCode" AS "skuCode",s."VariantName" AS name,s."DefaultPrice"::float8 AS price,s."BarcodeEan" AS barcode,COALESCE(SUM(GREATEST(0,b."OnHandQuantity"-b."ReservedQuantity"-b."BlockedQuantity")),0)::float8 AS "availableQuantity" FROM product_skus s LEFT JOIN stock_balances b ON b."ProductSkuId"=s."Id" AND b."TenantId"=s."TenantId" AND b."BranchId"=$2::uuid WHERE s."TenantId"=$1::uuid AND s."IsActive"=true GROUP BY s."Id",s."SkuCode",s."VariantName",s."DefaultPrice",s."BarcodeEan" ORDER BY s."VariantName" LIMIT 300',[context.tenantId,context.branchId]),
+    context.db.query('SELECT r."Id"::text AS id,r."OrderNumber" AS "orderNumber",r."ReportedDefect" AS defect,r."CustomerId"::text AS "customerId",r."FinalPrice"::float8 AS "finalPrice",r."Status" AS status FROM repair_orders r WHERE r."TenantId"=$1::uuid AND r."BranchId"=$2::uuid AND r."Status"=11 ORDER BY r."CreatedAtUtc" DESC LIMIT 100',[context.tenantId,context.branchId]),
+    context.db.query('SELECT sh."Id"::text AS id,cr."Name" AS register,sh."OpenedAtUtc" AS "openedAt" FROM cash_shifts sh JOIN cash_registers cr ON cr."Id"=sh."CashRegisterId" AND cr."TenantId"=sh."TenantId" AND cr."BranchId"=sh."BranchId" WHERE sh."TenantId"=$1::uuid AND sh."BranchId"=$2::uuid AND sh."OperatorUserId"=$3::uuid AND sh."Status"=1 ORDER BY sh."OpenedAtUtc" DESC LIMIT 1',[context.tenantId,context.branchId,context.userId])
+  ]);
+  return NextResponse.json({
+   customers:customers.map((p:any)=>({...p,document:context.permissions.has("customers.sensitive.view")?p.document:null,points:null})),
+   sellers,products,repairs,cashShift:cash[0]||null,
+   fiscalReady:false,
+   capabilities:{saveQuote:context.permissions.has("sales.create"),discountOverride:context.permissions.has("sales.discount.override"),cancel:context.permissions.has("sales.cancel"),fiscalIssue:false,checkout:false}
+  },{headers:{"X-Correlation-Id":correlationId,"Cache-Control":"no-store"}});
+ }catch(error){return failure(error,correlationId);}
 }
