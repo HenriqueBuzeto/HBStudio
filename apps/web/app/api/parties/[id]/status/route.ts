@@ -21,7 +21,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const isActive = Boolean(body.isActive);
 
     const sql = getDb();
-    const res = await sql.query(
+    const res = await sql(
       `UPDATE parties
        SET "IsActive" = $1, "UpdatedAtUtc" = NOW()
        WHERE "Id" = $2 AND "TenantId" = $3
