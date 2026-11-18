@@ -10,13 +10,13 @@ import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
  BadgeCheck,LockKeyhole,Percent,ClipboardList,ArrowRight} from "lucide-react";
 
 type Product={id:string;skuCode:string;name:string;price:number;barcode:string|null;availableQuantity:number};
-type Customer={id:string;name:string;document:string|null;points:null};
+type Customer={id:string;name:string;document:string|null;points:number;cashbackCents:number};
 type Seller={id:string;name:string;jobTitle:string|null};
 type Repair={id:string;orderNumber:string;defect:string;finalPrice:number;customerId:string;status:number};
 type Quote={id:string;number:string;status:number;customerId:string|null;customer:string|null;sellerId:string;seller:string|null;validUntil:string;paymentTerms:string;discount:number;shipping:number;createdAt:string;subtotal:number;total:number;items:Array<{sku:string;description:string;quantity:number;price:number}>};
 type Sale={id:string;saleNumber:string;status:number;paymentStatus:number;fulfillmentStatus:number;customerName:string;sellerName:string;subtotal:number;discountTotal:number;chargesTotal:number;totalAmount:number;createdAtUtc:string;items:Array<{skuCode:string;description:string;quantity:number;unitPrice:number}>;payments:Array<{method:number;amount:number;installments:number;status:number;reference:string|null}>;fiscalDocuments:Array<{status:number;accessKey:string;protocol:string|null;sefazStatus:number|null}>};
 type Cart={product:Product;quantity:number};
-type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
+type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};loyalty:null|{enabled:boolean;earnCentsPerPoint:number;cashbackBps:number};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
 type Method="Pix"|"CreditCard"|"DebitCard"|"Cash";
 const money=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
 const cents=(v:number)=>Math.round(v*100);
@@ -45,7 +45,7 @@ export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
  const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
- const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
+ const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,loyalty:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [customerId,setCustomerId]=useState(""),[sellerId,setSellerId]=useState(""),[cpf,setCpf]=useState("");
@@ -154,7 +154,11 @@ export default function SalesPage(){
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
      <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-xs font-black text-slate-900"><UserRound className="h-4 w-4 text-violet-600"/> Identificação do atendimento</h2>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Cliente cadastrado</span><select className={field} value={customerId} onChange={e=>setCustomerId(e.target.value)}><option value="">Consumidor final não identificado</option>{aux.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-     {customer&&<p className="text-[10px] text-slate-500">Cliente selecionado: {customer.name}. Pontuação de fidelidade não integrada; nenhum ponto será creditado automaticamente.</p>}
+     {customer&&<div className="rounded-xl border border-purple-100 bg-purple-50 p-3 text-[11px] text-purple-900">
+ <p className="font-bold">{customer.name} • {new Intl.NumberFormat("pt-BR").format(customer.points)} pontos acumulados</p>
+ <p className="mt-1">Cashback acumulado: {money(customer.cashbackCents/100)} (utilização no checkout ainda não habilitada).</p>
+ {aux.loyalty?.enabled&&<p className="mt-1 text-purple-700">Simulação desta venda: +{Math.floor(totalCents/aux.loyalty.earnCentsPerPoint)} pontos após pagamento confirmado. Nenhum ponto será lançado enquanto o checkout estiver bloqueado.</p>}
+ </div>}
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">CPF/CNPJ para documento fiscal futuro</span><input className={field} value={cpf} onChange={e=>setCpf(e.target.value)} placeholder="Opcional — não utilizado no orçamento" maxLength={18}/></label>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Vendedor responsável *</span><select className={field} value={sellerId} onChange={e=>setSellerId(e.target.value)}><option value="">Selecione...</option>{aux.sellers.map(s=><option key={s.id} value={s.id}>{s.name} {s.jobTitle?"("+s.jobTitle+")":""}</option>)}</select></label>
      <p className="text-[10px] text-slate-400">Vínculo do vendedor persistido no orçamento; comissão financeira não será gerada sem módulo oficial.</p>
