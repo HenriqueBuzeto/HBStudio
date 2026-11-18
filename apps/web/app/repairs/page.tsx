@@ -46,36 +46,7 @@ export default function RepairsPage() {
 
   const handleCreateOS = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!custName || !equip) return;
-
-    const newOS: RepairOrderView = {
-      id: `os-${Date.now()}`,
-      orderNumber: `OS-2026-${String(orders.length + 1).padStart(4, "0")}`,
-      status: 1,
-      statusName: "Recepção / Triagem",
-      customerName: custName,
-      customerPhone: custPhone,
-      equipmentDescription: equip,
-      imeiOrSerial: serial || "N/A",
-      faultDescription: fault,
-      deviceAccessMethod: method,
-      assignedTechnicianName: "Henrique Barreto",
-      totalEstimate: 0,
-      partsCost: 0,
-      laborCost: 0,
-      legalWarrantyDays: 90,
-      contractualWarrantyDays: 90,
-      openedAt: new Date().toLocaleDateString("pt-BR")
-    };
-
-    setOrders([newOS, ...orders]);
-    setSelectedOrder(newOS);
-    setShowModal(false);
-    setCustName("");
-    setCustPhone("");
-    setEquip("");
-    setSerial("");
-    setFault("");
+    window.alert("Abertura de OS indisponível até integração com Neon; nenhum registro foi criado.");
   };
 
   return (
@@ -99,7 +70,7 @@ export default function RepairsPage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowModal(true)}
+              disabled title="Aguardando integração da Assistência com Neon"
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -225,7 +196,7 @@ export default function RepairsPage() {
                   <td colSpan={8} className="py-16 text-center text-slate-400">
                     <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-slate-700">Nenhuma Ordem de Serviço aberta</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Nova Ordem de Serviço" para abrir um atendimento de bancada.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Módulo de ordens de serviço aguardando integração real com Neon.</p>
                   </td>
                 </tr>
               )}
