@@ -666,7 +666,7 @@ export default function CatalogPage() {
                             <td className="py-2.5 px-3">
                               <span className="inline-flex items-center gap-1 font-bold text-slate-500">
                                 <span className="w-2 h-2 rounded-full bg-slate-300"></span>
-                                {sku.availableUnitsCount ?? 0} un pronta(s)
+                                {sku.availableUnitsCount ?? 0} un aprovada(s)
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-right">
@@ -770,7 +770,7 @@ export default function CatalogPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        {unit.operationalStatus !== 3 && unit.operationalStatus !== 5 && (
+                        {canManage && (unit.operationalStatus === 1 || unit.operationalStatus === 2) && (
                           <button
                             onClick={() => {
                               setTargetUnit(unit);
