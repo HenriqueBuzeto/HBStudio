@@ -90,8 +90,14 @@ export default function FiscalPage() {
           setNfceDefaultSeries(String(e.nfceDefaultSeries || 1));
           setNfceNextNumber(String(e.nfceNextNumber || 1));
         }
+      } else {
+        const failure = await res.json().catch(() => null);
+        setFiscalData(null);
+        setStatusMsg({type:"error",text:failure?.error || "Status fiscal indisponível. Nenhum cadastro será considerado verificado."});
       }
     } catch (err) {
+      setFiscalData(null);
+      setStatusMsg({type:"error",text:"Não foi possível consultar o Neon. Emissão fiscal indisponível."});
       console.error("Erro ao carregar status fiscal:", err);
     } finally {
       setLoading(false);
@@ -272,6 +278,11 @@ export default function FiscalPage() {
           </div>
         </div>
 
+        <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <strong>Emissão de NFC-e não habilitada.</strong> Cadastros fiscais somente para homologação, sem gerar autorização ou protocolo.
+          {fiscalData?.readiness?.vaultConfigured === false && <span className="block mt-1">Cofre fiscal não configurado na Vercel: defina a variável segura FISCAL_ENCRYPTION_KEY.</span>}
+          {fiscalData?.fiscalReady === false && <span className="block mt-1">Transmissão, validação ICP-Brasil, consulta e cancelamento SEFAZ permanecem pendentes.</span>}
+        </div>
         {/* Feedback de Status */}
         {statusMsg && (
           <div
@@ -584,6 +595,13 @@ export default function FiscalPage() {
                     </div>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Código IBGE do Município *</label>
+                    <input type="text" inputMode="numeric" maxLength={7} required
+                      placeholder="7 dígitos do IBGE" value={cityCodeIbge}
+                      onChange={(event) => setCityCodeIbge(event.target.value)}
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono" />
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <input
@@ -707,7 +725,7 @@ export default function FiscalPage() {
 
                   <button
                     type="submit"
-                    disabled={saving || !pfxFile || !pfxPassword}
+                    disabled={saving || !pfxFile || !pfxPassword || !hasConfig || !fiscalData?.readiness?.vaultConfigured}
                     className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     <UploadCloud className="w-4 h-4 text-purple-400" />
@@ -768,7 +786,7 @@ export default function FiscalPage() {
 
                   <button
                     type="submit"
-                    disabled={saving || !cscToken}
+                    disabled={saving || !cscToken || !hasConfig || !fiscalData?.readiness?.vaultConfigured}
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     <Lock className="w-4 h-4" />
