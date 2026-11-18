@@ -232,3 +232,54 @@ BEGIN
  RETURN p_action;
 END;$$;
 -- Existing tenants remain unconfigured; only explicit admin setup enables accrual.
+
+-- Refund reversal is triggered only after inspection and approved restocking (SaleReturnStatus=2).
+-- Negative balances are intentionally possible after returns: future redemptions must be denied.
+CREATE OR REPLACE FUNCTION loyalty_reverse_return(p_return_id uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_return sale_returns%ROWTYPE; v_sale sales%ROWTYPE; v_original bigint;
+ v_available bigint; v_total numeric; v_refund numeric; v_points bigint; v_written uuid;
+BEGIN
+ SELECT * INTO v_return FROM sale_returns WHERE "Id"=p_return_id AND "Status"=2;
+ IF NOT FOUND THEN RETURN; END IF;
+ SELECT * INTO v_sale FROM sales WHERE "Id"=v_return."SaleId" AND "TenantId"=v_return."TenantId";
+ IF NOT FOUND OR v_sale."CustomerPartyId" IS NULL OR v_sale."Status" IN (6,8) THEN RETURN; END IF;
+ SELECT COALESCE(SUM("PointsDelta"),0)::bigint INTO v_original FROM loyalty_ledger
+ WHERE "TenantId"=v_sale."TenantId" AND "SaleId"=v_sale."Id" AND "Kind"='SALE_EARN';
+ IF v_original<=0 THEN RETURN; END IF;
+ PERFORM 1 FROM loyalty_accounts WHERE "TenantId"=v_sale."TenantId" AND "PartyId"=v_sale."CustomerPartyId" FOR UPDATE;
+ SELECT GREATEST(0,COALESCE(SUM("PointsDelta"),0))::bigint INTO v_available FROM loyalty_ledger
+ WHERE "TenantId"=v_sale."TenantId" AND "SaleId"=v_sale."Id"
+ AND "Kind" IN ('SALE_EARN','RETURN_REVERSAL','SALE_REVERSAL');
+ IF v_available<=0 THEN RETURN; END IF;
+ SELECT GREATEST(0,COALESCE(SUM("Quantity"*"UnitPrice"-"Discount"),0)-v_sale."DiscountTotal"+v_sale."ChargesTotal")
+ INTO v_total FROM sale_items WHERE "TenantId"=v_sale."TenantId" AND "SaleId"=v_sale."Id";
+ SELECT COALESCE(SUM("RefundAmount"),0) INTO v_refund FROM sale_return_items
+ WHERE "TenantId"=v_sale."TenantId" AND "SaleReturnId"=p_return_id;
+ IF v_total<=0 OR v_refund<=0 THEN RETURN; END IF;
+ v_points=LEAST(v_available,floor(v_original*LEAST(v_refund/v_total,1))::bigint);
+ IF v_points<=0 THEN RETURN; END IF;
+ INSERT INTO loyalty_ledger("TenantId","PartyId","EventKey","Kind","PointsDelta","SaleId","Reason")
+ VALUES(v_sale."TenantId",v_sale."CustomerPartyId",'RETURN_REVERSAL:'||p_return_id,'RETURN_REVERSAL',-v_points,v_sale."Id",'Devolução aprovada com estorno proporcional')
+ ON CONFLICT("TenantId","EventKey") DO NOTHING RETURNING "Id" INTO v_written;
+ IF v_written IS NOT NULL THEN
+   UPDATE loyalty_accounts SET "PointsBalance"="PointsBalance"-v_points,"UpdatedAtUtc"=now()
+   WHERE "TenantId"=v_sale."TenantId" AND "PartyId"=v_sale."CustomerPartyId";
+ END IF;
+END;$$;
+CREATE OR REPLACE FUNCTION loyalty_return_event() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW."Status"=2 THEN PERFORM loyalty_reverse_return(NEW."Id"); END IF;
+ RETURN NEW;
+END;$$;
+DROP TRIGGER IF EXISTS "TR_loyalty_return_event" ON sale_returns;
+CREATE TRIGGER "TR_loyalty_return_event" AFTER INSERT OR UPDATE OF "Status" ON sale_returns
+FOR EACH ROW EXECUTE FUNCTION loyalty_return_event();
+
+-- Only roles with existing access.manage governance receive administration keys.
+-- No role-name matching, no user/job-title grants, no expansion to operational roles.
+INSERT INTO role_permissions("TenantId","RoleId","PermissionKey","Id","CreatedAtUtc","Version")
+SELECT DISTINCT rp."TenantId",rp."RoleId",k.permission,gen_random_uuid(),now(),1
+FROM role_permissions rp
+CROSS JOIN (VALUES ('loyalty.view'),('loyalty.manage'),('loyalty.redeem')) AS k(permission)
+WHERE rp."PermissionKey"='access.manage'
+ON CONFLICT("TenantId","RoleId","PermissionKey") DO NOTHING;
