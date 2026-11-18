@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import {useAuth} from "@/lib/auth";
 import RootShellLayout from "@/components/RootShellLayout";
 import { 
   Boxes, 
@@ -13,7 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Tag,
-  ShieldCheck
+  ShieldCheck,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 
 export interface SkuVariant {
@@ -75,6 +78,9 @@ export interface Brand {
 }
 
 export default function CatalogPage() {
+  const {hasPermission,isLoading:authLoading}=useAuth();
+  const canManage=hasPermission("catalog.products.manage");
+  const canViewCost=hasPermission("catalog.cost.view");
   const [models, setModels] = useState<ProductModel[]>([]);
   const [units, setUnits] = useState<InventoryUnit[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -82,6 +88,15 @@ export default function CatalogPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loadFailures,setLoadFailures]=useState<string[]>([]);
+  const [lastLoadedAt,setLastLoadedAt]=useState<Date|null>(null);
+  const [isCategoryOpen,setIsCategoryOpen]=useState(false);
+  const [isBrandOpen,setIsBrandOpen]=useState(false);
+  const [categoryName,setCategoryName]=useState("");
+  const [categorySlug,setCategorySlug]=useState("");
+  const [brandName,setBrandName]=useState("");
+  const [brandDescription,setBrandDescription]=useState("");
+
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"models" | "units">("models");
@@ -131,57 +146,78 @@ export default function CatalogPage() {
   const [targetUnit, setTargetUnit] = useState<InventoryUnit | null>(null);
   const [approvalNotes, setApprovalNotes] = useState("");
 
-  // Carregar dados de Catálogo do Backend com tratamento rigoroso por coleção
-  const loadCatalogData = useCallback(async () => {
+  // Loads are independent; a failed route must never look like an empty table.
+  const loadCatalogData=useCallback(async()=>{
     setIsLoading(true);
     setErrorMsg(null);
-    const fetchErrors: string[] = [];
-
-    try {
-      const [catRes, brandRes, modelRes, unitRes] = await Promise.all([
-        fetch("/api/catalog/categories"),
-        fetch("/api/catalog/brands"),
-        fetch("/api/catalog/models"),
-        fetch("/api/catalog/units")
-      ]);
-
-      if (catRes.ok) {
-        setCategories(await catRes.json());
-      } else {
-        fetchErrors.push("Categorias");
+    const endpoints=[
+      ["Categorias","/api/catalog/categories"],
+      ["Marcas","/api/catalog/brands"],
+      ["Modelos","/api/catalog/models"],
+      ["Unidades","/api/catalog/units"]
+    ] as const;
+    const results=await Promise.allSettled(endpoints.map(async([name,url])=>{
+      const res=await fetch(url,{cache:"no-store",credentials:"same-origin"});
+      if(!res.ok){
+        const body=await res.json().catch(()=>null);
+        throw new Error(name+": "+(body?.error||"HTTP "+res.status));
       }
-
-      if (brandRes.ok) {
-        setBrands(await brandRes.json());
-      } else {
-        fetchErrors.push("Marcas");
+      const value:unknown=await res.json();
+      if(!Array.isArray(value))throw new Error(name+": contrato de resposta inválido.");
+      return value;
+    }));
+    const failures:string[]=[];
+    const details:string[]=[];
+    results.forEach((outcome,i)=>{
+      const name=endpoints[i][0];
+      if(outcome.status==="rejected"){
+        failures.push(name);
+        details.push(outcome.reason instanceof Error?outcome.reason.message:name+" indisponível");
+        return;
       }
-
-      if (modelRes.ok) {
-        setModels(await modelRes.json());
-      } else {
-        fetchErrors.push("Modelos");
+      switch(name){
+        case "Categorias":setCategories(outcome.value as Category[]);break;
+        case "Marcas":setBrands(outcome.value as Brand[]);break;
+        case "Modelos":setModels(outcome.value as ProductModel[]);break;
+        case "Unidades":setUnits(outcome.value as InventoryUnit[]);break;
       }
+    });
+    setLoadFailures(failures);
+    setLastLoadedAt(new Date());
+    if(details.length)setErrorMsg("Falha parcial de consulta ao Neon: "+details.join(" • ")+". Os registros já carregados não foram apagados.");
+    setIsLoading(false);
+  },[]);
 
-      if (unitRes.ok) {
-        setUnits(await unitRes.json());
-      } else {
-        fetchErrors.push("Unidades");
-      }
+  useEffect(()=>{
+    if(!authLoading)void loadCatalogData();
+  },[authLoading,loadCatalogData]);
 
-      if (fetchErrors.length > 0) {
-        setErrorMsg(`Atenção: Não foi possível carregar os dados de: ${fetchErrors.join(", ")}.`);
-      }
-    } catch {
-      setErrorMsg("Falha de comunicação com o serviço de catálogo.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCatalogData();
-  }, [loadCatalogData]);
+  const createCategory=async(e:React.FormEvent)=>{
+    e.preventDefault();
+    if(!canManage){setErrorMsg("Permissão catalog.products.manage necessária.");return;}
+    try{
+      const res=await fetch("/api/catalog/categories",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:categoryName,slug:categorySlug,parentCategoryId:null})});
+      const json=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(json.error||"Categoria não cadastrada.");
+      setSelectedCategoryId(json.id);
+      setIsCategoryOpen(false);setCategoryName("");setCategorySlug("");
+      await loadCatalogData();
+      setSuccessMsg("Categoria cadastrada no Neon.");
+    }catch(err){setErrorMsg(err instanceof Error?err.message:"Erro ao salvar categoria.");}
+  };
+  const createBrand=async(e:React.FormEvent)=>{
+    e.preventDefault();
+    if(!canManage){setErrorMsg("Permissão catalog.products.manage necessária.");return;}
+    try{
+      const res=await fetch("/api/catalog/brands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:brandName,description:brandDescription})});
+      const json=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(json.error||"Marca não cadastrada.");
+      setSelectedBrandId(json.id);
+      setIsBrandOpen(false);setBrandName("");setBrandDescription("");
+      await loadCatalogData();
+      setSuccessMsg("Marca cadastrada no Neon.");
+    }catch(err){setErrorMsg(err instanceof Error?err.message:"Erro ao salvar marca.");}
+  };
 
   // Handler: Criar Modelo com SKU inicial em Transação Atômica no Backend
   const handleCreateModel = async (e: React.FormEvent) => {
@@ -453,7 +489,7 @@ export default function CatalogPage() {
                 Produtos & Aparelhos
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                PostgreSQL Neon Conectado
+                {isLoading ? "Consultando Neon..." : loadFailures.length ? "Sincronização parcial • atualizar" : "Neon conectado"}
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
@@ -464,9 +500,19 @@ export default function CatalogPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => void loadCatalogData()} disabled={isLoading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold disabled:opacity-40">
+              <RefreshCw className="w-3.5 h-3.5" /> Atualizar
+            </button>
+            {canManage && <button type="button" onClick={()=>setIsCategoryOpen(true)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold hover:bg-purple-50">+ Categoria</button>}
+            {canManage && <button type="button" onClick={()=>setIsBrandOpen(true)}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold hover:bg-purple-50">+ Marca</button>}
             <button
               onClick={() => setShowCost(!showCost)}
+              disabled={!canViewCost}
+              title={!canViewCost?"Permissão catalog.cost.view necessária":"Ver ou ocultar custos"}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
               {showCost ? <EyeOff className="w-3.5 h-3.5 text-purple-600" /> : <Eye className="w-3.5 h-3.5 text-slate-400" />}
@@ -474,6 +520,7 @@ export default function CatalogPage() {
             </button>
             <button
               onClick={() => setIsRegisterUnitOpen(true)}
+              disabled={!canManage}
               className="flex items-center gap-1.5 px-3.5 py-2 border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-all shadow-xs"
             >
               <Smartphone className="w-3.5 h-3.5" />
@@ -481,6 +528,7 @@ export default function CatalogPage() {
             </button>
             <button
               onClick={() => setIsCreateModelOpen(true)}
+              disabled={!canManage}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -532,6 +580,12 @@ export default function CatalogPage() {
             {isLoading ? (
               <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center text-slate-400">
                 Carregando catálogo do PostgreSQL...
+              </div>
+            ) : loadFailures.includes("Modelos") && filteredModels.length===0 ? (
+              <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-12 text-center text-xs text-amber-800">
+                <AlertTriangle className="mx-auto mb-2 h-6 w-6"/>
+                Não foi possível consultar modelos. Isso não significa que o banco está vazio.
+                <button type="button" onClick={()=>void loadCatalogData()} className="ml-2 font-bold underline">Tentar novamente</button>
               </div>
             ) : filteredModels.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center text-slate-400 shadow-xs">
@@ -646,7 +700,7 @@ export default function CatalogPage() {
                   <th className="py-3 px-4">IMEI / Número de Série</th>
                   <th className="py-3 px-4">Condição & Grau</th>
                   <th className="py-3 px-4">Saúde Bateria</th>
-                  {showCost && <th className="py-3 px-4 font-mono text-rose-700">Custo de Aquisição</th>}
+                  {showCost && canViewCost && <th className="py-3 px-4 font-mono text-rose-700">Custo de Aquisição</th>}
                   <th className="py-3 px-4">Status Operacional</th>
                   <th className="py-3 px-4 text-right">Ação</th>
                 </tr>
@@ -658,6 +712,10 @@ export default function CatalogPage() {
                       Carregando unidades serializadas do banco...
                     </td>
                   </tr>
+                ) : loadFailures.includes("Unidades") && filteredUnits.length===0 ? (
+                  <tr><td colSpan={showCost?7:6} className="bg-amber-50 py-12 text-center text-amber-800">
+                    Unidades indisponíveis no momento. Isso não indica ausência de estoque. Clique em Atualizar.
+                  </td></tr>
                 ) : filteredUnits.length === 0 ? (
                   <tr>
                     <td colSpan={showCost ? 7 : 6} className="py-16 text-center text-slate-400">
@@ -691,7 +749,7 @@ export default function CatalogPage() {
                           <span className="text-slate-400">N/A</span>
                         )}
                       </td>
-                      {showCost && (
+                      {showCost && canViewCost && (
                         <td className="py-3 px-4 font-mono text-rose-700 font-bold">
                           {unit.acquisitionCost !== null && unit.acquisitionCost !== undefined
                             ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(unit.acquisitionCost)
