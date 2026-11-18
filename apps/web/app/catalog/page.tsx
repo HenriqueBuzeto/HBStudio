@@ -114,6 +114,7 @@ export default function CatalogPage() {
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [modelName, setModelName] = useState("");
+  const [modelKind,setModelKind]=useState(1);
   const [policy, setPolicy] = useState(2); // StrictSerialized por padrão para eletrônicos/smartphones
   const [modelDescription, setModelDescription] = useState("");
   const [initialSkuCode, setInitialSkuCode] = useState("");
@@ -230,7 +231,7 @@ export default function CatalogPage() {
     try {
       const payload = {
         name: modelName.trim(),
-        kind: 1, // Standard
+        kind: modelKind,
         serializationPolicy: policy,
         brandId: selectedBrandId,
         categoryId: selectedCategoryId,
@@ -590,7 +591,7 @@ export default function CatalogPage() {
             ) : filteredModels.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200/90 p-16 text-center text-slate-400 shadow-xs">
                 <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                <p className="font-bold text-slate-700 text-sm">Nenhum modelo cadastrado no catálogo</p>
+                <p className="font-bold text-slate-700 text-sm">{search.trim() ? "Nenhum modelo encontrado na busca" : "Nenhum modelo cadastrado no catálogo"}</p>
                 <p className="text-xs text-slate-400 mt-1">Cadastre novos modelos de smartphones, acessórios ou peças de reposição.</p>
                 <button
                   onClick={() => setIsCreateModelOpen(true)}
@@ -720,7 +721,7 @@ export default function CatalogPage() {
                   <tr>
                     <td colSpan={showCost ? 7 : 6} className="py-16 text-center text-slate-400">
                       <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                      <p className="font-bold text-slate-700">Nenhum aparelho serializado cadastrado</p>
+                      <p className="font-bold text-slate-700">{search.trim() ? "Nenhuma unidade encontrada na busca" : "Nenhum aparelho serializado cadastrado"}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">Clique em "Registrar Unidade (IMEI)" para cadastrar aparelhos novos ou seminovos.</p>
                     </td>
                   </tr>
@@ -788,6 +789,48 @@ export default function CatalogPage() {
           </div>
         )}
 
+        {/* Cadastro real de categoria */}
+        {isCategoryOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+            <div role="dialog" aria-label="Nova Categoria" aria-modal="true" className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between"><h3 className="font-extrabold text-slate-900">Nova categoria</h3>
+                <button type="button" onClick={()=>setIsCategoryOpen(false)} aria-label="Fechar">✕</button></div>
+              <form onSubmit={createCategory} className="space-y-3">
+                <label className="block text-xs font-bold text-slate-600">Nome da categoria *
+                  <input required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 p-3"
+                    value={categoryName} onChange={e=>{
+                      setCategoryName(e.target.value);
+                      setCategorySlug(e.target.value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""));
+                    }} placeholder="Ex.: Smartphones" /></label>
+                <label className="block text-xs font-bold text-slate-600">Slug / identificador *
+                  <input required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 p-3 font-mono"
+                    value={categorySlug} onChange={e=>setCategorySlug(e.target.value.toLowerCase())} placeholder="smartphones" /></label>
+                <p className="text-[11px] text-slate-500">Identificador único no cadastro da sua empresa.</p>
+                <div className="flex justify-end gap-2"><button type="button" onClick={()=>setIsCategoryOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold">Cancelar</button>
+                  <button type="submit" className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white">Salvar categoria</button></div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Cadastro real de marca */}
+        {isBrandOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+            <div role="dialog" aria-modal="true" aria-label="Nova Marca" className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+              <div className="flex items-center justify-between"><h3 className="font-extrabold text-slate-900">Nova marca</h3>
+                <button type="button" onClick={()=>setIsBrandOpen(false)} aria-label="Fechar">✕</button></div>
+              <form onSubmit={createBrand} className="space-y-3">
+                <label className="block text-xs font-bold text-slate-600">Nome da marca *
+                  <input required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 p-3"
+                    value={brandName} onChange={e=>setBrandName(e.target.value)} placeholder="Ex.: Apple" /></label>
+                <label className="block text-xs font-bold text-slate-600">Descrição (opcional)
+                  <textarea maxLength={500} rows={3} className="mt-1 w-full rounded-xl border border-slate-200 p-3"
+                    value={brandDescription} onChange={e=>setBrandDescription(e.target.value)} /></label>
+                <div className="flex justify-end gap-2"><button type="button" onClick={()=>setIsBrandOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold">Cancelar</button>
+                  <button type="submit" className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white">Salvar marca</button></div>
+              </form>
+            </div>
+          </div>
+        )}
         {/* Modal: Novo Modelo */}
         {isCreateModelOpen && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -800,7 +843,10 @@ export default function CatalogPage() {
               <form onSubmit={handleCreateModel} className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Marca *</label>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="font-bold text-slate-700">Marca *</label>
+                      <button type="button" onClick={()=>setIsBrandOpen(true)} className="text-[11px] font-bold text-purple-700">+ Cadastrar</button>
+                    </div>
                     <select
                       required
                       value={selectedBrandId}
@@ -814,7 +860,10 @@ export default function CatalogPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Categoria *</label>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="font-bold text-slate-700">Categoria *</label>
+                      <button type="button" onClick={()=>setIsCategoryOpen(true)} className="text-[11px] font-bold text-purple-700">+ Cadastrar</button>
+                    </div>
                     <select
                       required
                       value={selectedCategoryId}
@@ -829,6 +878,19 @@ export default function CatalogPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tipo do produto *</label>
+                  <select value={modelKind} onChange={e=>{
+                      const value=Number(e.target.value);setModelKind(value);
+                      if(value!==1)setPolicy(0);
+                    }} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800">
+                    <option value={1}>Produto para revenda (ex.: smartphone, computador)</option>
+                    <option value={2}>Insumo / Matéria-prima (ex.: filamento)</option>
+                    <option value={3}>Peça de reposição</option>
+                    <option value={4}>Serviço técnico</option>
+                    <option value={5}>Produto fabricado em 3D</option>
+                  </select>
+                </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Nome do Modelo *</label>
                   <input
