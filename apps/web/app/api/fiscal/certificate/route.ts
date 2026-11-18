@@ -33,7 +33,7 @@ export async function POST(request:NextRequest){
    [session.tenantId,session.branchId]
   );
   if(ests.length!==1)throw new FleetError(409,"ESTABLISHMENT_NOT_FOUND","Cadastre primeiro seu estabelecimento real.");
-  const est=ests[0];const expected=String(est.cnpj).replace(/\\D/g,"");const env=Number(est.environment);
+  const est=ests[0];const expected=String(est.cnpj).replace(/\D/g,"");const env=Number(est.environment);
   let leaf:X509Certificate;
   try{
    // Node/OpenSSL must decrypt the PKCS#12 and load a key matching the certificate.
@@ -50,7 +50,7 @@ export async function POST(request:NextRequest){
   if(leaf.subject===leaf.issuer)throw new FleetError(422,"CERT_UNTRUSTED","Certificado autoassinado não é aceito.");
   // Conservative: if the legal CNPJ is not extractable from the leaf's
   // subject, refuse rather than linking an unverified business identity.
-  const subjectMatches=leaf.subject.match(/(?:^|\\n)(?:CN|OU|O)=[^\\n]*?([0-9]{14})(?=\\D|$)/g)??[];
+  const subjectMatches=leaf.subject.match(/(?:^|\n)(?:CN|OU|O)=[^\n]*?([0-9]{14})(?=\D|$)/g)??[];
   const subjectCnpjs=subjectMatches.flatMap(m=>m.match(/[0-9]{14}/g)??[]);
   if(expected.length!==14||!subjectCnpjs.includes(expected))
    throw new FleetError(422,"CERT_CNPJ_UNVERIFIED","Não foi possível comprovar o CNPJ do estabelecimento no certificado A1. Revisão ICP-Brasil necessária.");
