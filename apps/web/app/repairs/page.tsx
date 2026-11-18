@@ -323,14 +323,11 @@ export default function RepairsPage() {
     <RootShellLayout>
       <div className="space-y-6">
         {/* Header Oficial do Módulo HBVisionX */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
                 Oficina & Laboratório Técnico
-              </span>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
-                MOD-07 • Gestão de OS
               </span>
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900 mt-2">
@@ -341,10 +338,10 @@ export default function RepairsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
             <button
               onClick={() => setTvMode(true)}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+              className="h-10 px-4 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
               <Tv className="w-4 h-4 text-purple-400" />
               <span>Modo TV Oficina</span>
@@ -352,7 +349,7 @@ export default function RepairsPage() {
 
             <button
               onClick={loadOrders}
-              className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl transition-all cursor-pointer"
+              className="h-10 w-10 flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl transition-all cursor-pointer shrink-0 shadow-xs"
               title="Atualizar dados"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-purple-600" : ""}`} />
@@ -360,7 +357,7 @@ export default function RepairsPage() {
 
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer"
+              className="h-10 px-5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>Nova Ordem de Serviço</span>
