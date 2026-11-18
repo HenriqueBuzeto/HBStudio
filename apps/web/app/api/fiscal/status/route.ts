@@ -22,7 +22,7 @@ export async function GET(request:NextRequest){
   const [certs,cscs,stats]=await Promise.all([
    session.db.query('SELECT "Id"::text AS id,"SubjectName" AS "subjectName","Thumbprint" AS thumbprint,"ValidFromUtc" AS "validFromUtc","ValidUntilUtc" AS "validUntilUtc","Cnpj" AS cnpj,"IsActive" AS "isActive","KeyIvBase64" AS format FROM fiscal_certificates WHERE "TenantId"=$1::uuid AND "EstablishmentId"=$2::uuid ORDER BY "CreatedAtUtc" DESC LIMIT 1',[session.tenantId,id]),
    session.db.query('SELECT "Id"::text AS id,"CscId" AS "cscId","CscTokenMasked" AS "cscTokenMasked","Environment" AS environment,"IsActive" AS "isActive",encode(substring("EncryptedCscToken" from 1 for 4),\'escape\') AS format FROM fiscal_cscs WHERE "TenantId"=$1::uuid AND "EstablishmentId"=$2::uuid AND "Environment"=$3::int ORDER BY "CreatedAtUtc" DESC LIMIT 1',[session.tenantId,id,est.environment]),
-   session.db.query('SELECT COUNT(*)::int AS total,COUNT(*) FILTER (WHERE "Status"=4)::int AS issued FROM fiscal_documents WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid',[session.tenantId,session.branchId])
+   session.db.query('SELECT COUNT(*)::int AS total,COUNT(*) FILTER (WHERE "Status"=4)::int AS issued FROM fiscal_documents d JOIN fiscal_establishments e ON e."Id"=d."EstablishmentId" AND e."TenantId"=d."TenantId" WHERE d."TenantId"=$1::uuid AND e."BranchId"=$2::uuid',[session.tenantId,session.branchId])
   ]);
   const cert=certs[0]??null,csc=cscs[0]??null;
   const certStored=!!cert&&cert.format==="HBF1:AES-256-GCM";
