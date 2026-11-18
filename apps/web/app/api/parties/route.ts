@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     query += ` ORDER BY p."CreatedAtUtc" DESC LIMIT ${pageSize} OFFSET ${offset};`;
 
-    const parties = await sql(query, params);
+    const parties = await sql.query(query, params);
 
     if (parties.length === 0) {
       return NextResponse.json([]);
@@ -70,19 +70,19 @@ export async function GET(request: NextRequest) {
 
     // Buscar Contatos, Endereços e Equipamentos para os clientes retornados
     const [contacts, addresses, equipments] = await Promise.all([
-      sql(
+      sql.query(
         `SELECT "Id", "PartyId", "Name", "Email", "Phone", "WhatsApp", "IsPrimary"
          FROM party_contacts
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
         [tenantId, partyIds]
       ),
-      sql(
+      sql.query(
         `SELECT "Id", "PartyId", "Street", "Number", "Complement", "Neighborhood", "City", "State", "PostalCode", "IsPrimary"
          FROM party_addresses
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
         [tenantId, partyIds]
       ),
-      sql(
+      sql.query(
         `SELECT "Id", "PartyId", "EquipmentType", "Brand", "Model", "Color", "SerialNumber", "Imei1", "Imei2", "Notes"
          FROM customer_equipments
          WHERE "TenantId" = $1 AND "PartyId" = ANY($2::uuid[]);`,
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     const sql = ctx.db;
     if (cleanDoc) {
-      const existing = await sql(
+      const existing = await sql.query(
         'SELECT "Id" FROM parties WHERE "TenantId" = $1 AND "DocumentNumber" = $2 LIMIT 1',
         [tenantId, cleanDoc]
       );
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     const partyId = crypto.randomUUID();
     const now = new Date().toISOString();
     const operations = [
-      sql(`INSERT INTO parties (
+      sql.query(`INSERT INTO parties (
         "Id","TenantId","Type","Name","TradeName","DocumentNumber",
         "StateRegistration","MunicipalRegistration","BirthDate","IsActive","Notes","CreatedAtUtc"
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11)`,
@@ -227,21 +227,21 @@ export async function POST(request: NextRequest) {
       ])
     ];
     if (body.enableCustomer !== false) {
-      operations.push(sql(
+      operations.push(sql.query(
         `INSERT INTO customer_profiles ("Id","TenantId","PartyId","InternalNotes","TotalSalesValue","CompletedRepairsCount","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,0,0,$5)`,
         [crypto.randomUUID(), tenantId, partyId, body.customerNotes?.trim() || null, now]
       ));
     }
     if (body.enableSupplier === true) {
-      operations.push(sql(
+      operations.push(sql.query(
         `INSERT INTO supplier_profiles ("Id","TenantId","PartyId","PaymentTerms","SupplyCategories","LeadTimeDays","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,$5,0,$6)`,
         [crypto.randomUUID(), tenantId, partyId, body.paymentTerms?.trim() || null, body.supplyCategories?.trim() || null, now]
       ));
     }
     if (body.primaryPhone?.trim() || body.primaryEmail?.trim()) {
-      operations.push(sql(
+      operations.push(sql.query(
         `INSERT INTO party_contacts ("Id","TenantId","PartyId","Name","Email","Phone","WhatsApp","IsPrimary","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
         [crypto.randomUUID(), tenantId, partyId, name, body.primaryEmail?.trim() || null,
@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
       ));
     }
     if (address) {
-      operations.push(sql(
+      operations.push(sql.query(
         `INSERT INTO party_addresses ("Id","TenantId","PartyId","Street","Number","Complement","Neighborhood",
           "City","State","PostalCode","IsPrimary","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
       ));
     }
     if (equipment) {
-      operations.push(sql(
+      operations.push(sql.query(
         `INSERT INTO customer_equipments ("Id","TenantId","PartyId","EquipmentType","Brand","Model","Color",
           "SerialNumber","Imei1","Imei2","Notes","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
