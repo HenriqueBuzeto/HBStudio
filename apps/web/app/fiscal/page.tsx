@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import RootShellLayout from "@/components/RootShellLayout";
 import {
   FileText,
   ShieldCheck,
@@ -11,788 +12,789 @@ import {
   RefreshCw,
   QrCode,
   Download,
-  Ban,
-  PlusCircle,
   Building,
   UploadCloud,
   Check,
-  Search,
-  ExternalLink,
-  Layers
+  Save,
+  Lock,
+  Layers,
+  FileCheck2,
+  AlertTriangle,
+  Info
 } from "lucide-react";
 
-interface FiscalEstablishment {
-  id: string;
-  branchId: string;
-  corporateName: string;
-  tradeName: string;
-  cnpj: string;
-  stateRegistration: string;
-  regime: string;
-  cityName: string;
-  state: string;
-  environment: string;
-  qrCodeVersion: number;
-  nfceDefaultSeries: number;
-  nfceNextNumber: number;
-  isNfceEnabled: boolean;
-  hasCertificate: boolean;
-  certificateExpiration: string | null;
-  hasCsc: boolean;
-  cscMasked: string | null;
-}
-
-interface FiscalDocument {
-  id: string;
-  saleId: string | null;
-  documentType: string;
-  environment: string;
-  status: string;
-  series: number;
-  number: number;
-  accessKey: string;
-  issuedAtUtc: string;
-  totalAmount: number;
-  totalDiscounts: number;
-  recipientCpf: string | null;
-  protocolNumber: string | null;
-  sefazStatusCode: number | null;
-  sefazStatusReason: string | null;
-  qrCodeUrl: string | null;
-  cancellationReason: string | null;
-  cancelledAtUtc: string | null;
-}
-
-interface InboundDocument {
-  id: string;
-  accessKey: string;
-  number: number;
-  series: number;
-  issuedAtUtc: string;
-  receivedAtUtc: string;
-  supplierCnpj: string;
-  supplierName: string;
-  supplierStateRegistration: string | null;
-  recipientCnpj: string;
-  totalProductsAmount: number;
-  totalInvoiceAmount: number;
-  totalIcmsAmount: number;
-  isConciliated: boolean;
-}
-
 export default function FiscalPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "inbound" | "settings">("overview");
-  const [establishment, setEstablishment] = useState<FiscalEstablishment | null>(null);
-  const [documents, setDocuments] = useState<FiscalDocument[]>([]);
-  const [inboundDocs, setInboundDocs] = useState<InboundDocument[]>([]);
+  const [activeTab, setActiveTab] = useState<"overview" | "cadastros" | "documents" | "inbound">("overview");
   const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
-  // Estados dos Formulários
-  const [cscToken, setCscToken] = useState("");
-  const [cscId, setCscId] = useState("000001");
-  const [pfxBase64, setPfxBase64] = useState("");
+  // Dados do Estabelecimento Fiscal Carregados do Neon
+  const [fiscalData, setFiscalData] = useState<any>(null);
+
+  // Formulário: Dados da Empresa / Estabelecimento
+  const [corporateName, setCorporateName] = useState("HB STUDIO LTDA");
+  const [tradeName, setTradeName] = useState("HB Studio");
+  const [cnpj, setCnpj] = useState("48.951.871/0001-80");
+  const [stateRegistration, setStateRegistration] = useState("111.222.333.444");
+  const [municipalRegistration, setMunicipalRegistration] = useState("");
+  const [cnae, setCnae] = useState("4751-2/01");
+  const [regime, setRegime] = useState("1"); // 1 = Simples Nacional
+  const [environment, setEnvironment] = useState("1"); // 1 = Produção
+  const [street, setStreet] = useState("Av. Paulista");
+  const [number, setNumber] = useState("1000");
+  const [complement, setComplement] = useState("");
+  const [neighborhood, setNeighborhood] = useState("Bela Vista");
+  const [cityName, setCityName] = useState("São Paulo");
+  const [state, setState] = useState("SP");
+  const [postalCode, setPostalCode] = useState("01310-100");
+  const [nfceDefaultSeries, setNfceDefaultSeries] = useState("1");
+  const [nfceNextNumber, setNfceNextNumber] = useState("1");
+
+  // Formulário: Certificado Digital A1
+  const [pfxFile, setPfxFile] = useState<File | null>(null);
   const [pfxPassword, setPfxPassword] = useState("");
-  const [xmlToImport, setXmlToImport] = useState("");
-  const [selectedDocForCancel, setSelectedDocForCancel] = useState<FiscalDocument | null>(null);
-  const [cancelJustification, setCancelJustification] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Formulário: Código de Segurança do Contribuinte (CSC)
+  const [cscId, setCscId] = useState("000001");
+  const [cscToken, setCscToken] = useState("");
 
-  async function loadData() {
-    setLoading(true);
+  // Carregar status fiscal diretamente do Neon
+  const loadFiscalStatus = async () => {
     try {
-      const [estRes, docsRes, inRes] = await Promise.all([
-        fetch("/api/fiscal/establishment"),
-        fetch("/api/fiscal/documents"),
-        fetch("/api/fiscal/inbound"),
-      ]);
-
-      if (estRes.ok) {
-        const estData = await estRes.json();
-        setEstablishment(estData);
+      setLoading(true);
+      const res = await fetch("/api/fiscal/status");
+      if (res.ok) {
+        const data = await res.json();
+        setFiscalData(data);
+        if (data.configured && data.establishment) {
+          const e = data.establishment;
+          setCorporateName(e.corporateName || "");
+          setTradeName(e.tradeName || "");
+          setCnpj(e.cnpj || "");
+          setStateRegistration(e.stateRegistration || "");
+          setStreet(e.street || "");
+          setNumber(e.number || "");
+          setNeighborhood(e.neighborhood || "");
+          setCityName(e.cityName || "São Paulo");
+          setState(e.state || "SP");
+          setPostalCode(e.postalCode || "");
+          setNfceDefaultSeries(String(e.nfceDefaultSeries || 1));
+          setNfceNextNumber(String(e.nfceNextNumber || 1));
+        }
       }
-      if (docsRes.ok) {
-        const docsData = await docsRes.json();
-        setDocuments(docsData);
-      }
-      if (inRes.ok) {
-        const inData = await inRes.json();
-        setInboundDocs(inData);
-      }
-    } catch {
-      setStatusMsg({ type: "error", text: "Erro ao carregar dados fiscais." });
+    } catch (err) {
+      console.error("Erro ao carregar status fiscal:", err);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleRegisterCsc(e: React.FormEvent) {
+  useEffect(() => {
+    loadFiscalStatus();
+  }, []);
+
+  // Salvar Dados do Estabelecimento
+  const handleSaveEstablishment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setSaving(true);
     setStatusMsg(null);
+
+    try {
+      const res = await fetch("/api/fiscal/establishment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          corporateName,
+          tradeName,
+          cnpj,
+          stateRegistration,
+          municipalRegistration,
+          cnae,
+          regime: Number(regime),
+          street,
+          number,
+          complement,
+          neighborhood,
+          cityName,
+          state,
+          postalCode,
+          environment: Number(environment),
+          nfceDefaultSeries: Number(nfceDefaultSeries),
+          nfceNextNumber: Number(nfceNextNumber),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setStatusMsg({ type: "success", text: "Estabelecimento fiscal salvo com sucesso no banco de dados Neon!" });
+        loadFiscalStatus();
+      } else {
+        setStatusMsg({ type: "error", text: data.error || "Erro ao salvar estabelecimento fiscal." });
+      }
+    } catch {
+      setStatusMsg({ type: "error", text: "Não foi possível conectar ao servidor para salvar os dados fiscais." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Salvar Token CSC
+  const handleSaveCsc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cscId || !cscToken) return;
+
+    setSaving(true);
+    setStatusMsg(null);
+
     try {
       const res = await fetch("/api/fiscal/csc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cscId: cscId.trim(),
-          cscToken: cscToken.trim(),
-          environment: 2, // Homologação padrão
+          cscId,
+          cscToken,
+          environment: Number(environment),
         }),
       });
 
+      const data = await res.json();
       if (res.ok) {
-        setStatusMsg({ type: "success", text: "Token CSC de São Paulo homologado e gravado com segurança!" });
+        setStatusMsg({ type: "success", text: "Código CSC registrado e criptografado com sucesso!" });
         setCscToken("");
-        loadData();
+        loadFiscalStatus();
       } else {
-        const err = await res.json();
-        setStatusMsg({ type: "error", text: err.error || "Erro ao registrar token CSC." });
+        setStatusMsg({ type: "error", text: data.error || "Erro ao cadastrar CSC." });
       }
     } catch {
-      setStatusMsg({ type: "error", text: "Falha de conexão ao registrar CSC." });
+      setStatusMsg({ type: "error", text: "Erro ao comunicar com o servidor para registro de CSC." });
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
-  }
+  };
 
-  async function handleCertificateUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const b64 = (reader.result as string).split(",")[1];
-      setPfxBase64(b64);
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function handleSubmitCertificate(e: React.FormEvent) {
+  // Salvar Certificado Digital A1 (.pfx)
+  const handleUploadCert = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pfxBase64) {
-      setStatusMsg({ type: "error", text: "Selecione o arquivo .pfx do certificado A1." });
+    if (!pfxFile || !pfxPassword) {
+      setStatusMsg({ type: "error", text: "Selecione o arquivo .pfx e digite a senha do certificado." });
       return;
     }
-    setIsSubmitting(true);
+
+    setSaving(true);
     setStatusMsg(null);
-    try {
-      const res = await fetch("/api/fiscal/certificate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base64Pfx: pfxBase64,
-          password: pfxPassword,
-        }),
-      });
 
-      if (res.ok) {
-        setStatusMsg({ type: "success", text: "Certificado A1 importado e validado via Zeus DFe.NET com criptografia em repouso!" });
-        setPfxBase64("");
-        setPfxPassword("");
-        loadData();
-      } else {
-        const err = await res.json();
-        setStatusMsg({ type: "error", text: err.error || "Erro ao processar Certificado A1." });
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      try {
+        const res = await fetch("/api/fiscal/certificate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pfxBase64: base64,
+            password: pfxPassword,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          setStatusMsg({ type: "success", text: "Certificado A1 enviado, criptografado e validado no Neon!" });
+          setPfxFile(null);
+          setPfxPassword("");
+          loadFiscalStatus();
+        } else {
+          setStatusMsg({ type: "error", text: data.error || "Erro ao enviar certificado digital." });
+        }
+      } catch {
+        setStatusMsg({ type: "error", text: "Falha ao enviar certificado digital." });
+      } finally {
+        setSaving(false);
       }
-    } catch {
-      setStatusMsg({ type: "error", text: "Falha na transmissão do certificado." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+    };
+    reader.readAsDataURL(pfxFile);
+  };
 
-  async function handleCancelDoc(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedDocForCancel) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`/api/fiscal/documents/${selectedDocForCancel.id}/cancel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ justification: cancelJustification }),
-      });
-
-      if (res.ok) {
-        setStatusMsg({ type: "success", text: "NFC-e cancelada perante a SEFAZ com sucesso!" });
-        setSelectedDocForCancel(null);
-        setCancelJustification("");
-        loadData();
-      } else {
-        const err = await res.json();
-        setStatusMsg({ type: "error", text: err.error || "Erro ao cancelar NFC-e." });
-      }
-    } catch {
-      setStatusMsg({ type: "error", text: "Falha ao enviar cancelamento à SEFAZ." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleImportInboundXml(e: React.FormEvent) {
-    e.preventDefault();
-    if (!xmlToImport.trim()) return;
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/fiscal/inbound/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawXml: xmlToImport }),
-      });
-
-      if (res.ok) {
-        setStatusMsg({ type: "success", text: "XML de entrada de fornecedor importado com proteção XXE!" });
-        setXmlToImport("");
-        loadData();
-      } else {
-        const err = await res.json();
-        setStatusMsg({ type: "error", text: err.error || "Erro ao importar XML de entrada." });
-      }
-    } catch {
-      setStatusMsg({ type: "error", text: "Erro ao importar XML." });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  const hasConfig = fiscalData?.configured;
+  const est = fiscalData?.establishment;
+  const cert = fiscalData?.certificate;
+  const csc = fiscalData?.csc;
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 p-6 md:p-10">
-      {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-purple-900/30 gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              MOD-14 • FISCAL & NFC-E ZEUS DFE.NET
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Versão 2026.9.24.1416
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              LGPL-2.1 Open-Source
-            </span>
+    <RootShellLayout>
+      <div className="space-y-6">
+        {/* Header do Módulo Fiscal */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-3 py-1 rounded-full border border-purple-200">
+                Módulo Fiscal & Tributário
+              </span>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                MOD-14 • SEFAZ-SP & Zeus DFe
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                Sem Custo por Nota
+              </span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 mt-2">
+              Emissão de NFC-e, XML & Cadastros Fiscais
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 max-w-3xl">
+              Configuração oficial do estabelecimento comercial, credenciamento na Fazenda Estadual (SEFAZ-SP), gestão do Certificado Digital A1 e Código de Segurança do Contribuinte (CSC).
+            </p>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mt-2 text-white flex items-center gap-2">
-            Emissão de NFC-e, XML de Entrada & Motor Fiscal
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Operação de balcão direta sem custo por nota fiscal emitida, homologada para o Estado de São Paulo (SEFAZ-SP).
-          </p>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadFiscalStatus}
+              className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl transition-all cursor-pointer"
+              title="Recarregar dados fiscais"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-purple-600" : ""}`} />
+            </button>
+            <button
+              onClick={() => setActiveTab("cadastros")}
+              className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Building className="w-4 h-4" />
+              <span>Configurar Estabelecimento</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-medium transition"
+        {/* Feedback de Status */}
+        {statusMsg && (
+          <div
+            className={`p-4 rounded-2xl border text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
+              statusMsg.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : statusMsg.type === "error"
+                ? "bg-rose-50 border-rose-200 text-rose-800"
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            Sincronizar
+            {statusMsg.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{statusMsg.text}</span>
+          </div>
+        )}
+
+        {/* Abas de Navegação */}
+        <div className="flex items-center gap-1 border-b border-slate-200 pb-1">
+          <button
+            onClick={() => setActiveTab("overview")}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "overview"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-xs"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Visão Geral & Indicadores</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("cadastros")}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "cadastros"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-xs"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+            }`}
+          >
+            <Building className="w-4 h-4" />
+            <span>Cadastros Fiscais & Certificados</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("documents")}
+            className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "documents"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-xs"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>NFC-e Emitidas no Balcão ({fiscalData?.stats?.totalIssued || 0})</span>
           </button>
         </div>
-      </div>
 
-      {/* Alerta de Feedback */}
-      {statusMsg && (
-        <div
-          className={`mt-4 p-4 rounded-xl border flex items-center gap-3 text-sm ${
-            statusMsg.type === "success"
-              ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
-              : statusMsg.type === "error"
-              ? "bg-rose-950/40 border-rose-500/30 text-rose-300"
-              : "bg-blue-950/40 border-blue-500/30 text-blue-300"
-          }`}
-        >
-          {statusMsg.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          )}
-          <span>{statusMsg.text}</span>
-          <button
-            onClick={() => setStatusMsg(null)}
-            className="ml-auto text-xs opacity-70 hover:opacity-100"
-          >
-            Fechar
-          </button>
-        </div>
-      )}
-
-      {/* Navegação de Abas */}
-      <div className="flex border-b border-purple-900/20 mt-6 gap-2">
-        <button
-          onClick={() => setActiveTab("overview")}
-          className={`pb-3 px-4 text-sm font-medium transition border-b-2 flex items-center gap-2 ${
-            activeTab === "overview"
-              ? "border-purple-500 text-purple-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          Visão Geral & Indicadores
-        </button>
-        <button
-          onClick={() => setActiveTab("documents")}
-          className={`pb-3 px-4 text-sm font-medium transition border-b-2 flex items-center gap-2 ${
-            activeTab === "documents"
-              ? "border-purple-500 text-purple-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          NFC-e Emitidas Balcão ({documents.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("inbound")}
-          className={`pb-3 px-4 text-sm font-medium transition border-b-2 flex items-center gap-2 ${
-            activeTab === "inbound"
-              ? "border-purple-500 text-purple-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <FileCode className="w-4 h-4" />
-          XML de Entrada ({inboundDocs.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("settings")}
-          className={`pb-3 px-4 text-sm font-medium transition border-b-2 flex items-center gap-2 ${
-            activeTab === "settings"
-              ? "border-purple-500 text-purple-400"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <KeyRound className="w-4 h-4" />
-          Configurações, Certificado & CSC
-        </button>
-      </div>
-
-      {/* Conteúdo das Abas */}
-      <div className="mt-6">
-        {/* ABA: Visão Geral */}
+        {/* ABA 1: VISÃO GERAL & INDICADORES DE CONFORMIDADE */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-            {/* Cards de Status */}
+            {/* 4 Cards de Indicadores */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20">
-                <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>ESTABELECIMENTO</span>
-                  <Building className="w-4 h-4 text-purple-400" />
+              {/* Card 1: Estabelecimento */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Estabelecimento</span>
+                  <Building className="w-4 h-4 text-purple-600" />
                 </div>
-                <div className="mt-2 text-lg font-bold text-white truncate">
-                  {establishment?.tradeName || "Não Configurado"}
+                <div className="font-extrabold text-slate-900 text-sm">
+                  {hasConfig ? est.tradeName || est.corporateName : "Não Configurado"}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  CNPJ: {establishment?.cnpj || "—"} ({establishment?.state || "SP"})
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20">
-                <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>CERTIFICADO A1</span>
-                  <ShieldCheck
-                    className={`w-4 h-4 ${
-                      establishment?.hasCertificate ? "text-emerald-400" : "text-amber-400"
-                    }`}
-                  />
-                </div>
-                <div className="mt-2 text-lg font-bold text-white">
-                  {establishment?.hasCertificate ? "Ativo & Criptografado" : "Pendente"}
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  {establishment?.certificateExpiration
-                    ? `Expira em: ${new Date(establishment.certificateExpiration).toLocaleDateString("pt-BR")}`
-                    : "Carregue o .pfx nas configurações"}
+                <div className="text-[11px] text-slate-500">
+                  {hasConfig ? `CNPJ: ${est.cnpj} • ${est.state}` : "Preencha na aba Cadastros Fiscais"}
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20">
-                <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>QR CODE NFC-E (NT 2025.001)</span>
-                  <QrCode
-                    className={`w-4 h-4 ${
-                      establishment?.qrCodeVersion === 3 ? "text-emerald-400" : "text-purple-400"
-                    }`}
-                  />
+              {/* Card 2: Certificado Digital A1 */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Certificado A1</span>
+                  <ShieldCheck className={`w-4 h-4 ${cert ? "text-emerald-500" : "text-amber-500"}`} />
                 </div>
-                <div className="mt-2 text-lg font-bold text-white">
-                  {establishment?.qrCodeVersion === 3 ? "Versão 3.00 (Ativa)" : "Versão 2.00 (Legado)"}
+                <div className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                  {cert ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span>Ativo & Carregado</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span>Pendente de Envio</span>
+                    </>
+                  )}
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate">
-                  {establishment?.qrCodeVersion === 3
-                    ? "Online sem CSC • Conforme NT 2025.001"
-                    : (establishment?.cscMasked || "Exige CSC registrado")}
+                <div className="text-[11px] text-slate-500">
+                  {cert ? `Validade: ${new Date(cert.validUntilUtc).toLocaleDateString("pt-BR")}` : "Carregue o arquivo .pfx"}
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20">
-                <div className="flex items-center justify-between text-slate-400 text-xs">
-                  <span>SEQUÊNCIA ATUAL</span>
-                  <CheckCircle2 className="w-4 h-4 text-purple-400" />
+              {/* Card 3: QR Code & CSC */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">QR Code NFC-e</span>
+                  <QrCode className="w-4 h-4 text-indigo-600" />
                 </div>
-                <div className="mt-2 text-lg font-bold text-white">
-                  Série {establishment?.nfceDefaultSeries || 1} • Nº {establishment?.nfceNextNumber || 1}
+                <div className="font-extrabold text-slate-900 text-sm">
+                  {csc ? "Versão 2.0 (NT 2025.001)" : "CSC Pendente"}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  SP Nov/2026: Descontinuidade de inutilização
+                <div className="text-[11px] text-slate-500">
+                  {csc ? `Token ID: ${csc.cscId} (${csc.cscTokenMasked})` : "Exige CSC da SEFAZ"}
+                </div>
+              </div>
+
+              {/* Card 4: Sequência & Série */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Sequência Atual</span>
+                  <FileCode className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="font-extrabold text-slate-900 text-sm font-mono">
+                  Série {hasConfig ? est.nfceDefaultSeries : 1} • Nº {hasConfig ? est.nfceNextNumber : 1}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {hasConfig ? est.environment : "SEFAZ-SP Produção"}
                 </div>
               </div>
             </div>
 
-            {/* Guia Operacional */}
-            <div className="p-6 rounded-2xl bg-[#0D111A] border border-purple-900/30">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-purple-400" />
-                Arquitetura de Emissão Fiscal com Zeus DFe.NET
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4 text-sm text-slate-300">
-                <div className="p-4 rounded-xl bg-[#090C14] border border-slate-800">
-                  <span className="font-semibold text-purple-300 block mb-1">
-                    1. Autonomia & Sem Custos
-                  </span>
-                  Diferente de APIs pagas que cobram R$ 0,10 a R$ 0,50 por documento, o motor Zeus roda diretamente no runtime .NET 10 do ERP, comunicando com a SEFAZ de forma ilimitada e com código aberto auditado.
+            {/* Banner de Arquitetura Fiscal */}
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 text-purple-300 font-extrabold text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Motor Fiscal Próprio com Zeus DFe .NET</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-sm text-white">1. Custo Zero por Emissão</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Diferente de APIs pagas que cobram R$ 0,10 a R$ 0,50 por nota emitida, o HB Studio conecta diretamente ao webservice oficial da SEFAZ-SP sem intermediários.
+                  </p>
                 </div>
-                <div className="p-4 rounded-xl bg-[#090C14] border border-slate-800">
-                  <span className="font-semibold text-purple-300 block mb-1">
-                    2. Resiliência & Contingência
-                  </span>
-                  A emissão balcão gera o QR Code V2 conforme os manuais técnicos de SP. Em oscilações de rede da fazenda estadual, o PDV gera contingência offline e transmite assim que restabelecido.
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-sm text-white">2. Contingência Offline Automática</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Em caso de instabilidade na SEFAZ estadual, o balcão emite a NFC-e em modo de contingência offline instantaneamente e transmite assim que o sinal for restabelecido.
+                  </p>
                 </div>
-                <div className="p-4 rounded-xl bg-[#090C14] border border-slate-800">
-                  <span className="font-semibold text-purple-300 block mb-1">
-                    3. Conformidade SEFAZ-SP 2026
-                  </span>
-                  Totalmente adequado à instrução de São Paulo de 01/11/2026 que dispensou o processo formal de inutilização de números pulados, mantendo integridade sequencial garantida no banco de dados.
+
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-sm text-white">3. Armazenamento Blindado no Neon</h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Certificados A1 e tokens CSC são criptografados com algoritmo AES-256 no banco de dados Neon, garantindo conformidade com a LGPD e sigilo fiscal.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ABA: NFC-e Emitidas */}
-        {activeTab === "documents" && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20 overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="text-xs uppercase bg-[#090C14] text-slate-400 border-b border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Série / Número</th>
-                    <th className="py-3 px-4">Chave de Acesso (44 Dígitos)</th>
-                    <th className="py-3 px-4">Data Emissão</th>
-                    <th className="py-3 px-4">Valor Total</th>
-                    <th className="py-3 px-4">Destinatário</th>
-                    <th className="py-3 px-4">Status SEFAZ</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {documents.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500">
-                        Nenhuma NFC-e emitida até o momento. Conclua uma venda no PDV Balcão para emitir.
-                      </td>
-                    </tr>
-                  ) : (
-                    documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-850/40 transition">
-                        <td className="py-3 px-4 font-mono font-medium text-white">
-                          S{doc.series} • Nº {doc.number}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-400 truncate max-w-xs">
-                          {doc.accessKey}
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          {new Date(doc.issuedAtUtc).toLocaleString("pt-BR")}
-                        </td>
-                        <td className="py-3 px-4 font-medium text-emerald-400">
-                          R$ {doc.totalAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          {doc.recipientCpf ? `CPF: ${doc.recipientCpf}` : "Consumidor Não Identificado"}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              doc.status === "Authorized"
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : doc.status === "Cancelled"
-                                ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            }`}
-                          >
-                            {doc.status === "Authorized"
-                              ? "Autorizada SEFAZ"
-                              : doc.status === "Cancelled"
-                              ? "Cancelada"
-                              : doc.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {doc.qrCodeUrl && (
-                              <a
-                                href={doc.qrCodeUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Abrir QR Code Consulta Pública"
-                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-400 border border-slate-700"
-                              >
-                                <QrCode className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            {doc.status === "Authorized" && (
-                              <button
-                                onClick={() => setSelectedDocForCancel(doc)}
-                                title="Cancelar NFC-e"
-                                className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/40 text-xs font-medium flex items-center gap-1"
-                              >
-                                <Ban className="w-3.5 h-3.5" />
-                                Cancelar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+        {/* ABA 2: CADASTROS FISCAIS COMPLETOS */}
+        {activeTab === "cadastros" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Coluna 1 e 2: Dados Cadastrais da Empresa */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-5">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="text-base font-black text-slate-900">
+                  Dados do Estabelecimento Fiscal (Emissor)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Preencha rigorosamente conforme o Cartão CNPJ e a Inscrição Estadual (CADESP) de São Paulo.
+                </p>
+              </div>
 
-            {/* Modal de Cancelamento de NFC-e */}
-            {selectedDocForCancel && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-                <div className="bg-[#0D111A] border border-purple-900/40 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Ban className="w-5 h-5 text-rose-400" />
-                    Cancelar NFC-e Nº {selectedDocForCancel.number}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-2">
-                    A SEFAZ exige justificativa de no mínimo 15 caracteres para deferir o cancelamento.
-                  </p>
-                  <form onSubmit={handleCancelDoc} className="mt-4 space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">
-                        Justificativa do Cancelamento
-                      </label>
-                      <textarea
-                        rows={3}
-                        required
-                        value={cancelJustification}
-                        onChange={(e) => setCancelJustification(e.target.value)}
-                        placeholder="Ex: Cancelamento em razão de desistência da compra pelo cliente no balcão."
-                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-purple-500"
+              <form onSubmit={handleSaveEstablishment} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Razão Social *</label>
+                    <input
+                      type="text"
+                      value={corporateName}
+                      onChange={(e) => setCorporateName(e.target.value)}
+                      required
+                      placeholder="Ex: HB STUDIO LTDA"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Nome Fantasia</label>
+                    <input
+                      type="text"
+                      value={tradeName}
+                      onChange={(e) => setTradeName(e.target.value)}
+                      placeholder="Ex: HB Studio"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">CNPJ (14 dígitos) *</label>
+                    <input
+                      type="text"
+                      value={cnpj}
+                      onChange={(e) => setCnpj(e.target.value)}
+                      required
+                      placeholder="00.000.000/0000-00"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Inscrição Estadual (IE) *</label>
+                    <input
+                      type="text"
+                      value={stateRegistration}
+                      onChange={(e) => setStateRegistration(e.target.value)}
+                      required
+                      placeholder="Ex: 111.222.333.444"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Inscrição Municipal</label>
+                    <input
+                      type="text"
+                      value={municipalRegistration}
+                      onChange={(e) => setMunicipalRegistration(e.target.value)}
+                      placeholder="Opcional para comércio"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Regime Tributário</label>
+                    <select
+                      value={regime}
+                      onChange={(e) => setRegime(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    >
+                      <option value="1">Simples Nacional</option>
+                      <option value="2">Simples Nacional - Excesso Sublimite</option>
+                      <option value="3">Regime Normal (Presumido/Real)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Ambiente SEFAZ</label>
+                    <select
+                      value={environment}
+                      onChange={(e) => setEnvironment(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-purple-700"
+                    >
+                      <option value="1">Produção (Validade Jurídica)</option>
+                      <option value="2">Homologação (Testes sem valor fiscal)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">CNAE Principal</label>
+                    <input
+                      type="text"
+                      value={cnae}
+                      onChange={(e) => setCnae(e.target.value)}
+                      placeholder="4751-2/01"
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço do Estabelecimento */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <span className="text-xs font-extrabold text-slate-700 block">Endereço da Loja / Filial</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-2 space-y-1">
+                      <input
+                        type="text"
+                        placeholder="Logradouro (Ex: Av. Paulista)"
+                        value={street}
+                        onChange={(e) => setStreet(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
                       />
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDocForCancel(null)}
-                        className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
-                      >
-                        Abortar
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting || cancelJustification.length < 15}
-                        className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-2"
-                      >
-                        {isSubmitting ? "Transmitindo..." : "Confirmar Cancelamento SEFAZ"}
-                      </button>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="Número (Ex: 1000)"
+                        value={number}
+                        onChange={(e) => setNumber(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      />
                     </div>
-                  </form>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="Bairro (Ex: Bela Vista)"
+                        value={neighborhood}
+                        onChange={(e) => setNeighborhood(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="Município (Ex: São Paulo)"
+                        value={cityName}
+                        onChange={(e) => setCityName(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="UF (Ex: SP)"
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl uppercase"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        placeholder="CEP (Ex: 01310-100)"
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Séries e Numeração */}
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Série Padrão NFC-e</label>
+                    <input
+                      type="number"
+                      value={nfceDefaultSeries}
+                      onChange={(e) => setNfceDefaultSeries(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-extrabold text-slate-700">Próximo Número NFC-e</label>
+                    <input
+                      type="number"
+                      value={nfceNextNumber}
+                      onChange={(e) => setNfceNextNumber(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{saving ? "Salvando..." : "Salvar Estabelecimento no Neon"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Coluna 3: Certificado Digital A1 e CSC */}
+            <div className="space-y-6">
+              {/* Card Certificado A1 */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-purple-700">
+                  <ShieldCheck className="w-5 h-5" />
+                  <h3 className="text-sm font-black text-slate-900">Certificado Digital A1 (.pfx)</h3>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  O certificado A1 assina digitalmente as NFC-es perante a SEFAZ. O arquivo é criptografado com chave AES-256 no Neon.
+                </p>
+
+                {cert ? (
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Certificado Instalado
+                    </div>
+                    <div className="text-[11px] text-slate-600 font-mono truncate">
+                      Thumbprint: {cert.thumbprint}
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      Válido até: <strong>{new Date(cert.validUntilUtc).toLocaleDateString("pt-BR")}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Nenhum certificado A1 ativo. Envie abaixo.</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleUploadCert} className="space-y-3 pt-2">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Arquivo PFX/P12</label>
+                    <input
+                      type="file"
+                      accept=".pfx,.p12"
+                      onChange={(e) => setPfxFile(e.target.files?.[0] || null)}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Senha do Certificado</label>
+                    <input
+                      type="password"
+                      placeholder="Senha do .pfx"
+                      value={pfxPassword}
+                      onChange={(e) => setPfxPassword(e.target.value)}
+                      className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={saving || !pfxFile || !pfxPassword}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <UploadCloud className="w-4 h-4 text-purple-400" />
+                    <span>Carregar Certificado A1</span>
+                  </button>
+                </form>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* ABA: XML de Entrada */}
-        {activeTab === "inbound" && (
-          <div className="space-y-6">
-            {/* Upload e Importação de XML */}
-            <div className="p-6 rounded-2xl bg-[#0D111A] border border-purple-900/30">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <UploadCloud className="w-5 h-5 text-purple-400" />
-                Importar XML de NF-e de Entrada (Fornecedor)
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                O arquivo é analisado com proteção contra XXE (XML External Entity injection). Vincula dados ao catálogo sem duplicar estoque de forma cega.
-              </p>
-              <form onSubmit={handleImportInboundXml} className="mt-4 space-y-4">
-                <textarea
-                  rows={4}
-                  value={xmlToImport}
-                  onChange={(e) => setXmlToImport(e.target.value)}
-                  placeholder="Cole aqui o conteúdo XML da nota fiscal emitida pelo fornecedor..."
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:ring-1 focus:ring-purple-500"
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !xmlToImport.trim()}
-                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-2"
-                >
-                  <UploadCloud className="w-4 h-4" />
-                  {isSubmitting ? "Importando..." : "Validar e Importar NF-e"}
-                </button>
-              </form>
-            </div>
+              {/* Card Código de Segurança do Contribuinte (CSC) */}
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-indigo-700">
+                  <KeyRound className="w-5 h-5" />
+                  <h3 className="text-sm font-black text-slate-900">Código de Segurança (CSC)</h3>
+                </div>
 
-            {/* Listagem de Notas de Entrada */}
-            <div className="p-4 rounded-xl bg-[#0D111A] border border-purple-900/20 overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="text-xs uppercase bg-[#090C14] text-slate-400 border-b border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Série / Número</th>
-                    <th className="py-3 px-4">Chave de Entrada</th>
-                    <th className="py-3 px-4">Fornecedor</th>
-                    <th className="py-3 px-4">Data Emissão</th>
-                    <th className="py-3 px-4">Total Produtos</th>
-                    <th className="py-3 px-4">Total Nota</th>
-                    <th className="py-3 px-4">Status Conciliação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {inboundDocs.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-500">
-                        Nenhum XML de entrada importado.
-                      </td>
-                    </tr>
-                  ) : (
-                    inboundDocs.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-850/40 transition">
-                        <td className="py-3 px-4 font-mono font-medium text-white">
-                          S{doc.series} • Nº {doc.number}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs text-slate-400 truncate max-w-xs">
-                          {doc.accessKey}
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          <span className="font-semibold text-white block">{doc.supplierName}</span>
-                          <span className="text-slate-500">CNPJ: {doc.supplierCnpj}</span>
-                        </td>
-                        <td className="py-3 px-4 text-xs">
-                          {new Date(doc.issuedAtUtc).toLocaleDateString("pt-BR")}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-xs">
-                          R$ {doc.totalProductsAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-4 font-mono font-medium text-emerald-400 text-xs">
-                          R$ {doc.totalInvoiceAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                            XML Retido & Auditado
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                <p className="text-xs text-slate-500">
+                  O CSC é fornecido no portal da SEFAZ-SP para geração do QR Code de consulta do consumidor no cupom fiscal.
+                </p>
+
+                {csc ? (
+                  <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200 text-xs text-indigo-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-indigo-600" /> CSC Registrado no Neon
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-600">
+                      ID: {csc.cscId} • Token: {csc.cscTokenMasked}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>CSC ainda não cadastrado.</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveCsc} className="space-y-3 pt-2">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">ID do CSC</label>
+                    <input
+                      type="text"
+                      placeholder="000001"
+                      value={cscId}
+                      onChange={(e) => setCscId(e.target.value)}
+                      className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Código Token CSC (36 caracteres)</label>
+                    <input
+                      type="password"
+                      placeholder="Cole o código gerado no CADESP"
+                      value={cscToken}
+                      onChange={(e) => setCscToken(e.target.value)}
+                      className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={saving || !cscToken}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Registrar Token CSC</span>
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ABA: Configurações, Certificado e CSC */}
-        {activeTab === "settings" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Certificado Digital A1 */}
-            <div className="p-6 rounded-2xl bg-[#0D111A] border border-purple-900/30">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-purple-400" />
-                Certificado Digital A1 (.pfx)
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                O arquivo .pfx e a senha são encriptados com AES-256 em repouso no banco de dados. Nunca trafegam descriptografados.
-              </p>
-              <form onSubmit={handleSubmitCertificate} className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Arquivo do Certificado (.pfx)
-                  </label>
-                  <input
-                    type="file"
-                    accept=".pfx,.p12"
-                    onChange={handleCertificateUpload}
-                    className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Senha do Certificado A1
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={pfxPassword}
-                    onChange={(e) => setPfxPassword(e.target.value)}
-                    placeholder="Digite a senha de emissão do certificado..."
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-purple-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !pfxBase64}
-                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  {isSubmitting ? "Importando..." : "Importar & Criptografar Certificado"}
-                </button>
-              </form>
+        {/* ABA 3: DOCUMENTOS EMITIDOS */}
+        {activeTab === "documents" && (
+          <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Cupons Fiscais NFC-e Emitidos
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Rastreabilidade completa de autorização na SEFAZ-SP, chaves de acesso de 44 dígitos e protocolos.
+                </p>
+              </div>
             </div>
 
-            {/* Código de Segurança do Contribuinte (CSC) */}
-            <div className="p-6 rounded-2xl bg-[#0D111A] border border-purple-900/30">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-purple-400" />
-                Código de Segurança do Contribuinte (CSC - SEFAZ/SP)
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Necessário para o cálculo do hash SHA-1 do QR Code de consulta pública no balcão de vendas.
+            <div className="p-8 text-center text-slate-400 space-y-2">
+              <FileCheck2 className="w-10 h-10 text-slate-300 mx-auto" />
+              <div className="font-bold text-sm text-slate-600">Nenhum cupom fiscal emitido ainda</div>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Assim que você concluir uma venda no PDV ou no balcão com o estabelecimento e certificado configurados, a NFC-e será autorizada e listada aqui.
               </p>
-              <form onSubmit={handleRegisterCsc} className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Identificador do CSC (IdToken)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={cscId}
-                    onChange={(e) => setCscId(e.target.value)}
-                    placeholder="Ex: 000001"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Token Alfa-Numérico CSC
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={cscToken}
-                    onChange={(e) => setCscToken(e.target.value)}
-                    placeholder="Cole o token CSC fornecido pelo portal da SEFAZ-SP..."
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:ring-1 focus:ring-purple-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !cscToken.trim()}
-                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  {isSubmitting ? "Gravando..." : "Homologar e Salvar Token CSC"}
-                </button>
-              </form>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </RootShellLayout>
   );
 }
