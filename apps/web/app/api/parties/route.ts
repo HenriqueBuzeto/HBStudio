@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
 import { authorizeFleet, guardOrigin, FleetError } from "@/lib/fleet-session";
 import crypto from "crypto";
 
@@ -14,8 +13,10 @@ export async function GET(request: NextRequest) {
     const tenantId = ctx.tenantId;
 
     const search = searchParams.get("search")?.trim() || "";
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20", 10)));
+    const pageInput = Number(searchParams.get("page") || "1");
+    const sizeInput = Number(searchParams.get("pageSize") || "20");
+    const page = Number.isSafeInteger(pageInput) && pageInput > 0 ? pageInput : 1;
+    const pageSize = Number.isSafeInteger(sizeInput) && sizeInput > 0 ? Math.min(sizeInput, 100) : 20;
     const offset = (page - 1) * pageSize;
 
     const sql = ctx.db;
@@ -46,7 +47,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       params.push(`%${search.toLowerCase()}%`);
       const idx = params.length;
-      query += ` AND (LOWER(p."Name") LIKE $${idx} OR LOWER(COALESCE(p."TradeName", '')) LIKE $${idx} OR p."DocumentNumber" LIKE $${idx})`;
+      const documentSearch = ctx.permissions.has("customers.sensitive.view") ? ` OR p."DocumentNumber" LIKE ${idx}` : "";
+      query += ` AND (LOWER(p."Name") LIKE ${idx} OR LOWER(COALESCE(p."TradeName", '')) LIKE ${idx}${documentSearch})`;
     }
 
     if (onlyCustomers || !ctx.permissions.has("suppliers.view")) {
