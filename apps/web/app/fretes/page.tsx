@@ -675,7 +675,7 @@ export default function FretesPage() {
                     Mesmo com o desconto máximo permitido de {pricingSim.maxCounterDiscountPct}%, a empresa retém <strong className="text-emerald-700 font-bold">R$ {profitAtMaxDiscount.toFixed(2)} ({marginPctAtMaxDiscount.toFixed(1)}%)</strong> de lucro líquido!
                   </p>
                   <button
-                    onClick={() => alert("Preço aprovado pelo sócio! Atualizado oficialmente no Catálogo e PDV Balcão sem expor custos ao cliente.")}
+                    disabled title="Precificação ainda não vinculada ao Catálogo e PDV reais"
                     className="mt-3.5 w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white font-bold text-xs transition-all shadow-md shadow-purple-600/20"
                   >
                     Aprovar & Publicar no Catálogo / PDV
