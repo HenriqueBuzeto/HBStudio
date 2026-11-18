@@ -28,6 +28,23 @@
 - Chaves granulares adicionadas ao `PermissionCatalog.cs`. Grant inicial SOMENTE aos papéis que já detêm `access.manage`; nomes de cargos não concedem permissões.
 - **Nenhuma tabela antiga foi excluída, apagada, truncada ou sobrescrita. Nenhum cliente/recompensa de demonstração foi inserido na base oficial.**
 
+## Homologação de implantação em 18/11/2026
+
+**Neon PostgreSQL oficial — migração aditiva aplicada:**
+- 5 tabelas novas: `loyalty_settings`, `loyalty_accounts`, `loyalty_rewards`, `loyalty_redemptions`, `loyalty_ledger`.
+- 7 gatilhos instalados, associados às contas, reservas, extrato, pagamentos e devoluções.
+- 3 permissões `loyalty.*` concedidas ao papel administrativo já autorizado por `access.manage` do tenant principal.
+- **0 configurações, 0 contas, 0 recompensas, 0 resgates, 0 lançamentos** inicialmente no banco oficial. Nenhuma informação de teste transferida da QA.
+- Aplicação transacional de 27 comandos de criação/adaptação sem executar DROP de objetos antigos nem exclusões. Checagem prévia: zero objetos com prefixo loyalty.
+
+**Validação SQL:** `EXPLAIN` no Neon QA dos comandos das rotas de política, cadastro de recompensa, mudança de status, reserva e processamento de resgate: 5/5 compatíveis, sem mutações.
+
+**GitHub CI:** após configuração do PostgreSQL 18 efêmero com migrações EF Core, o Next.js e a suíte .NET completa retornaram **success** no workflow `Loyalty Enterprise Gate` (run #44365749528).
+
+**Gate ainda pendente:** teste E2E no navegador da Vercel com sessão autenticada, post de recompensa real controlada e confirmação de recarga F5. Emissão automática de cashback monetário no PDV segue bloqueada.
+
+---
+
 ## API Vercel
 
 | Rota | Métodos | Acesso |
