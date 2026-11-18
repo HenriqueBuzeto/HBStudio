@@ -493,11 +493,10 @@ export default function ProcurementPage() {
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setCanViewCost(!canViewCost)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                canViewCost
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-slate-100 text-slate-600 border-slate-300"
-              }`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${canViewCost
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-slate-100 text-slate-600 border-slate-300"
+                }`}
               title="Alternar visibilidade de custos"
             >
               {canViewCost ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -590,11 +589,10 @@ export default function ProcurementPage() {
         <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-6 rounded-t-2xl pt-2 shadow-xs">
           <button
             onClick={() => setActiveTab("orders")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "orders"
-                ? "border-purple-600 text-purple-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === "orders"
+              ? "border-purple-600 text-purple-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
           >
             <ShoppingCart className="w-4 h-4" />
             Pedidos de Compra ({orders.length})
@@ -602,11 +600,10 @@ export default function ProcurementPage() {
 
           <button
             onClick={() => setActiveTab("receipts")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "receipts"
-                ? "border-purple-600 text-purple-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === "receipts"
+              ? "border-purple-600 text-purple-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
           >
             <PackageCheck className="w-4 h-4" />
             Conferência & Recebimentos ({receipts.length})
@@ -614,11 +611,10 @@ export default function ProcurementPage() {
 
           <button
             onClick={() => setActiveTab("used_devices")}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "used_devices"
-                ? "border-purple-600 text-purple-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === "used_devices"
+              ? "border-purple-600 text-purple-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
           >
             <Gamepad2 className="w-4 h-4" />
             Aquisição de Usados & Eletrônicos ({usedDevices.length})
@@ -678,14 +674,13 @@ export default function ProcurementPage() {
                           {po.supplierName || "Fornecedor"}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            po.status === "Received" ? "bg-emerald-100 text-emerald-800" :
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${po.status === "Received" ? "bg-emerald-100 text-emerald-800" :
                             po.status === "PartiallyReceived" ? "bg-amber-100 text-amber-800" :
-                            po.status === "Approved" ? "bg-blue-100 text-blue-800" :
-                            "bg-slate-100 text-slate-700"
-                          }`}>
+                              po.status === "Approved" ? "bg-blue-100 text-blue-800" :
+                                "bg-slate-100 text-slate-700"
+                            }`}>
                             {po.status === "PartiallyReceived" ? "Parcialmente Recebido" :
-                             po.status === "Approved" ? "Aprovado" : po.status}
+                              po.status === "Approved" ? "Aprovado" : po.status}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-600">
@@ -865,11 +860,10 @@ export default function ProcurementPage() {
                             : "••••••"}
                         </td>
                         <td className="py-3 px-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            ud.status === "ReceivedInStock"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-purple-100 text-purple-800"
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${ud.status === "ReceivedInStock"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-purple-100 text-purple-800"
+                            }`}>
                             {ud.status === "ReceivedInStock" ? "No Estoque" : "Em Avaliação"}
                           </span>
                         </td>
@@ -1050,11 +1044,10 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("computador_gamer")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      selectedCategory === "computador_gamer"
-                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
-                    }`}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${selectedCategory === "computador_gamer"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
                   >
                     <Cpu className="w-4 h-4 shrink-0" />
                     <div className="text-xs font-bold leading-tight">PC Gamer / Desktop</div>
@@ -1063,11 +1056,10 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("videogame")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      selectedCategory === "videogame"
-                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
-                    }`}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${selectedCategory === "videogame"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
                   >
                     <Gamepad2 className="w-4 h-4 shrink-0" />
                     <div className="text-xs font-bold leading-tight">Videogame / Console</div>
@@ -1076,11 +1068,10 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("smartphone")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      selectedCategory === "smartphone"
-                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
-                    }`}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${selectedCategory === "smartphone"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
                   >
                     <Smartphone className="w-4 h-4 shrink-0" />
                     <div className="text-xs font-bold leading-tight">Smartphone / Celular</div>
@@ -1089,11 +1080,10 @@ export default function ProcurementPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("notebook")}
-                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
-                      selectedCategory === "notebook"
-                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
-                    }`}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${selectedCategory === "notebook"
+                      ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-purple-300"
+                      }`}
                   >
                     <Laptop className="w-4 h-4 shrink-0" />
                     <div className="text-xs font-bold leading-tight">Notebook / Laptop</div>
@@ -1238,8 +1228,8 @@ export default function ProcurementPage() {
                       {selectedCategory === "computador_gamer"
                         ? "Serial / Tag da Máquina *"
                         : selectedCategory === "videogame"
-                        ? "Serial do Console (Sony / MS / Nintendo) *"
-                        : "Número de Série / Tag *"}
+                          ? "Serial do Console (Sony / MS / Nintendo) *"
+                          : "Número de Série / Tag *"}
                     </label>
                     <input
                       type="text"
