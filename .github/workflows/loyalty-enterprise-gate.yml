@@ -23,6 +23,20 @@ jobs:
         run: npm run build
   dotnet:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: hbstudio_erp_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres -d hbstudio_erp_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
