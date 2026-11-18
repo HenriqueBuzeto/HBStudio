@@ -73,82 +73,10 @@ interface MaintenancePlan {
 export default function FretesPage() {
   const [activeTab, setActiveTab] = useState<"trips" | "fueling" | "vehicles" | "maintenance" | "pricing">("trips");
   
-  // Data states
-  const [vehicles, setVehicles] = useState<Vehicle[]>([
-    {
-      id: "veh-1",
-      plate: "BRA2E19",
-      brand: "Volkswagen",
-      model: "Gol 1.0 Flex",
-      year: 2022,
-      ownership: "CompanyOwned",
-      fuel: "Flex",
-      currentOdometerKm: 54300,
-      status: "Ativo",
-      isAvailable: true
-    },
-    {
-      id: "veh-2",
-      plate: "RIO1A23",
-      brand: "Fiat",
-      model: "Fiorino 1.4 EVO",
-      year: 2023,
-      ownership: "CompanyOwned",
-      fuel: "Flex",
-      currentOdometerKm: 32150,
-      status: "Ativo",
-      isAvailable: true
-    }
-  ]);
-
-  const [trips, setTrips] = useState<Trip[]>([
-    {
-      id: "trip-1",
-      tripNumber: "VIG-202611-0001",
-      vehicleId: "veh-1",
-      vehiclePlate: "BRA2E19",
-      driverName: "Henrique Barreto",
-      purpose: "Retirada de Lote de iPhones Usados em São Paulo",
-      originCity: "Campinas",
-      destinationCity: "São Paulo",
-      startOdometerKm: 54200,
-      endOdometerKm: 54300,
-      distanceKm: 100,
-      status: "Completed",
-      startedAtUtc: "2026-11-16T10:00:00Z",
-      completedAtUtc: "2026-11-16T13:30:00Z",
-      notes: "Viagem concluída. 5 iPhones 14 Pro 128GB coletados e inspecionados."
-    }
-  ]);
-
-  const [plans, setPlans] = useState<MaintenancePlan[]>([
-    {
-      id: "plan-1",
-      vehicleId: "veh-1",
-      planName: "Troca de Óleo Motor 5W30 + Filtros",
-      targetType: "OilChange",
-      intervalKm: 10000,
-      intervalDays: 180,
-      lastServiceOdometerKm: 50000,
-      nextServiceOdometerKm: 60000,
-      evaluationStatus: "UpToDate",
-      kmRemaining: 5700,
-      daysRemaining: 120
-    },
-    {
-      id: "plan-2",
-      vehicleId: "veh-2",
-      planName: "Revisão Freios e Pastilhas",
-      targetType: "Brakes",
-      intervalKm: 20000,
-      intervalDays: 365,
-      lastServiceOdometerKm: 15000,
-      nextServiceOdometerKm: 35000,
-      evaluationStatus: "Upcoming",
-      kmRemaining: 2850,
-      daysRemaining: 25
-    }
-  ]);
+  // Sem fixtures: toda informação de frota deve vir de persistência real.
+  const [vehicles] = useState<Vehicle[]>([]);
+  const [trips] = useState<Trip[]>([]);
+  const [plans] = useState<MaintenancePlan[]>([]);
 
   // Modal states
   const [showNewTripModal, setShowNewTripModal] = useState(false);
@@ -157,36 +85,36 @@ export default function FretesPage() {
 
   // Forms
   const [newTripForm, setNewTripForm] = useState({
-    vehicleId: "veh-1",
-    driverName: "Henrique Barreto",
-    purpose: "Retirada de Aparelhos",
-    originCity: "Campinas",
-    destinationCity: "São Paulo",
-    startOdometerKm: 54300,
+    vehicleId: "",
+    driverName: "",
+    purpose: "",
+    originCity: "",
+    destinationCity: "",
+    startOdometerKm: 0,
     notes: ""
   });
 
-  const [closeTripEndKm, setCloseTripEndKm] = useState(54400);
+  const [closeTripEndKm, setCloseTripEndKm] = useState(0);
 
   const [fuelingForm, setFuelingForm] = useState({
-    vehicleId: "veh-1",
-    totalAmount: 50.00,
+    vehicleId: "",
+    totalAmount: 0,
     liters: "",
     fuelType: "Gasoline",
     paymentMethod: "CompanyPix",
-    gasStationName: "Posto Shell Rodoanel",
+    gasStationName: "",
     isTripDirectCost: true
   });
 
-  // Precificação Inteligente Demo State
+  // Simulador inicialmente vazio, sem inventar produto, IMEI ou custo
   const [pricingSim, setPricingSim] = useState({
-    imei: "354891092837481",
-    model: "iPhone 14 Pro 128GB Roxo Profundo",
-    baseCost: 3200.00,
-    freightAllocated: 75.00,
-    targetAcquisitionDiscountPct: 15.0, // Desconto-alvo de compra de usados
-    targetMarkupPct: 30.0,              // Markup comercial sobre custo total
-    maxCounterDiscountPct: 5.0,         // Desconto comercial máximo permitido no balcão/PDV
+    imei: "",
+    model: "",
+    baseCost: 0,
+    freightAllocated: 0,
+    targetAcquisitionDiscountPct: 0,
+    targetMarkupPct: 0,
+    maxCounterDiscountPct: 0,
     rounding: "EndingIn90"
   });
 
@@ -207,48 +135,21 @@ export default function FretesPage() {
   const counterDiscountAmount = finalSuggestedPrice * (pricingSim.maxCounterDiscountPct / 100);
   const maxDiscountedPrice = finalSuggestedPrice - counterDiscountAmount;
   const profitAtMaxDiscount = maxDiscountedPrice - totalBaseCost;
-  const marginPctAtMaxDiscount = (profitAtMaxDiscount / maxDiscountedPrice) * 100;
+  const marginPctAtMaxDiscount = maxDiscountedPrice > 0 ? (profitAtMaxDiscount / maxDiscountedPrice) * 100 : 0;
 
+  // Bloquear escritas locais sem backend: nunca informar persistência fictícia.
   const handleCreateTrip = (e: React.FormEvent) => {
     e.preventDefault();
-    const created: Trip = {
-      id: `trip-${Date.now()}`,
-      tripNumber: `VIG-202611-${String(trips.length + 1).padStart(4, "0")}`,
-      vehicleId: newTripForm.vehicleId,
-      vehiclePlate: vehicles.find(v => v.id === newTripForm.vehicleId)?.plate || "BRA2E19",
-      driverName: newTripForm.driverName,
-      purpose: newTripForm.purpose,
-      originCity: newTripForm.originCity,
-      destinationCity: newTripForm.destinationCity,
-      startOdometerKm: Number(newTripForm.startOdometerKm),
-      status: "InProgress",
-      startedAtUtc: new Date().toISOString(),
-      notes: newTripForm.notes
-    };
-    setTrips([created, ...trips]);
-    setShowNewTripModal(false);
+    window.alert("Cadastro de viagens indisponível até a integração com o Neon.");
   };
 
-  const handleCloseTrip = (trip: Trip) => {
-    const endKm = Number(closeTripEndKm);
-    const dist = endKm - trip.startOdometerKm;
-    setTrips(trips.map(t => t.id === trip.id ? {
-      ...t,
-      status: "Completed",
-      endOdometerKm: endKm,
-      distanceKm: dist,
-      completedAtUtc: new Date().toISOString()
-    } : t));
-
-    // Atualiza hodometro do veiculo
-    setVehicles(vehicles.map(v => v.id === trip.vehicleId ? { ...v, currentOdometerKm: endKm } : v));
-    setShowCloseTripModal(null);
+  const handleCloseTrip = (_trip: Trip) => {
+    window.alert("Conclusão de viagens indisponível até a integração com o Neon.");
   };
 
   const handleCreateFueling = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Abastecimento registrado com sucesso!\nValor: R$ ${fuelingForm.totalAmount.toFixed(2)}\nForma de Pagamento: ${fuelingForm.paymentMethod}\nFinanceiro e DRE alimentados sem duplicidade.`);
-    setShowFuelingModal(false);
+    window.alert("Lançamento de combustível indisponível até integração financeira real.");
   };
 
   return (
@@ -270,20 +171,22 @@ export default function FretesPage() {
               Gestão de Fretes, Frota & Custos de Deslocamento
             </h1>
             <p className="text-xs text-slate-500">
-              Controle de viagens, abastecimentos rápidos (R$ 50), planos de manutenção e rateio de frete para composição de custo de estoque (CPC 16).
+              Controle de viagens, abastecimentos, manutenção e rateio de frete. Integração de dados operacionais pendente.
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
-              onClick={() => setShowFuelingModal(true)}
+              disabled
+              title="Aguardando integração com Neon"
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition-colors shadow-xs"
             >
               <Fuel className="w-3.5 h-3.5 text-amber-600" />
-              <span>Abastecer (R$ 50)</span>
+              <span>Abastecer (indisponível)</span>
             </button>
             <button
-              onClick={() => setShowNewTripModal(true)}
+              disabled
+              title="Aguardando integração com Neon"
               className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -305,7 +208,7 @@ export default function FretesPage() {
               {vehicles.length} Veículos
             </div>
             <div className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 100% Operacionais & Disponíveis
+              <CheckCircle2 className="w-3.5 h-3.5" /> Dados de disponibilidade não integrados
             </div>
           </div>
 
@@ -317,10 +220,10 @@ export default function FretesPage() {
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 mt-2">
-              1.420 km
+              —
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              Média de 71 km por deslocamento
+              Sem métricas integradas
             </div>
           </div>
 
@@ -332,10 +235,10 @@ export default function FretesPage() {
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 mt-2">
-              R$ 890,00
+              —
             </div>
             <div className="text-xs text-purple-600 font-semibold mt-1">
-              Alocados em compras e estoque
+              Custo ainda não integrado
             </div>
           </div>
 
@@ -347,10 +250,10 @@ export default function FretesPage() {
               </div>
             </div>
             <div className="text-2xl font-black text-amber-600 mt-2">
-              1 Próxima
+              —
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              Óleo em dia • Freios a revisar
+              Sem histórico de manutenção integrado
             </div>
           </div>
         </div>
@@ -513,44 +416,14 @@ export default function FretesPage() {
                 Regra de Abastecimento Rápido da HB Studio
               </h3>
               <p className="text-xs text-amber-800 mt-1">
-                Lançamento rápido sem litros obrigatórios ("Abasteci R$ 50,00"). Registra a despesa na DRE, atualiza o financeiro conforme a forma de pagamento (se pago por sócio, gera reembolso societário sem duplicar despesa).
+                O lançamento de despesas ficará disponível somente após integrar frota, financeiro e DRE ao Neon.
               </p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
               <h4 className="text-sm font-extrabold text-slate-900">Últimos Lançamentos de Combustível & Despesas</h4>
-              <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
-                      <Fuel className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Posto Shell Rodoanel • Gasolina Comum</div>
-                      <div className="text-xs text-slate-500">Veículo: Gol 1.0 Flex (BRA2E19) • Condutor: Henrique Barreto</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base font-black text-emerald-600">R$ 50,00</div>
-                    <div className="text-xs text-slate-500">Pix Empresa (Liquidado à Vista)</div>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                      <DollarSign className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Pedágio Rodovia dos Bandeirantes</div>
-                      <div className="text-xs text-slate-500">Despesa de Viagem: Retirada de iPhones em SP</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base font-black text-slate-900">R$ 12,40</div>
-                    <div className="text-xs text-purple-600 font-semibold">Sem Parar (Contas a Pagar)</div>
-                  </div>
-                </div>
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-5 text-xs text-slate-500">
+                Nenhum lançamento demonstrativo será exibido. Histórico aguardando integração com Neon.
               </div>
             </div>
           </div>
