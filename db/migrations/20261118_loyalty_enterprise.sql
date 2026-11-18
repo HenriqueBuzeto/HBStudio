@@ -244,8 +244,8 @@ BEGIN
  INSERT INTO loyalty_ledger ("TenantId","PartyId","RedemptionId","EventKey","Kind","PointsDelta","ActorId","RulesSnapshot")
    VALUES (v_tenant,v_party,new_id,'REDEEM:'||new_id::text,'REDEEM',-rw."PointsCost",v_actor,
    jsonb_build_object('rewardTitle',rw."Title",'rewardKind',rw."Kind",'pointsCost',rw."PointsCost"));
- UPDATE loyalty_accounts SET "PointsBalance"="PointsBalance"-rw."PointsCost",
-    "LifetimeRedeemed"="LifetimeRedeemed"+rw."PointsCost","UpdatedAtUtc"=now()
+ UPDATE loyalty_accounts a SET "PointsBalance"=a."PointsBalance"-rw."PointsCost",
+    "LifetimeRedeemed"=a."LifetimeRedeemed"+rw."PointsCost","UpdatedAtUtc"=now()
  WHERE "TenantId"=v_tenant AND "PartyId"=v_party;
  INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action","ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version")
  VALUES (gen_random_uuid(),v_tenant,v_branch,'LoyaltyRedemption',new_id::text,'Reserved',v_actor,v_email,v_correlation,
@@ -275,8 +275,8 @@ BEGIN
   INSERT INTO loyalty_ledger ("TenantId","PartyId","RedemptionId","EventKey","Kind","PointsDelta","ActorId","RulesSnapshot")
    VALUES (v_tenant,rd."PartyId",rd."Id",'REDEEM_REFUND:'||rd."Id"::text,'REDEEM_REFUND',rd."PointsSpent",v_actor,
     jsonb_build_object('reason',left(v_notes,500)));
-  UPDATE loyalty_accounts SET "PointsBalance"="PointsBalance"+rd."PointsSpent",
-   "LifetimeRedeemed"="LifetimeRedeemed"-rd."PointsSpent","UpdatedAtUtc"=now()
+  UPDATE loyalty_accounts a SET "PointsBalance"=a."PointsBalance"+rd."PointsSpent",
+   "LifetimeRedeemed"=a."LifetimeRedeemed"-rd."PointsSpent","UpdatedAtUtc"=now()
    WHERE "TenantId"=v_tenant AND "PartyId"=rd."PartyId";
  ELSE RAISE EXCEPTION 'LOYALTY_INVALID_ACTION' USING ERRCODE='P0001'; END IF;
  INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action","ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version")
