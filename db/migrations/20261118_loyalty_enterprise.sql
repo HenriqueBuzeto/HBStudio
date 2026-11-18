@@ -3,11 +3,13 @@
 CREATE TABLE IF NOT EXISTS loyalty_settings (
   "TenantId" uuid PRIMARY KEY REFERENCES tenants("Id") ON DELETE RESTRICT,
   "Enabled" boolean NOT NULL DEFAULT false,
+  "EnabledSinceUtc" timestamptz,
   "EarnEveryCents" integer NOT NULL DEFAULT 500 CHECK ("EarnEveryCents">0),
   "PointsPerStep" integer NOT NULL DEFAULT 1 CHECK ("PointsPerStep">0 AND "PointsPerStep"<=100),
   "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
   "UpdatedAtUtc" timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE loyalty_settings ADD COLUMN IF NOT EXISTS "EnabledSinceUtc" timestamptz;
 CREATE TABLE IF NOT EXISTS loyalty_accounts (
   "TenantId" uuid NOT NULL REFERENCES tenants("Id") ON DELETE RESTRICT,
   "PartyId" uuid NOT NULL REFERENCES parties("Id") ON DELETE RESTRICT,
@@ -83,6 +85,16 @@ CREATE OR REPLACE FUNCTION loyalty_validate_tenant() RETURNS trigger LANGUAGE pl
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM parties WHERE "Id"=NEW."PartyId" AND "TenantId"=NEW."TenantId")
  THEN RAISE EXCEPTION 'Loyalty party tenant mismatch' USING ERRCODE='23514'; END IF;
+ IF TG_TABLE_NAME='loyalty_redemptions' THEN
+   IF NOT EXISTS(SELECT 1 FROM loyalty_rewards WHERE "Id"=NEW."RewardId" AND "TenantId"=NEW."TenantId")
+      OR NOT EXISTS(SELECT 1 FROM users WHERE "Id"=NEW."RedeemedByUserId" AND "TenantId"=NEW."TenantId")
+   THEN RAISE EXCEPTION 'Reward/actor tenant mismatch' USING ERRCODE='23514'; END IF;
+ ELSIF TG_TABLE_NAME='loyalty_ledger' THEN
+   IF NEW."SaleId" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM sales WHERE "Id"=NEW."SaleId" AND "TenantId"=NEW."TenantId")
+   THEN RAISE EXCEPTION 'Sale tenant mismatch' USING ERRCODE='23514'; END IF;
+   IF NEW."RedemptionId" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM loyalty_redemptions WHERE "Id"=NEW."RedemptionId" AND "TenantId"=NEW."TenantId" AND "PartyId"=NEW."PartyId")
+   THEN RAISE EXCEPTION 'Redemption tenant mismatch' USING ERRCODE='23514'; END IF;
+ END IF;
  RETURN NEW;
 END;$$;
 DROP TRIGGER IF EXISTS "TR_loyalty_account_tenant" ON loyalty_accounts;
@@ -100,7 +112,7 @@ BEGIN
  IF NOT FOUND OR v_sale."CustomerPartyId" IS NULL OR v_sale."Status" NOT IN (4,5)
    OR v_sale."PaymentStatus"<>4 OR v_sale."ConfirmedAtUtc" IS NULL THEN RETURN; END IF;
  SELECT * INTO v_settings FROM loyalty_settings WHERE "TenantId"=v_sale."TenantId" AND "Enabled"=true;
- IF NOT FOUND THEN RETURN; END IF;
+ IF NOT FOUND OR v_settings."EnabledSinceUtc" IS NULL OR v_sale."ConfirmedAtUtc"<v_settings."EnabledSinceUtc" THEN RETURN; END IF;
  IF NOT EXISTS(SELECT 1 FROM parties WHERE "Id"=v_sale."CustomerPartyId" AND "TenantId"=v_sale."TenantId" AND "IsActive"=true) THEN RETURN; END IF;
  SELECT GREATEST(0,round((COALESCE(SUM(i."Quantity"*i."UnitPrice"-i."Discount"),0)
     -v_sale."DiscountTotal"+v_sale."ChargesTotal")*100)::bigint) INTO v_total_cents
@@ -128,7 +140,7 @@ CREATE OR REPLACE FUNCTION loyalty_reverse_sale(p_sale_id uuid) RETURNS void LAN
 DECLARE v_sale sales%ROWTYPE; v_points bigint; v_written uuid;
 BEGIN
  SELECT * INTO v_sale FROM sales WHERE "Id"=p_sale_id;
- IF NOT FOUND OR v_sale."Status" NOT IN (6,8) OR v_sale."CustomerPartyId" IS NULL THEN RETURN; END IF;
+ IF NOT FOUND OR (v_sale."Status" NOT IN (6,8) AND v_sale."PaymentStatus" NOT IN (6,7)) OR v_sale."CustomerPartyId" IS NULL THEN RETURN; END IF;
  SELECT COALESCE(SUM("PointsDelta"),0)::bigint INTO v_points FROM loyalty_ledger
  WHERE "TenantId"=v_sale."TenantId" AND "SaleId"=p_sale_id AND "Kind" IN ('SALE_EARN','RETURN_REVERSAL');
  IF v_points<=0 THEN RETURN; END IF;
@@ -144,7 +156,7 @@ END;$$;
 CREATE OR REPLACE FUNCTION loyalty_sale_event() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF NEW."Status" IN (4,5) AND NEW."PaymentStatus"=4 THEN PERFORM loyalty_accrue_sale(NEW."Id"); END IF;
- IF NEW."Status" IN (6,8) THEN PERFORM loyalty_reverse_sale(NEW."Id"); END IF;
+ IF NEW."Status" IN (6,8) OR NEW."PaymentStatus" IN (6,7) THEN PERFORM loyalty_reverse_sale(NEW."Id"); END IF;
  RETURN NEW;
 END;$$;
 DROP TRIGGER IF EXISTS "TR_loyalty_sale_event" ON sales;
