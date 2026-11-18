@@ -1368,12 +1368,12 @@ export default function PartiesPage() {
         {/* MODAL: NOVO CADASTRO COMPLETO NÍVEL SENIOR                                */}
         {/* ========================================================================= */}
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-3xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white w-full min-w-0 max-w-3xl rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90vh]">
 
               {/* Modal Header */}
-              <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-                <div className="flex items-center gap-3">
+              <div className="p-3 sm:p-5 border-b border-slate-200 flex justify-between items-center gap-2 bg-slate-50/50">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
                     <UserPlus className="w-5 h-5" />
                   </div>
@@ -1384,18 +1384,18 @@ export default function PartiesPage() {
                 </div>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="p-1.5 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
+                  className="shrink-0 p-1.5 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Steps */}
-              <div className="flex border-b border-slate-200 bg-white px-6">
+              <div className="flex min-w-0 shrink-0 overflow-x-auto border-b border-slate-200 bg-white px-2 sm:px-6" aria-label="Etapas do cadastro">
                 <button
                   type="button"
                   onClick={() => setFormStep("general")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "general" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1404,7 +1404,7 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("address")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "address" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1413,7 +1413,7 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("equipment")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "equipment" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1433,7 +1433,7 @@ export default function PartiesPage() {
               )}
 
               {/* Form Body */}
-              <form onSubmit={handleCreateParty} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <form onSubmit={handleCreateParty} className="min-w-0 min-h-0 p-3 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formStep === "general" && (
                   <div className="space-y-4 animate-in fade-in">
                     <div className="flex items-center gap-4">
