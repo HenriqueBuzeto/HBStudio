@@ -213,7 +213,10 @@ export async function POST(request: NextRequest) {
         branch_id: user.DefaultBranchId,
         session_id: sessionId,
         security_stamp: String(user.SecurityStamp || 1),
-        permission: permissions,
+        // Não incluir as 133 PermissionKeys no JWT/cookie: o token anterior
+        // excedia o limite de ~4 KiB por cookie e era descartado pelo browser.
+        // As permissões efetivas são consultadas do Neon em /api/auth/me,
+        // após autenticação e validação da sessão, sem confiar em claims antigas.
       },
       jwtSecret,
       {
@@ -222,6 +225,19 @@ export async function POST(request: NextRequest) {
         audience: "HBStudioErpClient",
       }
     );
+
+    // Fail-closed para futuras alterações no JWT: não voltar a emitir
+    // cookies acima dos limites comuns dos navegadores.
+    if (Buffer.byteLength(`hb_access_token=${token}`, "utf8") > 3800) {
+      console.error(`[${correlationId}] SESSION_COOKIE_TOO_LARGE`);
+      return NextResponse.json(
+        {
+          error: "Não foi possível criar uma sessão compatível com o navegador.",
+          code: "SESSION_COOKIE_TOO_LARGE",
+        },
+        { status: 500, headers: { "X-Correlation-Id": correlationId } }
+      );
+    }
 
     const partnerRoleName = mapPartnerType(partner.Type);
 
