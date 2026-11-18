@@ -10,7 +10,7 @@ import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
  BadgeCheck,LockKeyhole,Percent,ClipboardList,ArrowRight} from "lucide-react";
 
 type Product={id:string;skuCode:string;name:string;price:number;barcode:string|null;availableQuantity:number};
-type Customer={id:string;name:string;document:string|null;points:null};
+type Customer={id:string;name:string;document:string|null;points:number|null};
 type Seller={id:string;name:string;jobTitle:string|null};
 type Repair={id:string;orderNumber:string;defect:string;finalPrice:number;customerId:string;status:number};
 type Quote={id:string;number:string;status:number;customerId:string|null;customer:string|null;sellerId:string;seller:string|null;validUntil:string;paymentTerms:string;discount:number;shipping:number;createdAt:string;subtotal:number;total:number;items:Array<{sku:string;description:string;quantity:number;price:number}>};
@@ -154,7 +154,7 @@ export default function SalesPage(){
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
      <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-xs font-black text-slate-900"><UserRound className="h-4 w-4 text-violet-600"/> Identificação do atendimento</h2>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Cliente cadastrado</span><select className={field} value={customerId} onChange={e=>setCustomerId(e.target.value)}><option value="">Consumidor final não identificado</option>{aux.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-     {customer&&<p className="text-[10px] text-slate-500">Cliente selecionado: {customer.name}. Pontuação de fidelidade não integrada; nenhum ponto será creditado automaticamente.</p>}
+     {customer&&<p className="text-[10px] text-slate-500">Cliente selecionado: {customer.name}. {customer.points===null?"Saldo de fidelidade restrito por permissão.":`Saldo atual do Clube HB: ${Number(customer.points).toLocaleString("pt-BR")} pontos.`} Os novos pontos serão lançados apenas quando a venda e o pagamento forem confirmados pelo fluxo oficial.</p>}
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">CPF/CNPJ para documento fiscal futuro</span><input className={field} value={cpf} onChange={e=>setCpf(e.target.value)} placeholder="Opcional — não utilizado no orçamento" maxLength={18}/></label>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Vendedor responsável *</span><select className={field} value={sellerId} onChange={e=>setSellerId(e.target.value)}><option value="">Selecione...</option>{aux.sellers.map(s=><option key={s.id} value={s.id}>{s.name} {s.jobTitle?"("+s.jobTitle+")":""}</option>)}</select></label>
      <p className="text-[10px] text-slate-400">Vínculo do vendedor persistido no orçamento; comissão financeira não será gerada sem módulo oficial.</p>
