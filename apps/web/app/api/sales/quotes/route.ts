@@ -43,7 +43,7 @@ export async function POST(request:NextRequest){
   const paymentTerms=string(b.paymentTerms,"Condição de pagamento",100);
   const quoteNumber="ORC-"+new Date().getUTCFullYear()+"-"+crypto.randomUUID().slice(0,12).toUpperCase();
   const sql=
-  'WITH request_items AS (SELECT j.id,j.quantity FROM jsonb_to_recordset($5::jsonb) j(id uuid,quantity integer,"expectedCents" integer)), '+
+  'WITH request_items AS (SELECT j.id,j.quantity,j."expectedCents" FROM jsonb_to_recordset($5::jsonb) j(id uuid,quantity integer,"expectedCents" integer)), '+
   'valid_items AS (SELECT r.id,r.quantity,s."SkuCode" AS sku,s."VariantName" AS description,s."DefaultPrice" AS price FROM request_items r JOIN product_skus s ON s."Id"=r.id AND s."TenantId"=$1::uuid AND s."IsActive"=true AND ROUND(s."DefaultPrice"*100)::int=r."expectedCents"), '+
   'totals AS (SELECT COUNT(*)::int AS qty,COALESCE(SUM(v.quantity*v.price),0)::numeric(18,2) AS subtotal FROM valid_items v), '+
   'created AS (INSERT INTO sales_quotes ("Id","TenantId","BranchId","QuoteNumber","CustomerPartyId","SellerUserId","Status","ValidUntilUtc","PaymentTermsExpected","Notes","DiscountTotal","ShippingTotal","CreatedAtUtc") SELECT gen_random_uuid(),$1::uuid,$2::uuid,$3,$4::uuid,$6::uuid,1,now()+interval \'7 days\',$7,\'Orçamento de balcão; não reserva estoque nem confirma pagamento.\',$8::numeric/100,0,now() FROM totals WHERE totals.qty=$9 AND totals.subtotal>=$8::numeric/100 AND EXISTS(SELECT 1 FROM users u WHERE u."Id"=$6::uuid AND u."TenantId"=$1::uuid AND u."IsActive"=true) AND ($4::uuid IS NULL OR EXISTS(SELECT 1 FROM parties p WHERE p."Id"=$4::uuid AND p."TenantId"=$1::uuid AND p."IsActive"=true)) RETURNING "Id","QuoteNumber"), '+
