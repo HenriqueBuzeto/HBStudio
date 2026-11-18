@@ -12,6 +12,10 @@ Esta é uma auditoria estática e de metadados, **não uma homologação funcion
 
 Status: **CONFIRMADO** = evidência direta do código/metadata; **RISCO** = derivação técnica dependente de teste; **PENDENTE** = não foi possível verificar. Não atribuir PASS sem evidência.
 
+## Correção de diagnóstico obrigatória
+
+O teste real de TypeScript no GitHub Actions rejeitou chamadas `sql(statement, params)` (TS2345) e a documentação oficial da Neon confirma que a maneira correta de executar uma string parametrizada é `sql.query(statement, params)`. Atribuir o erro 500 à ausência de `.query` foi um **falso positivo**. A branch de auditoria reverteu essa hipótese e corrige o erro introduzido anteriormente. O HTTP 500 de produção precisa ser investigado com o corpo de resposta, logs de função/Neon e contrato do banco; não foi localizado com certeza nesta sessão. A segunda execução de CI deve ser checada antes do merge.
+
 ## Resumo executivo
 
 A infraestrutura de domínio tem cobertura elevada de entidades (clientes, vendas, estoque, caixa, CRM, financeiro, fidelidade, manufatura, projetos, fretes e OS), mas há uma diferença significativa entre **tabelas existentes**, **APIs implementadas**, **UI existente** e **fluxos operacionais homologados**. A condição de pronto precisa ser avaliada pela cadeia completa usuário → autorização → API → Neon → auditoria → recarregamento → reversão.
@@ -20,7 +24,7 @@ A infraestrutura de domínio tem cobertura elevada de entidades (clientes, venda
 
 | ID | Achado e evidência | Impacto | Tratamento |
 | --- | --- | --- | --- |
-| P0-01 | **CONFIRMADO** `apps/web/lib/serverless-db.ts`: `getDb()` devolvia `neon(connectionString)` (função chamável), mas `fleet-session.ts`, login, logout, `/api/auth/me`, catálogo, vendas, OS e outras rotas chamam `db.query(sql, params)`. | Erros 500 ou 503 sistêmicos, incluindo auth e telas transacionais | **CORRIGIDO NA BRANCH DE AUDITORIA** com adaptador tipado preservando a API chamável, `.query` e `.transaction`. Teste de compilação/integração pendente. |
+| P0-01 | **CONFIRMADO PELO CI**: a biblioteca Neon `@neondatabase/serverless` permite `sql.query(query, params)` nativamente; uma hipótese anterior de incompatibilidade com esse método estava ERRADA. O PR #10 trouxe chamadas `sql(query,params)` em rotas de clientes, rejeitadas pelo TypeScript (TS2345). | O código da `master` após PR #10 não compila e não pode ser publicado como está. Causa original do HTTP 500 de produção **não comprovada**. | **CORRIGIDO NA BRANCH DE AUDITORIA**: restauradas chamadas `sql.query(query,params)` em todas as rotas de clientes e preservado `getDb()` nativo. CI deve confirmar TypeScript + build. |
 | P0-02 | **CONFIRMADO** API de clientes retornava 500; rotas antigas validavam somente JWT e tenant, não Effective Access nem guard de origem. | Escrita/consulta sem permissionamento canônico; API frágil | **ALTERADO NA BRANCH** para usar `authorizeFleet`, `guardOrigin`, escopo por tenant e permissão, além de erros estruturados. Validar permissão por tipo de cliente/fornecedor. |
 | P0-03 | **CONFIRMADO** `apps/web/app/api/repairs/orders/route.ts`: criação de cliente/aparelho/OS/itens/histórico em queries sucessivas; número `OS-ano-N` calculado por COUNT+1. | Cadastro parcial e colisão em dois usuários concorrentes | Refatorar com sequência transacional por tenant/filial/ano, lock ou constraint UNIQUE e criação atômica; testar rollback, simultaneidade e idempotência. **NÃO CORRIGIDO NESTA RODADA**. |
 | P0-04 | **CONFIRMADO** `apps/web/app/api/sales/route.ts` preserva bloqueio do checkout real por segurança; `/api/sales/auxiliary` declara `checkout:false` e `fiscalIssue:false`. | Venda não completa ciclo financeiro, estoque, fiscal e cashback | Homologar meio de pagamento, confirmação real, baixa imutável de estoque, caixa/financeiro/fiscal e compensações antes de liberar. Jamais remover bloqueio por conveniência. |
@@ -99,8 +103,8 @@ A infraestrutura de domínio tem cobertura elevada de entidades (clientes, venda
 
 ## Correções já versionadas na branch de auditoria (ainda não mescladas)
 
-1. `apps/web/lib/serverless-db.ts`: compatibilização de `db(sql,params)`, `db.query(sql,params)` e `db.transaction([...])`.
-2. `apps/web/app/api/parties/route.ts`: sessão/role/tenant canônicos, `guardOrigin`, paginação mais segura, acesso a documentos condicionado a permissão, cadastro atômico do PR #10 preservado.
+1. `apps/web/lib/serverless-db.ts`: preservado o contrato nativo Neon, sem adaptadores artificiais. Os endpoints de clientes foram corrigidos para usar `sql.query(...)` e `sql.transaction([...])` onde adequado.
+2. `apps/web/app/api/parties/route.ts`: correção TS2345 de consultas, sessão/role/tenant canônicos, `guardOrigin`, paginação mais segura, documentos condicionados a permissão e transação atômica de criação.
 3. `apps/web/app/api/parties/[id]/{addresses,equipments,status}/route.ts`: autorização e guards; status somente aceita booleano explícito.
 4. `apps/web/app/parties/page.tsx`: remoção de recompensa, pontuação, nível e progressão simulados enquanto a fidelidade real não está integrada.
 5. `.github/workflows/erp-serverless-integrity.yml`: gate independente de TypeScript e build Next.js; **não publica Vercel**.
