@@ -35,7 +35,7 @@ export async function POST(request:NextRequest){
   const discountCents=Number(b.discountCents??0);
   if(!Number.isSafeInteger(discountCents)||discountCents<0||discountCents>100000000)throw new FleetError(400,"VALIDATION_ERROR","Desconto inválido.");
   if(discountCents>0&&!ctx.permissions.has("sales.discount.override"))throw new FleetError(403,"FORBIDDEN","Desconto exige permissão sales.discount.override.");
-  const items:Array<{id:string;quantity:number}>=b.items;
+  const items:Array<{id:string;quantity:number;expectedPriceCents:number}>=b.items;
   if(!Array.isArray(items)||items.length===0||items.length>50)throw new FleetError(400,"VALIDATION_ERROR","Informe de 1 a 50 produtos.");
   const parsed=items.map(i=>({id:uuid(i?.id,"Produto"),quantity:Number(i?.quantity),expectedCents:Number(i?.expectedPriceCents)}));
   if(parsed.some(i=>!Number.isSafeInteger(i.quantity)||i.quantity<=0||i.quantity>100||!Number.isSafeInteger(i.expectedCents)||i.expectedCents<0)||new Set(parsed.map(i=>i.id)).size!==parsed.length)
