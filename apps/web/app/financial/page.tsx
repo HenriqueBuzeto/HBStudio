@@ -40,6 +40,7 @@ export default function FinancialPage() {
   const [payables, setPayables] = useState<FinancialTitle[]>([]);
   const [receivables, setReceivables] = useState<FinancialTitle[]>([]);
 
+  // Valores provisórios não devem ser tratados como DRE validada.
   const dreData = {
     grossRevenue: 0.00,
     deductions: 0.00,
@@ -70,7 +71,7 @@ export default function FinancialPage() {
               Financeiro Geral & DRE Gerencial
             </h1>
             <p className="text-xs text-slate-500">
-              Controle de partidas dobradas, conciliação bancária, fluxo de caixa e obrigações.
+              Módulo financeiro aguardando integração com Neon. Indicadores zerados não representam saldos reais.
             </p>
           </div>
 
