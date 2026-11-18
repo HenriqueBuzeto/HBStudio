@@ -5,9 +5,6 @@ import {
   requireValue, optionalDate, type CrmSession,
 } from "@/lib/crm-session";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function guardedId(value: string): string { return requireUuid(value, "Identificador"); }
 function checkedPriority(value: unknown): number {
