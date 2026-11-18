@@ -205,7 +205,7 @@ export default function FretesPage() {
               </div>
             </div>
             <div className="text-2xl font-black text-slate-900 mt-2">
-              {vehicles.length} Veículos
+              —
             </div>
             <div className="text-xs text-emerald-600 font-semibold mt-1 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> Dados de disponibilidade não integrados
@@ -329,7 +329,7 @@ export default function FretesPage() {
                 <h2 className="text-sm font-extrabold text-slate-900">Registro de Viagens de Campo e Logística</h2>
                 <p className="text-xs text-slate-500">Histórico de saídas, condutores e cálculo automático de quilometragem.</p>
               </div>
-              <span className="text-xs font-bold text-slate-400">Total: {trips.length} viagens</span>
+              <span className="text-xs font-bold text-slate-400">Total não integrado</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -348,6 +348,9 @@ export default function FretesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {trips.length === 0 && (
+                    <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Nenhuma viagem cadastrada. Integração com Neon pendente.</td></tr>
+                  )}
                   {trips.map((trip) => (
                     <tr key={trip.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-4 font-mono font-bold text-purple-700">
@@ -432,6 +435,11 @@ export default function FretesPage() {
         {/* Tab 3: Veículos */}
         {activeTab === "vehicles" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {vehicles.length === 0 && (
+              <div className="col-span-full rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-500 text-sm">
+                Nenhum veículo cadastrado. Integração com Neon pendente.
+              </div>
+            )}
             {vehicles.map((v) => (
               <div key={v.id} className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
                 <div className="flex items-start justify-between">
@@ -474,7 +482,12 @@ export default function FretesPage() {
             </h3>
 
             <div className="space-y-3">
-              {plans.map((p) => {
+              {plans.length === 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-500 text-sm">
+                Nenhum plano de manutenção cadastrado. Integração com Neon pendente.
+              </div>
+            )}
+            {plans.map((p) => {
                 const isOverdue = p.evaluationStatus === "Overdue";
                 const isUpcoming = p.evaluationStatus === "Upcoming";
 
