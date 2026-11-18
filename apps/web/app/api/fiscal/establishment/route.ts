@@ -1,169 +1,48 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
-import crypto from "crypto";
+import {NextRequest,NextResponse} from "next/server";
+import crypto from "node:crypto";
+import {authorizeFleet,guardOrigin,FleetError} from "@/lib/fleet-session";
+import {validateFiscalEstablishment} from "@/lib/fiscal-validation";
 
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
-}
-
-// POST /api/fiscal/establishment - Salvar ou atualizar cadastro do estabelecimento fiscal no Neon
-export async function POST(request: NextRequest) {
-  const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
-
-  try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-    const branchId = decoded.branch_id || "b0000000-0000-0000-0000-000000000001";
-
-    const body = await request.json();
-    const {
-      corporateName,
-      tradeName,
-      cnpj,
-      stateRegistration,
-      municipalRegistration,
-      cnae,
-      regime, // 1 = Simples Nacional, 2 = Regime Normal
-      street,
-      number,
-      complement,
-      neighborhood,
-      cityCodeIbge,
-      cityName,
-      state,
-      postalCode,
-      environment, // 1 = Producao, 2 = Homologacao
-      nfceDefaultSeries,
-      nfceNextNumber,
-    } = body;
-
-    if (!corporateName || !cnpj || !stateRegistration) {
-      return NextResponse.json(
-        { error: "Razão Social, CNPJ e Inscrição Estadual são obrigatórios para emissão fiscal." },
-        { status: 400 }
-      );
-    }
-
-    const cleanCnpj = cnpj.replace(/\D/g, "");
-    if (cleanCnpj.length !== 14) {
-      return NextResponse.json({ error: "CNPJ inválido (deve conter 14 dígitos)." }, { status: 400 });
-    }
-
-    const sql = getDb();
-
-    // Verificar se já existe estabelecimento para o tenant
-    const existing = await sql.query(
-      `SELECT "Id" FROM fiscal_establishments WHERE "TenantId" = $1 LIMIT 1;`,
-      [tenantId]
-    );
-
-    if (existing.length > 0) {
-      // Atualizar estabelecimento existente
-      await sql.query(
-        `UPDATE fiscal_establishments
-         SET "CorporateName" = $1,
-             "TradeName" = $2,
-             "Cnpj" = $3,
-             "StateRegistration" = $4,
-             "MunicipalRegistration" = $5,
-             "Cnae" = $6,
-             "Regime" = $7,
-             "Street" = $8,
-             "Number" = $9,
-             "Complement" = $10,
-             "Neighborhood" = $11,
-             "CityCodeIbge" = $12,
-             "CityName" = $13,
-             "State" = $14,
-             "PostalCode" = $15,
-             "Environment" = $16,
-             "NfceDefaultSeries" = $17,
-             "NfceNextNumber" = $18,
-             "IsNfceEnabled" = true,
-             "IsActive" = true,
-             "UpdatedAtUtc" = NOW()
-         WHERE "Id" = $19 AND "TenantId" = $20;`,
-        [
-          corporateName.trim(),
-          tradeName?.trim() || corporateName.trim(),
-          cleanCnpj,
-          stateRegistration.trim(),
-          municipalRegistration?.trim() || "",
-          cnae?.trim() || "4751201",
-          Number(regime || 1),
-          street?.trim() || "Rua Principal",
-          number?.trim() || "100",
-          complement?.trim() || null,
-          neighborhood?.trim() || "Centro",
-          cityCodeIbge?.trim() || "3550308", // Padrão SP
-          cityName?.trim() || "São Paulo",
-          state?.trim().toUpperCase() || "SP",
-          postalCode?.replace(/\D/g, "") || "01001000",
-          Number(environment || 1),
-          Number(nfceDefaultSeries || 1),
-          Number(nfceNextNumber || 1),
-          existing[0].Id,
-          tenantId,
-        ]
-      );
-
-      return NextResponse.json({
-        message: "Dados do estabelecimento fiscal atualizados com sucesso no Neon.",
-        id: existing[0].Id,
-      });
-    } else {
-      // Inserir novo estabelecimento
-      const res = await sql.query(
-        `INSERT INTO fiscal_establishments (
-          "Id", "TenantId", "BranchId", "CorporateName", "TradeName", "Cnpj", "StateRegistration",
-          "MunicipalRegistration", "Cnae", "Regime", "Street", "Number", "Complement",
-          "Neighborhood", "CityCodeIbge", "CityName", "State", "PostalCode",
-          "Environment", "QrVersion", "NfceDefaultSeries", "NfceNextNumber", "IsNfceEnabled", "IsActive", "CreatedAtUtc"
-        )
-        VALUES (
-          gen_random_uuid(), $1, $2, $3, $4, $5, $6,
-          $7, $8, $9, $10, $11, $12,
-          $13, $14, $15, $16, $17,
-          $18, 3, $19, $20, true, true, NOW()
-        )
-        RETURNING "Id";`,
-        [
-          tenantId,
-          branchId,
-          corporateName.trim(),
-          tradeName?.trim() || corporateName.trim(),
-          cleanCnpj,
-          stateRegistration.trim(),
-          municipalRegistration?.trim() || "",
-          cnae?.trim() || "4751201",
-          Number(regime || 1),
-          street?.trim() || "Rua Principal",
-          number?.trim() || "100",
-          complement?.trim() || null,
-          neighborhood?.trim() || "Centro",
-          cityCodeIbge?.trim() || "3550308",
-          cityName?.trim() || "São Paulo",
-          state?.trim().toUpperCase() || "SP",
-          postalCode?.replace(/\D/g, "") || "01001000",
-          Number(environment || 1),
-          Number(nfceDefaultSeries || 1),
-          Number(nfceNextNumber || 1),
-        ]
-      );
-
-      return NextResponse.json({
-        message: "Estabelecimento fiscal cadastrado com sucesso no Neon.",
-        id: res[0].Id,
-      });
-    }
-  } catch (err: any) {
-    console.error(`[${correlationId}] Erro ao salvar estabelecimento:`, err);
-    return NextResponse.json({ error: "Erro interno ao salvar dados fiscais." }, { status: 500 });
+export async function POST(request:NextRequest){
+ const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
+ try{
+  guardOrigin(request);
+  const session=await authorizeFleet(request,"fiscal.settings.manage");
+  if(Number(request.headers.get("content-length")||0)>10000)throw new FleetError(413,"PAYLOAD_TOO_LARGE","Cadastro fiscal muito extenso.");
+  const v=validateFiscalEstablishment(await request.json().catch(()=>null));
+  const [existing,history]=await Promise.all([
+   session.db.query('SELECT "Id"::text AS id,"Cnpj" AS cnpj FROM fiscal_establishments WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid LIMIT 2',[session.tenantId,session.branchId]),
+   session.db.query('SELECT COUNT(*)::int AS count FROM fiscal_documents d JOIN fiscal_establishments e ON e."Id"=d."EstablishmentId" AND e."TenantId"=d."TenantId" WHERE d."TenantId"=$1::uuid AND e."BranchId"=$2::uuid',[session.tenantId,session.branchId])
+  ]);
+  if(existing.length>1)throw new FleetError(409,"ESTABLISHMENT_DUPLICATED","Mais de um estabelecimento nesta filial. Revisão fiscal necessária.");
+  if(Number(history[0]?.count)>0)throw new FleetError(409,"FISCAL_HISTORY_LOCKED","Existem documentos fiscais. Alteração de emissor/número requer processo fiscal de migração auditável.");
+  // Do not set IsNfceEnabled until real SEFAZ E2E homologation.
+  const args=[
+   session.tenantId,session.branchId,
+   v.corporateName,v.tradeName,v.cnpj,v.stateRegistration,v.municipalRegistration,v.cnae,
+   v.regime,v.street,v.number,v.complement||null,v.neighborhood,v.cityCodeIbge,v.cityName,
+   v.state,v.postalCode,v.environment,v.nfceDefaultSeries,v.nfceNextNumber,
+   session.userId,session.email,cid
+  ];
+  let rows;
+  if(existing.length){
+   rows=await session.db.query(
+    'WITH updated AS (UPDATE fiscal_establishments SET "CorporateName"=$3,"TradeName"=$4,"Cnpj"=$5,"StateRegistration"=$6,"MunicipalRegistration"=$7,"Cnae"=$8,"Regime"=$9::int,"Street"=$10,"Number"=$11,"Complement"=$12,"Neighborhood"=$13,"CityCodeIbge"=$14,"CityName"=$15,"State"=$16,"PostalCode"=$17,"Environment"=$18::int,"NfceDefaultSeries"=$19::int,"NfceNextNumber"=$20::int,"QrVersion"=3,"IsNfceEnabled"=false,"IsActive"=true,"UpdatedAtUtc"=now() WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid AND "Id"=$24::uuid AND NOT EXISTS(SELECT 1 FROM fiscal_documents d JOIN fiscal_establishments e ON e."Id"=d."EstablishmentId" AND e."TenantId"=d."TenantId" WHERE d."TenantId"=$1::uuid AND e."BranchId"=$2::uuid) RETURNING "Id"),' +
+    ' audited AS (INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action","ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version") SELECT gen_random_uuid(),$1::uuid,$2::uuid,\'FiscalEstablishment\',s."Id"::text,\'Updated\',$21::uuid,$22,$23,jsonb_build_object(\'cnpj\',$5,\'environment\',$18,\'isNfceEnabled\',false),now(),1 FROM updated s RETURNING "Id") SELECT s."Id"::text AS id FROM updated s CROSS JOIN audited',
+    [...args,existing[0].id]
+   );
+  }else{
+   rows=await session.db.query(
+    'WITH created AS (INSERT INTO fiscal_establishments ("Id","TenantId","BranchId","CorporateName","TradeName","Cnpj","StateRegistration","MunicipalRegistration","Cnae","Regime","Street","Number","Complement","Neighborhood","CityCodeIbge","CityName","State","PostalCode","Environment","QrVersion","NfceDefaultSeries","NfceNextNumber","IsNfceEnabled","IsActive","CreatedAtUtc") VALUES(gen_random_uuid(),$1::uuid,$2::uuid,$3,$4,$5,$6,$7,$8,$9::int,$10,$11,$12,$13,$14,$15,$16,$17,$18::int,3,$19::int,$20::int,false,true,now()) RETURNING "Id"),' +
+    ' audited AS (INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId","Action","ActorId","ActorEmail","CorrelationId","AfterStateJson","CreatedAtUtc","Version") SELECT gen_random_uuid(),$1::uuid,$2::uuid,\'FiscalEstablishment\',s."Id"::text,\'Created\',$21::uuid,$22,$23,jsonb_build_object(\'cnpj\',$5,\'environment\',$18,\'isNfceEnabled\',false),now(),1 FROM created s RETURNING "Id") SELECT s."Id"::text AS id FROM created s CROSS JOIN audited',
+    args
+   );
   }
+  if(rows.length!==1)throw new FleetError(409,"FISCAL_CONFLICT","Cadastro fiscal não alterado. Atualize a tela.");
+  return NextResponse.json({id:rows[0].id,configured:true,fiscalReady:false,message:"Estabelecimento cadastrado para homologação. Emissão bloqueada até validação externa da SEFAZ."},{status:200,headers:{"Cache-Control":"no-store","X-Correlation-Id":cid}});
+ }catch(error){
+  if(error instanceof FleetError)return NextResponse.json({code:error.code,error:error.message},{status:error.status,headers:{"X-Correlation-Id":cid}});
+  console.error("[FISCAL]["+cid+"] Establishment:",error instanceof Error?error.name:"Unknown");
+  return NextResponse.json({code:"ESTABLISHMENT_SAVE_UNAVAILABLE",error:"Não foi possível salvar o estabelecimento. Revise os dados e tente novamente."},{status:503,headers:{"X-Correlation-Id":cid}});
+ }
 }

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/serverless-db";
 import jwt from "jsonwebtoken";
 
-export const dynamic = "force-dynamic";
 
 function getJwtSecret(): string {
   const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;

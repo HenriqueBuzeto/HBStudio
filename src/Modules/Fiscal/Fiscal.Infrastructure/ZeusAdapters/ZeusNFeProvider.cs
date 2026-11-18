@@ -16,275 +16,48 @@ public class ZeusNFeProvider : IFiscalProvider
 
     public Task<ServiceStatusResult> CheckStatusAsync(FiscalEstablishment establishment, CancellationToken ct = default)
     {
+        // P0: no SEFAZ transport is implemented in this adapter.
+        // Reporting 107/ONLINE without a real webservice response is prohibited.
         return Task.FromResult(new ServiceStatusResult(
-            IsOnline: true,
-            StatusCode: 107,
-            StatusReason: "Serviço em Operação (SEFAZ-SP autorizada para NFC-e)",
+            IsOnline: false, StatusCode: 999,
+            StatusReason: "SEFAZ_EXTERNA_NAO_INTEGRADA: verificação real de status indisponível.",
             Environment: establishment.Environment == FiscalEnvironment.Production ? "Produção" : "Homologação",
-            Uf: establishment.State,
-            CheckedAtUtc: DateTime.UtcNow
-        ));
+            Uf: establishment.State, CheckedAtUtc: DateTime.UtcNow));
     }
 
     public Task<DocumentStatusConsultationResult> ConsultDocumentStatusAsync(
-        FiscalEstablishment establishment,
-        FiscalCertificate? certificate,
-        string accessKey,
-        CancellationToken ct = default)
+        FiscalEstablishment establishment, FiscalCertificate? certificate,
+        string accessKey, CancellationToken ct = default)
     {
-        // Se o certificado A1 não estiver configurado/ativo, reporta recusa sem disparar consulta externa fictícia
-        if (certificate == null || !certificate.IsActive)
-        {
-            return Task.FromResult(new DocumentStatusConsultationResult(
-                Success: false,
-                StatusCode: 999,
-                StatusReason: "Certificado A1 ausente ou inativo (EXTERNAL_NOT_CONFIGURED).",
-                ProtocolNumber: null,
-                ProtocolReceivedAtUtc: null,
-                ProtocolXml: null
-            ));
-        }
-
-        // Conforme NT 2025.002 e atualização SEFAZ-SP out/2026:
-        // Protocolo oficial com 17 posições (Ex: 13526000000000001)
-        string protocolNumber17 = $"13526{DateTime.UtcNow:yyMMddHHmmss}01";
+        // Never synthesize an authorization status, protocol or protocol XML.
         return Task.FromResult(new DocumentStatusConsultationResult(
-            Success: true,
-            StatusCode: 100,
-            StatusReason: "Autorizado o uso da NF-e/NFC-e (Consulta Protocolo Individual)",
-            ProtocolNumber: protocolNumber17,
-            ProtocolReceivedAtUtc: DateTime.UtcNow,
-            ProtocolXml: $"<retConsSitNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><cStat>100</cStat><xMotivo>Autorizado o uso</xMotivo><chNFe>{accessKey}</chNFe><protNFe versao=\"4.00\"><infProt><tpAmb>{(int)establishment.Environment}</tpAmb><chNFe>{accessKey}</chNFe><dhRecbto>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRecbto><nProt>{protocolNumber17}</nProt><cStat>100</cStat><xMotivo>Autorizado o uso da NFC-e</xMotivo></infProt></protNFe></retConsSitNFe>"
-        ));
+            Success: false, StatusCode: 999,
+            StatusReason: "SEFAZ_EXTERNA_NAO_INTEGRADA: consulta de protocolo bloqueada.",
+            ProtocolNumber: null, ProtocolReceivedAtUtc: null, ProtocolXml: null));
     }
 
     public Task<NfceTransmissionResult> EmitNfceAsync(
-        FiscalEstablishment establishment,
-        FiscalCertificate? certificate,
-        FiscalCsc? csc,
-        NfceTransmissionRequest request,
-        CancellationToken ct = default)
+        FiscalEstablishment establishment, FiscalCertificate? certificate, FiscalCsc? csc,
+        NfceTransmissionRequest request, CancellationToken ct = default)
     {
-        // 1. Validação obrigatória de Certificado A1
-        if (certificate == null || !certificate.IsActive)
-        {
-            return Task.FromResult(new NfceTransmissionResult(
-                Success: false,
-                AccessKey: string.Empty,
-                StatusCode: 999,
-                StatusReason: "Certificado Digital A1 não configurado ou inativo.",
-                ProtocolNumber: null,
-                QrCodeUrl: null,
-                SignedXml: null,
-                ErrorMessage: "É obrigatório registrar um certificado digital A1 válido em Fiscal -> Configurações para emissão oficial."
-            ));
-        }
-
-        // 2. Se a versão for QR Code V2, o CSC é estritamente obrigatório
-        if (establishment.QrVersion == QrCodeVersion.V2 && (csc == null || !csc.IsActive))
-        {
-            return Task.FromResult(new NfceTransmissionResult(
-                Success: false,
-                AccessKey: string.Empty,
-                StatusCode: 999,
-                StatusReason: "Código de Segurança do Contribuinte (CSC) não configurado para QR Code V2.",
-                ProtocolNumber: null,
-                QrCodeUrl: null,
-                SignedXml: null,
-                ErrorMessage: "O CSC da SEFAZ-SP é obrigatório para gerar o QR Code no leiaute V2."
-            ));
-        }
-
-        // 3. Montagem da Chave de Acesso Oficial (44 dígitos)
-        // [cUF 2][AAMM 4][CNPJ 14][mod 2][serie 3][nNF 9][tpEmis 1][cNF 8][cDV 1]
-        string cUf = "35"; // São Paulo
-        string aamm = DateTime.UtcNow.ToString("yyMM");
-        string cnpjFormatted = establishment.Cnpj.PadLeft(14, '0');
-        string mod = "65"; // NFC-e
-        string serie = request.Series.ToString().PadLeft(3, '0');
-        string nNf = request.Number.ToString().PadLeft(9, '0');
-        string tpEmis = "1"; // Emissão normal
-        string cNf = "18920145"; // Código numérico aleatório
-        
-        string baseKey = $"{cUf}{aamm}{cnpjFormatted}{mod}{serie}{nNf}{tpEmis}{cNf}";
-        int dv = CalculateMod11(baseKey);
-        string accessKey = $"{baseKey}{dv}";
-
-        // 4. Montagem do QR Code conforme Nota Técnica 2025.001 (V3) ou Padrão V2
-        string qrCodeUrl = GenerateQrCodeUrl(
-            establishment,
-            accessKey,
-            request.TotalAmount,
-            request.RecipientCpf,
-            csc,
-            tpEmis: 1,
-            certificate: certificate
-        );
-
-        // Conforme NT 2025.002 e SEFAZ-SP (vigência out/2026):
-        // Protocolo de autorização oficial com 17 posições: [cUF 2][AAMM 4][Seq 11] = 17 caracteres
-        string officialProtocol17 = $"13526{DateTime.UtcNow:yyMMddHHmmss}01";
-
-        // 5. XML assinado no padrão SEFAZ (NFe v4.00)
-        string signedXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<nfeProc versao=""4.00"" xmlns=""http://www.portalfiscal.inf.br/nfe"">
-  <NFe>
-    <infNFe Id=""NFe{accessKey}"" versao=""4.00"">
-      <ide>
-        <cUF>{cUf}</cUF>
-        <cNF>{cNf}</cNF>
-        <natOp>VENDA DE MERCADORIA NO BALCAO</natOp>
-        <mod>{mod}</mod>
-        <serie>{request.Series}</serie>
-        <nNF>{request.Number}</nNF>
-        <dhEmi>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhEmi>
-        <tpNF>1</tpNF>
-        <idDest>1</idDest>
-        <cMunFG>{establishment.CityCodeIbge}</cMunFG>
-        <tpImp>4</tpImp>
-        <tpEmis>{tpEmis}</tpEmis>
-        <cDV>{dv}</cDV>
-        <tpAmb>{(int)establishment.Environment}</tpAmb>
-        <finNFe>1</finNFe>
-        <indFinal>1</indFinal>
-        <indPres>1</indPres>
-        <procEmi>0</procEmi>
-        <verProc>{ProviderName}</verProc>
-      </ide>
-      <emit>
-        <CNPJ>{establishment.Cnpj}</CNPJ>
-        <xNome>{establishment.CorporateName}</xNome>
-        <xFant>{establishment.TradeName}</xFant>
-        <enderEmit>
-          <xLgr>{establishment.Street}</xLgr>
-          <nro>{establishment.Number}</nro>
-          <xBairro>{establishment.Neighborhood}</xBairro>
-          <cMun>{establishment.CityCodeIbge}</cMun>
-          <xMun>{establishment.CityName}</xMun>
-          <UF>{establishment.State}</UF>
-          <CEP>{establishment.PostalCode.Replace("-", "")}</CEP>
-        </enderEmit>
-        <IE>{establishment.StateRegistration}</IE>
-        <CRT>{(int)establishment.Regime}</CRT>
-      </emit>
-      <dest>
-        {(string.IsNullOrEmpty(request.RecipientCpf) ? "" : $"<CPF>{request.RecipientCpf.Replace(".", "").Replace("-", "")}</CPF>")}
-        {(string.IsNullOrEmpty(request.RecipientName) ? "" : $"<xNome>{request.RecipientName}</xNome>")}
-      </dest>
-      <total>
-        <ICMSTot>
-          <vBC>0.00</vBC>
-          <vICMS>0.00</vICMS>
-          <vProd>{request.TotalAmount + request.TotalDiscounts:F2}</vProd>
-          <vDesc>{request.TotalDiscounts:F2}</vDesc>
-          <vNF>{request.TotalAmount:F2}</vNF>
-        </ICMSTot>
-      </total>
-      <pag>
-        <detPag>
-          <tPag>01</tPag>
-          <vPag>{request.TotalAmount:F2}</vPag>
-        </detPag>
-      </pag>
-      <infRespTec>
-        <CNPJ>00000000000000</CNPJ>
-        <xContato>HB Studio Tecnologia</xContato>
-        <email>contato@hbstudio.com</email>
-      </infRespTec>
-    </infNFe>
-  </NFe>
-  <protNFe versao=""4.00"">
-    <infProt>
-      <tpAmb>{(int)establishment.Environment}</tpAmb>
-      <verAplic>{ProviderName}</verAplic>
-      <chNFe>{accessKey}</chNFe>
-      <dhRecbto>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRecbto>
-      <nProt>{officialProtocol17}</nProt>
-      <digVal>4d61737465724842</digVal>
-      <cStat>100</cStat>
-      <xMotivo>Autorizado o uso da NF-e / NFC-e</xMotivo>
-    </infProt>
-  </protNFe>
-</nfeProc>";
-
+        // No SOAP/TLS transmission has been implemented. Never return cStat 100
+        // or invent an access key, XML, QR Code or an authorization protocol.
         return Task.FromResult(new NfceTransmissionResult(
-            Success: true,
-            AccessKey: accessKey,
-            StatusCode: 100,
-            StatusReason: "Autorizado o uso da NFC-e",
-            ProtocolNumber: officialProtocol17,
-            QrCodeUrl: qrCodeUrl,
-            SignedXml: signedXml,
-            ErrorMessage: null
-        ));
+            Success: false, AccessKey: string.Empty, StatusCode: 999,
+            StatusReason: "SEFAZ_EXTERNA_NAO_INTEGRADA",
+            ProtocolNumber: null, QrCodeUrl: null, SignedXml: null,
+            ErrorMessage: "Emissão bloqueada até integrar assinatura XML e autorização SEFAZ real."));
     }
 
     public Task<NfceCancellationResult> CancelNfceAsync(
-        FiscalEstablishment establishment,
-        FiscalCertificate? certificate,
-        NfceCancellationRequest request,
-        CancellationToken ct = default)
+        FiscalEstablishment establishment, FiscalCertificate? certificate,
+        NfceCancellationRequest request, CancellationToken ct = default)
     {
-        if (certificate == null || !certificate.IsActive)
-        {
-            return Task.FromResult(new NfceCancellationResult(
-                Success: false,
-                StatusCode: 999,
-                StatusReason: "Certificado A1 ausente.",
-                CancellationProtocol: null,
-                EventXml: null,
-                ErrorMessage: "Certificado digital obrigatório para cancelamento de NFC-e."
-            ));
-        }
-
-        string eventSeq = request.SequentialEventNumber.ToString();
-        string cUf = "35";
-        // Protocolo de evento SEFAZ com 17 posições
-        string cancellationProtocol = $"13526{DateTime.UtcNow:yyMMddHHmmss}99";
-
-        string eventXml = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<procEventoNFe versao=""1.00"" xmlns=""http://www.portalfiscal.inf.br/nfe"">
-  <evento versao=""1.00"">
-    <infEvento Id=""ID110111{request.AccessKey}01"">
-      <cOrgao>{cUf}</cOrgao>
-      <tpAmb>{(int)establishment.Environment}</tpAmb>
-      <CNPJ>{establishment.Cnpj}</CNPJ>
-      <chNFe>{request.AccessKey}</chNFe>
-      <dhEvento>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhEvento>
-      <tpEvento>110111</tpEvento>
-      <nSeqEvento>{eventSeq}</nSeqEvento>
-      <verEvento>1.00</verEvento>
-      <detEvento versao=""1.00"">
-        <descEvento>Cancelamento</descEvento>
-        <nProt>{request.ProtocolNumber}</nProt>
-        <xJust>{request.Justification}</xJust>
-      </detEvento>
-    </infEvento>
-  </evento>
-  <retEvento versao=""1.00"">
-    <infEvento>
-      <tpAmb>{(int)establishment.Environment}</tpAmb>
-      <verAplic>{ProviderName}</verAplic>
-      <cOrgao>{cUf}</cOrgao>
-      <cStat>135</cStat>
-      <xMotivo>Evento registrado e vinculado a NF-e</xMotivo>
-      <chNFe>{request.AccessKey}</chNFe>
-      <tpEvento>110111</tpEvento>
-      <nSeqEvento>{eventSeq}</nSeqEvento>
-      <dhRegEvento>{DateTime.UtcNow:yyyy-MM-ddTHH:mm:sszzz}</dhRegEvento>
-      <nProt>{cancellationProtocol}</nProt>
-    </infEvento>
-  </retEvento>
-</procEventoNFe>";
-
+        // Fiscal cancellation requires an actual signed event and SEFAZ cStat 135.
         return Task.FromResult(new NfceCancellationResult(
-            Success: true,
-            StatusCode: 135,
-            StatusReason: "Evento registrado e vinculado a NF-e (Cancelamento homologado)",
-            CancellationProtocol: cancellationProtocol,
-            EventXml: eventXml,
-            ErrorMessage: null
-        ));
+            Success: false, StatusCode: 999, StatusReason: "SEFAZ_EXTERNA_NAO_INTEGRADA",
+            CancellationProtocol: null, EventXml: null,
+            ErrorMessage: "Cancelamento bloqueado até existir resposta oficial da SEFAZ."));
     }
 
     public string GenerateQrCodeUrl(
@@ -349,20 +122,10 @@ public class ZeusNFeProvider : IFiscalProvider
         }
         else
         {
-            // QR Code Versão 2.00 (Legado com CSC e cHashQRCode via SHA-1)
-            string cIdToken = csc?.CscId ?? "000001";
-            string rawCsc = csc != null ? Encoding.UTF8.GetString(csc.EncryptedCscToken) : "CSC_PLACEHOLDER";
-            string dhEmiHex = Convert.ToHexString(Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:sszzz")));
-            string vNf = totalAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-            string digValHex = Convert.ToHexString(Encoding.UTF8.GetBytes("MasterHB"));
-            string cDest = string.IsNullOrEmpty(recipientCpf) ? "" : recipientCpf.Replace(".", "").Replace("-", "");
-
-            string qrStringWithoutHash = $"{accessKey}|2|{amb}|{cDest}|{dhEmiHex}|{vNf}|0.00|{digValHex}|{cIdToken}";
-            string stringToHash = $"{qrStringWithoutHash}{rawCsc}";
-            string cHash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(stringToHash))).ToLowerInvariant();
-
-            string fullPayload = $"{qrStringWithoutHash}|{cHash}";
-            return $"{baseUrl}?p={fullPayload}";
+            // Legacy V2 must never use placeholder CSC, fabricated digest or
+            // encrypted CSC bytes as cleartext. Real QR assembly belongs to a
+            // fully validated SEFAZ provider with a decrypted scoped secret.
+            throw new NotSupportedException("FISCAL_QR_V2_NOT_HOMOLOGATED");
         }
     }
 
@@ -377,11 +140,7 @@ public class ZeusNFeProvider : IFiscalProvider
             return Convert.ToBase64String(signature);
         }
 
-        // Quando a chave privada RSA real ainda não está carregada (simulação / testes sem PFX físico real),
-        // calcula o hash SHA-1 canônico de 20 bytes e codifica em Base64 determinístico
-        using var rsaTemp = RSA.Create(2048);
-        byte[] deterministicSig = rsaTemp.SignData(dataBytes, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
-        return Convert.ToBase64String(deterministicSig);
+        throw new InvalidOperationException("Chave privada do certificado A1 é obrigatória para assinatura do QR Code.");
     }
 
     private static int CalculateMod11(string input)
