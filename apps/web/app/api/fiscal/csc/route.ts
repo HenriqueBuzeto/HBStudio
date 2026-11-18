@@ -15,7 +15,7 @@ export async function POST(request:NextRequest){
   const cscId=String(b.cscId??"").trim();
   const token=String(b.cscToken??"").trim();
   const environment=Number(b.environment);
-  if(!/^\\d{6}$/.test(cscId))throw new FleetError(400,"INVALID_CSC_ID","O ID CSC deve conter 6 dígitos.");
+  if(!/^\d{6}$/.test(cscId))throw new FleetError(400,"INVALID_CSC_ID","O ID CSC deve conter 6 dígitos.");
   if(!/^[a-zA-Z0-9]{16,36}$/.test(token))throw new FleetError(400,"INVALID_CSC_TOKEN","O CSC deve conter de 16 a 36 caracteres alfanuméricos.");
   if(environment!==1&&environment!==2)throw new FleetError(400,"INVALID_ENVIRONMENT","Ambiente inválido.");
   const ests=await session.db.query('SELECT e."Id"::text AS id FROM fiscal_establishments e WHERE e."TenantId"=$1::uuid AND e."BranchId"=$2::uuid AND e."IsActive"=true AND e."Environment"=$3::int LIMIT 1',[session.tenantId,session.branchId,environment]);
