@@ -15,7 +15,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{id:strin
   return respond({party,
    account:a||{pointsBalance:"0",lifetimeEarned:"0",lifetimeRedeemed:"0",cashbackCents:"0",eligibleSpendCents:"0",purchasesCount:0},
    accountExists:!!a,
-   tier:calculateTier(Number(a?.lifetimeEarned||0),p),
+   tier:calculateTier(Number(a?.lifetimeEarned||0),p?{silverAtPoints:Number(p.silverAtPoints),goldAtPoints:Number(p.goldAtPoints),diamondAtPoints:Number(p.diamondAtPoints)}:undefined),
    program:p,ledger,redemptions,rewards,
    capabilities:{redeem:s.permissions.has("loyalty.redeem"),fulfill:s.permissions.has("loyalty.fulfill"),voucherCheckout:false},
    note:"Saldo contabilizado no extrato; valores de cashback são créditos acumulados, não dinheiro ou desconto disponível no PDV enquanto checkout não for homologado."
