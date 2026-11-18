@@ -40,11 +40,8 @@ export default function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Usuário com cookie válido tentando acessar /login: redireciona para a home
-  if (pathname === "/login" && token) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
+  // Nao redirecionar /login apenas porque existe um cookie: ele pode estar
+  // expirado, revogado ou incorreto. O /api/auth/me valida a sessao de fato.
   return NextResponse.next();
 }
 
