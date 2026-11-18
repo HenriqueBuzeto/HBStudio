@@ -372,14 +372,23 @@ export default function PartiesPage() {
     );
   };
 
-  // Salvar novo cadastro completo com persistência real via BFF
+  // Grava todos os vínculos juntos para evitar clientes incompletos.
   const handleCreateParty = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim()) {
+      setErrorMsg("Informe o nome completo ou razão social antes de salvar.");
+      setFormStep("general");
+      return;
+    }
+    if (newStreet.trim() && (!newNeighborhood.trim() || !newCity.trim()
+      || !newState.trim() || !newPostalCode.trim())) {
+      setErrorMsg("Preencha rua, bairro, cidade, estado e CEP ou remova o endereço incompleto.");
+      setFormStep("address");
+      return;
+    }
 
     setIsSaving(true);
     setErrorMsg(null);
-
     const payload = {
       type: newType,
       name: newName.trim(),
@@ -395,7 +404,23 @@ export default function PartiesPage() {
       supplyCategories: null,
       paymentTerms: null,
       primaryPhone: newPhone.trim() || null,
-      primaryEmail: newEmail.trim() || null
+      primaryEmail: newEmail.trim() || null,
+      address: newStreet.trim() ? {
+        street: newStreet.trim(),
+        number: newNumber.trim() || "S/N",
+        complement: newComplement.trim() || null,
+        neighborhood: newNeighborhood.trim(),
+        city: newCity.trim(),
+        state: newState.trim().toUpperCase(),
+        postalCode: newPostalCode.trim()
+      } : null,
+      equipment: newEquipmentModel.trim() ? {
+        equipmentType: "Smartphone",
+        brand: newEquipmentBrand,
+        model: newEquipmentModel.trim(),
+        color: newEquipmentColor.trim() || null,
+        imei1: newEquipmentImei.trim() || null
+      } : null
     };
 
     try {
@@ -404,88 +429,14 @@ export default function PartiesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setErrorMsg(err.error || "Erro ao salvar cliente no banco de dados.");
-        setIsSaving(false);
+        setErrorMsg(err.error || `Falha ao salvar cadastro (HTTP ${res.status}).`);
         return;
       }
 
-      const created = await res.json();
-      const partialErrors: string[] = [];
-
-      // Se informou equipamento, persiste no backend de forma explícita
-      if (newEquipmentModel.trim()) {
-        try {
-          const eqRes = await fetch(`/api/parties/${created.id}/equipments`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              equipmentType: "Smartphone",
-              brand: newEquipmentBrand,
-              model: newEquipmentModel.trim(),
-              color: newEquipmentColor.trim() || null,
-              imei1: newEquipmentImei.trim() || null,
-              imei2: null,
-              serialNumber: null,
-              notes: null
-            })
-          });
-          if (!eqRes.ok) {
-            const eqErr = await eqRes.json().catch(() => ({}));
-            partialErrors.push(`Equipamento: ${eqErr.error || "falha ao registrar aparelho"}`);
-          }
-        } catch {
-          partialErrors.push("Equipamento: falha de comunicação");
-        }
-      }
-
-      // Se informou endereço, valida e persiste no backend sem dados artificiais
-      if (newStreet.trim()) {
-        if (!newCity.trim() || !newState.trim()) {
-          partialErrors.push("Endereço: Cidade e Estado são obrigatórios quando a rua for informada.");
-        } else if (!newNeighborhood.trim() || !newPostalCode.trim()) {
-          partialErrors.push("Endereço: Bairro e CEP são obrigatórios quando a rua for informada.");
-        } else {
-          try {
-            const addrRes = await fetch(`/api/parties/${created.id}/addresses`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                street: newStreet.trim(),
-                number: newNumber.trim() || "S/N",
-                complement: newComplement.trim() || null,
-                neighborhood: newNeighborhood.trim(),
-                city: newCity.trim(),
-                state: newState.trim().toUpperCase(),
-                postalCode: newPostalCode.trim(),
-                isPrimary: true
-              })
-            });
-            if (!addrRes.ok) {
-              const addrErr = await addrRes.json().catch(() => ({}));
-              partialErrors.push(`Endereço: ${addrErr.error || "falha ao registrar endereço"}`);
-            }
-          } catch {
-            partialErrors.push("Endereço: falha de comunicação");
-          }
-        }
-      }
-
-      // Recarrega lista completa
-      await loadParties();
-
-      if (partialErrors.length > 0) {
-        setErrorMsg(`Cliente gravado com pendências parciais: ${partialErrors.join("; ")}`);
-      } else {
-        setSuccessMsg(`Cadastro de "${newName}" salvo e persistido com sucesso!`);
-        setTimeout(() => setSuccessMsg(null), 5000);
-      }
-
       setShowCreateModal(false);
-
-      // Limpeza de formulário
+      setSuccessMsg(`Cadastro de "${newName}" salvo com sucesso no banco de dados.`);
       setNewName("");
       setNewTradeName("");
       setNewDoc("");
@@ -502,13 +453,17 @@ export default function PartiesPage() {
       setNewComplement("");
       setNewNeighborhood("");
       setNewCity("");
+      setNewState("SP");
+      setNewEquipmentBrand("Apple");
       setNewEquipmentModel("");
       setNewEquipmentImei("");
       setNewEquipmentColor("");
       setNewNotes("");
       setFormStep("general");
+      await loadParties(1, "", "all");
+      setFilterType("all");
     } catch {
-      setErrorMsg("Erro de comunicação ao salvar cliente.");
+      setErrorMsg("Falha de conexão ao salvar cadastro. Verifique sua conexão e tente novamente.");
     } finally {
       setIsSaving(false);
     }
