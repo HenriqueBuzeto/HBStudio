@@ -2,15 +2,15 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  Smartphone, 
-  Phone, 
-  Mail, 
-  Plus, 
-  CheckCircle2, 
+import {
+  Users,
+  UserPlus,
+  Search,
+  Smartphone,
+  Phone,
+  Mail,
+  Plus,
+  CheckCircle2,
   ShieldCheck,
   FolderOpen,
   MapPin,
@@ -528,9 +528,9 @@ export default function PartiesPage() {
     const matchDoc = p.documentNumber?.includes(term.replace(/\D/g, ""));
     const matchPhone = p.contacts.some(c => c.phone?.includes(term) || c.whatsApp?.includes(term));
     const matchEmail = p.contacts.some(c => c.email?.toLowerCase().includes(term));
-    const matchEquipment = p.equipments.some(e => 
-      e.model.toLowerCase().includes(term) || 
-      e.imei1?.includes(term) || 
+    const matchEquipment = p.equipments.some(e =>
+      e.model.toLowerCase().includes(term) ||
+      e.imei1?.includes(term) ||
       e.serialNumber?.toLowerCase().includes(term)
     );
 
@@ -553,6 +553,31 @@ export default function PartiesPage() {
   return (
     <RootShellLayout>
       <div className="space-y-6">
+        {/* Notificações de Sucesso e Erro Globais */}
+        {errorMsg && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-rose-800 text-xs font-bold animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-500 hover:text-rose-700 font-extrabold cursor-pointer">
+              ✕
+            </button>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-800 text-xs font-bold animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+            <button onClick={() => setSuccessMsg(null)} className="text-emerald-500 hover:text-emerald-700 font-extrabold cursor-pointer">
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Header Enterprise HB Studio */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
           <div>
@@ -590,31 +615,28 @@ export default function PartiesPage() {
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
                 onClick={() => setFilterType("customers")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  filterType === "customers"
-                    ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === "customers"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 Clientes ({parties.filter(p => p.isCustomer).length})
               </button>
               <button
                 onClick={() => setFilterType("suppliers")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  filterType === "suppliers"
-                    ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === "suppliers"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 Fornecedores ({parties.filter(p => p.isSupplier).length})
               </button>
               <button
                 onClick={() => setFilterType("all")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  filterType === "all"
-                    ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === "all"
+                  ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 Todos ({parties.length})
               </button>
@@ -698,7 +720,7 @@ export default function PartiesPage() {
                   filteredParties.map((party) => {
                     const primaryContact = party.contacts.find(c => c.isPrimary) || party.contacts[0];
                     return (
-                      <tr 
+                      <tr
                         key={party.id}
                         onClick={() => {
                           setFullScreenParty(party);
@@ -810,11 +832,10 @@ export default function PartiesPage() {
 
                         {/* Status */}
                         <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                            party.isActive 
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
-                              : "bg-rose-50 text-rose-700 border border-rose-200"
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold ${party.isActive
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}>
                             {party.isActive ? "Ativo" : "Inativo"}
                           </span>
                         </td>
@@ -873,7 +894,7 @@ export default function PartiesPage() {
         {fullScreenParty && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
             <div className="bg-slate-50 w-full max-w-7xl h-[95vh] rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
-              
+
               {/* Topbar da Tela Cheia */}
               <div className="p-5 bg-white border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -912,11 +933,10 @@ export default function PartiesPage() {
                             setErrorMsg("Erro de comunicação ao alterar status.");
                           }
                         }}
-                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
-                          fullScreenParty.isActive
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${fullScreenParty.isActive
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+                          : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                          }`}
                         title="Clique para alternar status ativo/inativo no banco"
                       >
                         {fullScreenParty.isActive ? "Cadastro Ativo (Clique p/ Inativar)" : "Cadastro Inativo (Clique p/ Ativar)"}
@@ -1036,22 +1056,20 @@ export default function PartiesPage() {
               <div className="px-6 pt-3 bg-white border-b border-slate-200 flex gap-2 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab("cadastral")}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${
-                    activeTab === "cadastral"
-                      ? "border-purple-600 text-purple-700"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${activeTab === "cadastral"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <FileText className="w-4 h-4" />
                   Dados Cadastrais & Endereços
                 </button>
                 <button
                   onClick={() => setActiveTab("gamification")}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${
-                    activeTab === "gamification"
-                      ? "border-purple-600 text-purple-700"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${activeTab === "gamification"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <Gift className="w-4 h-4 text-amber-500" />
                   Módulo Gamificação & Resgate de Brindes
@@ -1061,33 +1079,30 @@ export default function PartiesPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("history")}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${
-                    activeTab === "history"
-                      ? "border-purple-600 text-purple-700"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${activeTab === "history"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <History className="w-4 h-4" />
                   Histórico de Vendas & OS ({fullScreenParty.history.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("equipments")}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${
-                    activeTab === "equipments"
-                      ? "border-purple-600 text-purple-700"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${activeTab === "equipments"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <Smartphone className="w-4 h-4" />
                   Aparelhos Registrados ({fullScreenParty.equipments.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("financial")}
-                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${
-                    activeTab === "financial"
-                      ? "border-purple-600 text-purple-700"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`flex items-center gap-2 py-3 px-4 border-b-2 font-bold text-xs transition-colors whitespace-nowrap ${activeTab === "financial"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   <CreditCard className="w-4 h-4" />
                   Limites, Financeiro & LGPD
@@ -1096,14 +1111,14 @@ export default function PartiesPage() {
 
               {/* Conteúdo das Abas (Scrollável) */}
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-6">
-                
+
                 {/* ========================================================= */}
                 {/* ABA 1: DADOS CADASTRAIS & ENDEREÇOS COMPLETO              */}
                 {/* ========================================================= */}
                 {activeTab === "cadastral" && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      
+
                       {/* Cartão de Identificação */}
                       <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
                         <div className="flex items-center gap-2 text-slate-800 font-extrabold text-sm border-b border-slate-100 pb-3">
@@ -1314,13 +1329,12 @@ export default function PartiesPage() {
                         {REWARDS_CATALOG.map((reward) => {
                           const canRedeem = (fullScreenParty.gamification?.pointsBalance ?? 0) >= reward.pointsRequired;
                           return (
-                            <div 
-                              key={reward.id} 
-                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                                canRedeem 
-                                  ? "bg-white border-purple-200/90 hover:border-purple-500 hover:shadow-md" 
-                                  : "bg-slate-50 border-slate-200 opacity-60"
-                              }`}
+                            <div
+                              key={reward.id}
+                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${canRedeem
+                                ? "bg-white border-purple-200/90 hover:border-purple-500 hover:shadow-md"
+                                : "bg-slate-50 border-slate-200 opacity-60"
+                                }`}
                             >
                               <div>
                                 <div className="flex items-center justify-between mb-2">
@@ -1342,11 +1356,10 @@ export default function PartiesPage() {
                               <button
                                 onClick={() => handleRedeemReward(reward)}
                                 disabled={!canRedeem}
-                                className={`w-full mt-4 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                                  canRedeem
-                                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
-                                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                }`}
+                                className={`w-full mt-4 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${canRedeem
+                                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
+                                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                  }`}
                               >
                                 {canRedeem ? (
                                   <>
@@ -1394,12 +1407,11 @@ export default function PartiesPage() {
                           <div key={item.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
-                                  item.type === "Venda" ? "bg-emerald-100 text-emerald-800" :
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${item.type === "Venda" ? "bg-emerald-100 text-emerald-800" :
                                   item.type === "OS" ? "bg-blue-100 text-blue-800" :
-                                  item.type === "Resgate" ? "bg-amber-100 text-amber-800" :
-                                  "bg-purple-100 text-purple-800"
-                                }`}>
+                                    item.type === "Resgate" ? "bg-amber-100 text-amber-800" :
+                                      "bg-purple-100 text-purple-800"
+                                  }`}>
                                   {item.type}
                                 </span>
                                 <span className="font-extrabold text-slate-900 text-xs">{item.title}</span>
@@ -1572,7 +1584,7 @@ export default function PartiesPage() {
         {showCreateModal && (
           <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-3xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              
+
               {/* Modal Header */}
               <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
                 <div className="flex items-center gap-3">
@@ -1597,8 +1609,8 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("general")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors ${
-                    formStep === "general" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400"
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                    formStep === "general" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
                   1. Dados Pessoais / Fiscais
@@ -1606,8 +1618,8 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("address")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors ${
-                    formStep === "address" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400"
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                    formStep === "address" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
                   2. Endereço Completo
@@ -1615,13 +1627,24 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("equipment")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors ${
-                    formStep === "equipment" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400"
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                    formStep === "equipment" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
                   3. Aparelho & Vínculos Iniciais
                 </button>
               </div>
+
+              {/* Alerta de Erro no Próprio Modal se houver */}
+              {errorMsg && (
+                <div className="mx-6 mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-rose-800 text-xs font-bold">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{errorMsg}</span>
+                  </div>
+                  <button type="button" onClick={() => setErrorMsg(null)} className="text-rose-500 hover:text-rose-700">✕</button>
+                </div>
+              )}
 
               {/* Form Body */}
               <form onSubmit={handleCreateParty} className="p-6 space-y-4 overflow-y-auto flex-1">
@@ -1932,15 +1955,17 @@ export default function PartiesPage() {
                       <button
                         type="button"
                         onClick={() => setFormStep("address")}
-                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
+                        className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
                       >
                         ← Voltar
                       </button>
                       <button
                         type="submit"
-                        className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-black shadow-md shadow-purple-600/20"
+                        disabled={isSaving}
+                        className="px-6 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-md shadow-purple-600/20 flex items-center gap-2 cursor-pointer"
                       >
-                        Salvar Cadastro Completo
+                        {isSaving && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        <span>{isSaving ? "Salvando..." : "Salvar Cadastro Completo"}</span>
                       </button>
                     </div>
                   </div>
