@@ -1,0 +1,32 @@
+name: Loyalty Enterprise — Vercel + Neon gate
+on:
+  push:
+    branches: [feat/loyalty-cashback-enterprise-20261118]
+  workflow_dispatch:
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+      - name: Build production
+        run: npm run build
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Compile canonical permission catalog
+        run: dotnet build tests/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj --configuration Release
