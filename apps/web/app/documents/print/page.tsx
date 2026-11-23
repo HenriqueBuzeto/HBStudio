@@ -31,7 +31,10 @@ export default function DocumentPrintPage(){
   const docId=params.get("id")||"";
   const requestedPaper=params.get("paper");
   setKind(docKind);setId(docId);
-  setPaper(docKind==="contract"?"A4":requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:"80");
+  const defaultPaper=localStorage.getItem("hbstudio:printer-paper:v1");
+  const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:
+    defaultPaper==="58"||defaultPaper==="80"||defaultPaper==="A4"?defaultPaper:"80";
+  setPaper(docKind==="contract"?"A4":selected);
   if(!["quote","training","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
    setError("Documento ou identificador inválido.");setLoading(false);return;
   }
@@ -101,7 +104,7 @@ export default function DocumentPrintPage(){
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
-       <button type="button" key={option.code} onClick={()=>setPaper(option.code)}
+       <button type="button" key={option.code} onClick={()=>{setPaper(option.code);localStorage.setItem("hbstudio:printer-paper:v1",option.code);}}
         className={"rounded-lg border px-3 py-2 text-xs font-bold "+(effectivePaper===option.code?"border-violet-700 bg-violet-50 text-violet-800":"border-slate-200 text-slate-600")}>
         {option.name}
        </button>)}
