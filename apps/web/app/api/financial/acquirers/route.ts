@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from "next/server";
 import crypto from "node:crypto";
 import {authorizeFleet,guardOrigin,FleetError,uuid,string} from "@/lib/fleet-session";
-import {percentToBps,currencyToCentsStrict,calculateAcquirerFee,type AcquirerRate} from "@/lib/acquirer-fees";
+import {percentToBps,currencyToCentsStrict,type AcquirerRate} from "@/lib/acquirer-fees";
 
 const headers=(cid:string)=>({"Cache-Control":"no-store","X-Correlation-Id":cid});
 const fail=(e:unknown,cid:string)=>{
@@ -42,8 +42,7 @@ function rulesPayload(input:unknown):AcquirerRate[]{
     fixedFeeCents:currencyToCentsStrict(r.fixedFee,"Tarifa fixa"),
     settlementDays:days,settlementMode:r.settlementMode,enabled:r.enabled};
    if(rate.mdrBps+rate.anticipationBps>=10000)throw new RangeError("Taxas excessivas");
-   // Reject a fee grid that exceeds the gross amount even for a R$ 100.00 example.
-   if(rate.enabled)calculateAcquirerFee(10_000,rate);
+   // High fixed fees may be legitimate for low-value baskets: validate on the real transaction amount.
    return rate;
   }catch{throw new FleetError(422,"INVALID_RATE","Taxas inválidas ou incompatíveis na modalidade "+key+".");}
  });
