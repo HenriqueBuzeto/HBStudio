@@ -22,7 +22,7 @@ type Readiness={checks:Array<{code:string;ready:boolean;label:string;module:stri
 type MerchantFeePreview={
  configured:boolean;profiles:Array<{id:string;name:string;provider:string;version:number}>;
  selectedProfileId?:string;profileVersion?:number;customerInterestCents:number;
- quote?:{grossCents:number;mdrFeeCents:number;anticipationFeeCents:number;fixedFeeCents:number;netExpectedCents:number;feeTotalCents:number;settlementDays:number;settlementMode:string}|null;
+ quote?:{grossCents:number;mdrFeeCents:number;anticipationFeeCents:number;fixedFeeCents:number;netExpectedCents:number;feeTotalCents:number;settlementDays:number;settlementMode:string;merchantExpectedInstallmentsCents:number[]}|null;
  explanation?:string;disclaimer?:string;
 };
 type Method="Pix"|"CreditCard"|"DebitCard"|"Cash";
@@ -282,6 +282,8 @@ export default function SalesPage(){
          <div className="flex justify-between text-rose-700"><span>Antecipação e tarifa fixa</span><strong>− {money((merchantFees.quote.anticipationFeeCents+merchantFees.quote.fixedFeeCents)/100)}</strong></div>
          <div className="flex justify-between border-t pt-2 text-emerald-700"><span>Líquido previsto para a empresa</span><strong>{money(merchantFees.quote.netExpectedCents/100)}</strong></div>
          <p className="text-[10px] text-slate-500">Tabela v{merchantFees.profileVersion} • Repasse {merchantFees.quote.settlementMode==="MONTHLY"?"mensal (estimado)":"único"} • D+{merchantFees.quote.settlementDays}. Somente a conciliação confirma o líquido real.</p>
+         {merchantFees.quote.settlementMode==="MONTHLY"&&merchantFees.quote.merchantExpectedInstallmentsCents.length>1&&
+          <p className="text-[10px] text-slate-500">Previsão de recebíveis: {merchantFees.quote.merchantExpectedInstallmentsCents.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p>}
         </div>:<p className="text-amber-800">{merchantFees?.explanation||"Nenhuma taxa de adquirente disponível. O sistema não presume taxa zero nem líquido igual ao bruto."}</p>}
        <p className="text-[10px] text-slate-400">Simulação informativa: não cria pagamento, contas a receber nem liquidação.</p>
       </div>}
