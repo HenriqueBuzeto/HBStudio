@@ -10,7 +10,7 @@ function failure(error: unknown, cid: string) {
   const message = error instanceof Error ? error.message : "";
   const code = message.match(/REPAIR_[A-Z_]+/)?.[0];
   if (code) {
-    const status = code.includes("CONFLICT") ? 409 : code.includes("NOT_FOUND") ? 404 : 422;
+    const status = (code.includes("CONFLICT") || code.includes("IDEMPOTENCY_MISMATCH")) ? 409 : code.includes("NOT_FOUND") ? 404 : 422;
     return NextResponse.json({ code, error: "Os dados não atendem às regras da ordem de serviço.", }, { status, headers: headers(cid) });
   }
   console.error("[Repairs][" + cid + "] database failure:", error instanceof Error ? error.name : "unknown");
