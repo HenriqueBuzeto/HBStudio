@@ -157,7 +157,7 @@ export default function SalesPage(){
     const printUrl=buildPrintUrl("quote",response.quote.id,prefs.paper,true);
     setPrintRetryUrl(printUrl);
     if(pendingPrint&&!pendingPrint.closed){
-      try{pendingPrint.location.replace(printUrl);}
+      try{pendingPrint.location.replace(new URL(printUrl,window.location.origin).href);}
       catch{setNotice("Orçamento salvo, mas a janela de impressão foi bloqueada. Utilize Imprimir agora.");}
     }else{
       setNotice("Orçamento salvo. O navegador bloqueou a impressão automática; use Imprimir agora.");
