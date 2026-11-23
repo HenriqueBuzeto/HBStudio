@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS pos_training_sales (
  UNIQUE ("TenantId","BranchId","Number"),
  UNIQUE ("TenantId","BranchId","Id"),
  CHECK (("Status"='SIMULATED' AND "VoidedAtUtc" IS NULL AND "VoidedByUserId" IS NULL)
-  OR ("Status"='VOIDED' AND "VoidedAtUtc" IS NOT NULL AND "VoidedByUserId" IS NOT NULL AND length(trim("VoidReason"))>3))
+  OR ("Status"='VOIDED' AND "VoidedAtUtc" IS NOT NULL AND "VoidedByUserId" IS NOT NULL AND length(trim(COALESCE("VoidReason",'')))>3))
 );
 CREATE INDEX IF NOT EXISTS "IX_pos_training_sales_scope"
  ON pos_training_sales ("TenantId","BranchId","CreatedAtUtc" DESC);
