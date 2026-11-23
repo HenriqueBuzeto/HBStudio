@@ -3,12 +3,13 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
-import {Wallet,FileSpreadsheet,RefreshCw,AlertTriangle,LockKeyhole,Receipt,ArrowDownRight,ArrowUpRight} from "lucide-react";
+import {Wallet,FileSpreadsheet,RefreshCw,AlertTriangle,LockKeyhole,Receipt,ArrowDownRight,ArrowUpRight,CreditCard} from "lucide-react";
 
 type TitleRow={id:string;titleNumber:string;description:string;dueDate:string;originalAmount:number;settledAmount:number;balance:number;status:number;party:string};
 type JournalRow={id:string;documentNumber:string;description:string;sourceType:string;competenceDate:string;recordedTotal:number;debits:number;credits:number;lineCount:number};
 type Report={journals:JournalRow[];payables:TitleRow[];receivables:TitleRow[];
- allowed:{payables:boolean;receivables:boolean};journalIntegrity:{reviewed:number;inconsistent:number;unbalancedEntryIds:string[]};dreAvailable:false;note:string};
+ allowed:{payables:boolean;receivables:boolean};journalIntegrity:{reviewed:number;inconsistent:number;unbalancedEntryIds:string[]};dreAvailable:false;note:string;
+ acquirerMetrics:{transactionCount:number;settledCount:number;grossCents:string;expectedFeeCents:string;netExpectedCents:string;netSettledCents:string}|null};
 const money=(n:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);
 const date=(s:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short"}).format(new Date(s));
 const nav="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700";
@@ -37,13 +38,30 @@ export default function FinancialPage(){
     <div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Controladoria e Financeiro</span>
      <h1 className="mt-2 text-xl font-extrabold text-slate-900">Financeiro Geral & Integridade Contábil</h1>
      <p className="mt-1 max-w-xl text-xs text-slate-500">Contas e partidas contábeis persistidas no Neon, separadas por empresa e filial.</p></div>
-    <button onClick={()=>void load()} disabled={loading} className={nav+" inline-flex items-center gap-2 disabled:opacity-50"}><RefreshCw className="h-4 w-4"/>{loading?"Consultando...":"Atualizar"}</button>
+    <div className="flex flex-wrap gap-2">
+     <a href="/financial/acquirers" className={nav+" inline-flex items-center gap-2 border-violet-200 text-violet-700"}><CreditCard className="h-4 w-4"/>Crédito / Débito & Pix — taxas da maquininha</a>
+     <button onClick={()=>void load()} disabled={loading} className={nav+" inline-flex items-center gap-2 disabled:opacity-50"}><RefreshCw className="h-4 w-4"/>{loading?"Consultando...":"Atualizar"}</button>
+    </div>
    </header>
    {error&&<div role="alert" className="flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800"><AlertTriangle className="h-4 w-4 shrink-0"/>{error}</div>}
    <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><ArrowDownRight className="h-5 w-5 text-rose-600"/><div className="mt-2 text-2xl font-black text-slate-900">{report&&report.allowed.payables?money(totalPayables):"—"}</div><p className="text-xs text-slate-500">Saldo dos títulos a pagar consultados</p></div>
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><ArrowUpRight className="h-5 w-5 text-blue-600"/><div className="mt-2 text-2xl font-black text-slate-900">{report&&report.allowed.receivables?money(totalReceivables):"—"}</div><p className="text-xs text-slate-500">Saldo dos títulos a receber consultados</p></div>
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><FileSpreadsheet className="h-5 w-5 text-violet-700"/><div className="mt-2 text-2xl font-black text-slate-900">{report?report.journalIntegrity.inconsistent:"—"}</div><p className="text-xs text-slate-500">Lançamentos com divergência contábil</p></div>
+   </section>
+   <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+     <h2 className="flex items-center gap-2 text-sm font-extrabold"><CreditCard className="h-4 w-4 text-violet-700"/>Controle de recebíveis — Crédito, Débito & Pix</h2>
+     <a href="/financial/acquirers" className="text-xs font-bold text-violet-700 underline">Gerenciar taxas da adquirente</a>
+    </div>
+    {report?.acquirerMetrics&&report.acquirerMetrics.transactionCount>0?
+     <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div><p className="text-xs text-slate-500">Bruto dos recebíveis registrados</p><p className="font-black">{money(Number(report.acquirerMetrics.grossCents)/100)}</p></div>
+      <div><p className="text-xs text-slate-500">Taxas contratuais previstas</p><p className="font-black text-rose-700">− {money(Number(report.acquirerMetrics.expectedFeeCents)/100)}</p></div>
+      <div><p className="text-xs text-slate-500">Líquido previsto (não liquidado)</p><p className="font-black text-violet-700">{money(Number(report.acquirerMetrics.netExpectedCents)/100)}</p></div>
+      <div><p className="text-xs text-slate-500">Líquido efetivamente conciliado</p><p className="font-black text-emerald-700">{money(Number(report.acquirerMetrics.netSettledCents)/100)}</p></div>
+      <p className="col-span-full text-xs text-slate-500">Conciliação: {report.acquirerMetrics.settledCount}/{report.acquirerMetrics.transactionCount} operações com repasse confirmado. Valores estimados não são caixa/banco.</p>
+     </div>:<p className="mt-3 text-xs text-slate-500">Nenhum recebível de adquirente com snapshot financeiro verificado nesta filial. Configurar a tabela de taxas não gera recebimentos nem altera o resultado.</p>}
    </section>
    <nav className="flex flex-wrap gap-2" aria-label="Seções financeiras">
     <button onClick={()=>setTab("journal")} className={nav+(tab==="journal"?" border-violet-500 bg-violet-50 text-violet-700":"")}>Razão e integridade</button>
