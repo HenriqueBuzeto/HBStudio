@@ -362,8 +362,11 @@ export default function SalesPage(){
     {documentModeError&&<div role="alert" className="mt-2 rounded-lg bg-amber-100 p-2 font-semibold text-amber-900">{documentModeError}</div>}
     <p className="mt-2 text-[10px]">Atalho disponível na janela do PDV; algumas combinações podem ser interceptadas pelo navegador. Também é possível usar o botão.</p>
    </div>
-   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
-     {readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+   {!trainingMode&&<div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>}
+     {trainingMode&&<div className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-900">
+      Treinamento ativo: dispensa saldo, turno, depósito e conta contábil porque não gera venda real, recebimento nem baixa de estoque. O cupom é marcado SIMULAÇÃO.
+     </div>}
+     {!trainingMode&&readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
        <strong className="block text-slate-800">Pré-requisitos verificados nesta filial</strong>
        <ul className="mt-2 space-y-1.5">
         {readiness.checks.map(check=><li key={check.code} className="flex items-center justify-between gap-2">
