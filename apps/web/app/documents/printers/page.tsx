@@ -9,8 +9,8 @@ const settingsKey="hbstudio:printer-paper:v1";
 export default function PrinterSetupPage(){
  const [paper,setPaper]=useState<Paper>("80");
  const [saved,setSaved]=useState(false);
- useEffect(()=>{const v=localStorage.getItem(settingsKey);if(v==="58"||v==="80"||v==="A4")setPaper(v);},[]);
- const save=(v:Paper)=>{setPaper(v);localStorage.setItem(settingsKey,v);setSaved(true);};
+ useEffect(()=>{try{const v=localStorage.getItem(settingsKey);if(v==="58"||v==="80"||v==="A4")setPaper(v);}catch{/* Safe fallback when storage is disabled. */}},[]);
+ const save=(v:Paper)=>{setPaper(v);try{localStorage.setItem(settingsKey,v);setSaved(true);}catch{setSaved(false);}};
  const testPrint=()=>window.print();
  return <RootShellLayout>
   <style>{`
