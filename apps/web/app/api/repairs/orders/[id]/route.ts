@@ -1,140 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { authorizeFleet, guardOrigin, FleetError, uuid } from "@/lib/fleet-session";
 
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
+const responseHeaders=(cid:string)=>({"X-Correlation-Id":cid,"Cache-Control":"no-store"});
+
+function respondError(e:unknown,cid:string) {
+  if(e instanceof FleetError)
+    return NextResponse.json({code:e.code,error:e.message},{status:e.status,headers:responseHeaders(cid)});
+  const message=e instanceof Error?e.message:"";
+  if(message.includes("REPAIR_CONFLICT"))
+    return NextResponse.json({code:"REPAIR_CONFLICT",error:"OS alterada por outro usuário. Recarregue antes de tentar novamente."},{status:409,headers:responseHeaders(cid)});
+  if(message.includes("REPAIR_NOT_FOUND"))
+    return NextResponse.json({code:"REPAIR_NOT_FOUND",error:"OS não encontrada nesta filial."},{status:404,headers:responseHeaders(cid)});
+  if(/REPAIR_INVALID_|REPAIR_DELIVERED_/.test(message))
+    return NextResponse.json({code:"REPAIR_VALIDATION_ERROR",error:"Transição de status ou itens não permitidos para esta OS."},{status:422,headers:responseHeaders(cid)});
+  console.error("[Repairs]["+cid+"] update error:",e instanceof Error?e.name:"unknown");
+  return NextResponse.json({code:"REPAIR_UPDATE_UNAVAILABLE",error:"Falha ao atualizar ordem de serviço."},{status:503,headers:responseHeaders(cid)});
 }
 
-// PUT /api/repairs/orders/[id] - Atualizar status (Kanban), detalhes e itens (produtos/serviços)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
-
+export async function PUT(request:NextRequest,{params}:{params:Promise<{id:string}>}) {
+  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
   try {
-    const { id } = await params;
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-    const userId = decoded.sub || decoded.nameid;
-
-    const body = await request.json();
-    const {
-      status, // Novo status numérico do Kanban
-      diagnosticNotes,
-      resolutionNotes,
-      reportedDefect,
-      items, // array atualizado de itens
-    } = body;
-
-    const sql = getDb();
-
-    // 1. Buscar a OS existente
-    const currentOrders = await sql.query(
-      `SELECT "Id", "Status", "TotalLaborPrice", "TotalPartsPrice" FROM repair_orders WHERE "Id" = $1 AND "TenantId" = $2;`,
-      [id, tenantId]
+    guardOrigin(request);
+    const {id}=await params;
+    uuid(id,"OS");
+    const body=await request.json();
+    if(!body||typeof body!=="object"||Array.isArray(body))
+      throw new FleetError(422,"VALIDATION_ERROR","Dados inválidos.");
+    const changingItems=Object.prototype.hasOwnProperty.call(body,"items");
+    const changingStatus=Object.prototype.hasOwnProperty.call(body,"status");
+    const permission=changingItems?"repairs.quote":changingStatus?"repairs.execute":"repairs.diagnose";
+    const ctx=await authorizeFleet(request,permission);
+    if(changingItems&&changingStatus&&!ctx.permissions.has("repairs.execute"))
+      throw new FleetError(403,"FORBIDDEN","Permissão repairs.execute necessária.");
+    const expectedStatus=Number(body.expectedStatus);
+    if(!Number.isInteger(expectedStatus))
+      throw new FleetError(422,"VALIDATION_ERROR","Status atual obrigatório.");
+    const expectedUpdated=body.expectedUpdatedAtUtc;
+    if(expectedUpdated!==null && (typeof expectedUpdated!=="string" || !Number.isFinite(Date.parse(expectedUpdated))))
+      throw new FleetError(422,"VALIDATION_ERROR","Token de concorrência inválido.");
+    if(!Object.prototype.hasOwnProperty.call(body,"expectedUpdatedAtUtc"))
+      throw new FleetError(422,"VALIDATION_ERROR","Token de concorrência ausente.");
+    const status=changingStatus?Number(body.status):null;
+    if(status!==null&&!Number.isInteger(status))
+      throw new FleetError(422,"VALIDATION_ERROR","Status inválido.");
+    if(changingItems&&(!Array.isArray(body.items)||body.items.length>100))
+      throw new FleetError(422,"VALIDATION_ERROR","Lista de itens inválida.");
+    const items=changingItems?body.items.map((item:any)=>{
+      if(!item||typeof item!=="object"||![1,2].includes(item.itemType))
+        throw new FleetError(422,"VALIDATION_ERROR","Tipo de item inválido.");
+      const quantity=Number(item.quantity),price=Number(item.unitPrice);
+      if(typeof item.description!=="string"||!item.description.trim()||
+        !Number.isFinite(quantity)||quantity<=0||quantity>10000||
+        !Number.isFinite(price)||price<0||price>100000000||
+        Math.round(price*100)!==price*100)
+        throw new FleetError(422,"VALIDATION_ERROR","Quantidade ou preço inválido.");
+      return {itemType:item.itemType,description:item.description.trim(),quantity,
+        unitPrice:price,productSkuId:item.productSkuId?uuid(item.productSkuId,"SKU"):null};
+    }):null;
+    const optionalText=(v:unknown,max:number)=> {
+      if(v===undefined||v===null||v==="")return null;
+      if(typeof v!=="string"||v.length>max)
+        throw new FleetError(422,"VALIDATION_ERROR","Campo de texto inválido.");
+      return v.trim()||null;
+    };
+    const rows=await ctx.db.query(
+      'SELECT * FROM repair_enterprise_update($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::int,$8::timestamptz,$9::int,$10::text,$11::text,$12::text,$13::jsonb)',
+      [ctx.tenantId,ctx.branchId,ctx.userId,ctx.email,cid,id,expectedStatus,expectedUpdated,
+        status,optionalText(body.reportedDefect,2000),optionalText(body.diagnosticNotes,2000),
+        optionalText(body.resolutionNotes,2000),items===null?null:JSON.stringify(items)]
     );
-
-    if (currentOrders.length === 0) {
-      return NextResponse.json({ error: "Ordem de serviço não encontrada." }, { status: 404 });
-    }
-
-    const current = currentOrders[0];
-    const newStatus = status !== undefined ? Number(status) : current.Status;
-
-    // 2. Se houver atualização de itens (produtos ou serviços adicionados/removidos)
-    let totalLabor = Number(current.TotalLaborPrice || 0);
-    let totalParts = Number(current.TotalPartsPrice || 0);
-
-    if (Array.isArray(items)) {
-      totalLabor = 0;
-      totalParts = 0;
-      // Remover itens anteriores e regravar lista consolidada
-      await sql.query(`DELETE FROM repair_estimate_items WHERE "RepairOrderId" = $1;`, [id]);
-
-      for (const it of items) {
-        const subtotal = Number(it.quantity || 1) * Number(it.unitPrice || 0);
-        if (it.itemType === 1) {
-          totalLabor += subtotal;
-        } else {
-          totalParts += subtotal;
-        }
-
-        await sql.query(
-          `INSERT INTO repair_estimate_items (
-            "Id", "TenantId", "RepairOrderId", "ItemType", "Description", "Quantity", "UnitPrice", "UnitCost", "ProductSkuId", "CreatedAtUtc"
-          )
-          VALUES (
-            gen_random_uuid(), $1, $2, $3, $4, $5, $6, 0, $7, NOW()
-          );`,
-          [
-            tenantId,
-            id,
-            it.itemType || 1,
-            it.description || "Item de Manutenção",
-            Number(it.quantity || 1),
-            Number(it.unitPrice || 0),
-            it.productSkuId || null,
-          ]
-        );
-      }
-    }
-
-    const finalPrice = totalLabor + totalParts;
-
-    // 3. Atualizar a ordem de serviço
-    await sql.query(
-      `UPDATE repair_orders
-       SET "Status" = $1,
-           "DiagnosticNotes" = COALESCE($2, "DiagnosticNotes"),
-           "ResolutionNotes" = COALESCE($3, "ResolutionNotes"),
-           "ReportedDefect" = COALESCE($4, "ReportedDefect"),
-           "TotalLaborPrice" = $5,
-           "TotalPartsPrice" = $6,
-           "FinalPrice" = $7,
-           "DeliveredAtUtc" = CASE WHEN $1 = 12 THEN NOW() ELSE "DeliveredAtUtc" END,
-           "UpdatedAtUtc" = NOW()
-       WHERE "Id" = $8 AND "TenantId" = $9;`,
-      [
-        newStatus,
-        diagnosticNotes || null,
-        resolutionNotes || null,
-        reportedDefect || null,
-        totalLabor,
-        totalParts,
-        finalPrice,
-        id,
-        tenantId,
-      ]
-    );
-
-    // 4. Se o status mudou, registrar no histórico
-    if (newStatus !== current.Status) {
-      await sql.query(
-        `INSERT INTO repair_status_history (
-          "Id", "TenantId", "RepairOrderId", "OldStatus", "NewStatus", "Notes", "ChangedByUserId", "CreatedAtUtc"
-        )
-        VALUES (
-          gen_random_uuid(), $1, $2, $3, $4, 'Status atualizado no Kanban.', $5, NOW()
-        );`,
-        [tenantId, id, current.Status, newStatus, userId]
-      );
-    }
-
-    return NextResponse.json({
-      message: "Ordem de serviço atualizada com sucesso.",
-      status: newStatus,
-      finalPrice,
-    });
-  } catch (err: any) {
-    console.error(`[${correlationId}] Erro ao atualizar OS:`, err);
-    return NextResponse.json({ error: "Erro interno ao atualizar ordem de serviço." }, { status: 500 });
-  }
+    const result=rows[0];
+    return NextResponse.json({message:"OS atualizada e registrada no histórico.",
+      status:result.status,finalPrice:Number(result.finalPrice),
+      updatedAtUtc:result.updatedAtUtc},{headers:responseHeaders(cid)});
+  } catch(e){return respondError(e,cid);}
 }
