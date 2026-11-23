@@ -14,7 +14,7 @@ export async function PATCH(request:NextRequest,{params}:Params){
   if(reason.length<4||reason.length>500)throw new FleetError(422,"INVALID_REASON","Informe o motivo de cancelamento (4 a 500 caracteres).");
   const rows=await ctx.db.query(`
     WITH voided AS (
-      UPDATE pos_training_sales SET "Status"='VOIDED',"VoidedAtUtc"=now(),
+      UPDATE pos_training_checkout_records SET "Status"='VOIDED',"VoidedAtUtc"=now(),
        "VoidedByUserId"=$4::uuid,"VoidReason"=$5
       WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid
        AND "Id"=$3::uuid AND "Status"='SIMULATED'
