@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCpf,normalizeDocument} from "@/lib/br-format";
 import { useAuth } from "@/lib/auth";
 import {
   Users,
@@ -180,7 +181,7 @@ export default function UsersManagementPage() {
           password,
           isPartner,
           roleTitle: roleTitle.trim() || (isPartner ? "CEO" : "Operador Geral"),
-          documentNumber: documentNumber.trim() || undefined
+          documentNumber: normalizeDocument(documentNumber) || undefined
         })
       });
 
@@ -718,7 +719,7 @@ export default function UsersManagementPage() {
                       <input
                         type="text"
                         value={documentNumber}
-                        onChange={(e) => setDocumentNumber(e.target.value)}
+                        onChange={(e) => setDocumentNumber(formatCpf(e.target.value))}
                         placeholder="000.000.000-00"
                         className="w-full text-xs px-3 py-2 bg-white rounded-xl border border-amber-300 focus:outline-none font-mono"
                       />
