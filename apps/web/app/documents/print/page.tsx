@@ -89,7 +89,10 @@ export default function DocumentPrintPage(){
     <div><h1 className="text-lg font-black text-slate-900">Central de impressão e documentos</h1>
      <p className="mt-1 text-xs text-slate-600">Impressão pelo driver do Windows/macOS, exportação em PDF do navegador e compartilhamento via WhatsApp.</p>
     </div>
-    <a className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold" href="/sales">Voltar ao PDV</a>
+    <div className="flex flex-wrap gap-2">
+     <a className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold" href="/documents/printers">Configurar impressora</a>
+     <a className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold" href="/sales">Voltar ao PDV</a>
+    </div>
    </header>
    {loading&&<div className="rounded-xl border bg-white p-6 text-sm">Consultando documento no Neon...</div>}
    {error&&<div role="alert" className="hb-print-actions flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
