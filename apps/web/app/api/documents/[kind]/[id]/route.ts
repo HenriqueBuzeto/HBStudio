@@ -9,11 +9,40 @@ export async function GET(request:NextRequest,context:Context){
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try{
   const {kind,id}=await context.params;
-  if(!["quote","training","service","contract","sale"].includes(kind))
+  if(!["quote","training","training-sale","service","contract","sale"].includes(kind))
    throw new FleetError(404,"DOCUMENT_NOT_FOUND","Tipo de documento não encontrado.");
   uuid(id,"Documento");
-  const permission=kind==="quote"||kind==="training"||kind==="sale"?"sales.pos.use":"repairs.view";
+  const permission=kind==="quote"||kind==="training"||kind==="training-sale"||kind==="sale"?"sales.pos.use":"repairs.view";
   const ctx=await authorizeFleet(request,permission);
+  if(kind==="training-sale"){
+    const [train]=await ctx.db.query(
+      `SELECT t."Number" AS number,t."CreatedAtUtc" AS "createdAt",
+       t."PaymentMethod" AS method,t."Installments" AS installments,
+       t."TotalCents"::text AS total,t."SubtotalCents"::text AS subtotal,
+       t."DiscountCents"::text AS discount,t."ItemsSnapshot" AS items,
+       t."Status" AS status,p."Name" AS customer,
+       b."Name" AS branchName,ten."Name" AS tenantName
+      FROM pos_training_sales t
+      JOIN branches b ON b."Id"=t."BranchId" AND b."TenantId"=t."TenantId"
+      JOIN tenants ten ON ten."Id"=t."TenantId"
+      LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
+      WHERE t."Id"=$3::uuid AND t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid`,
+      [ctx.tenantId,ctx.branchId,id]
+    );
+    if(!train)throw new FleetError(404,"DOCUMENT_NOT_FOUND","Simulação não encontrada nesta filial.");
+    const items=Array.isArray(train.items)?train.items:[];
+    return NextResponse.json({kind,documentType:"TRAINING_SALE",number:train.number,
+      issuedAt:train.createdAt,organization:{name:train.tenantName,legalName:train.tenantName,
+       branch:train.branchName,cnpj:null,address:""},
+      customer:train.customer||"Consumidor não identificado",
+      items:items.map((i:any)=>({sku:i.skuCode,description:i.description,
+       quantity:i.quantity,unitPrice:i.unitCents/100,discount:0})),
+      totals:{subtotal:Number(train.subtotal)/100,discount:Number(train.discount)/100,
+       shipping:0,total:Number(train.total)/100},
+      notes:"FORMA SIMULADA: "+train.method+" • "+train.installments+"x • "+train.status,
+      disclaimer:"SIMULAÇÃO / TREINAMENTO — NÃO É DOCUMENTO FISCAL, NÃO É COMPROVANTE DE PAGAMENTO. NENHUM ESTOQUE, CAIXA, RECEITA OU FINANCEIRO FOI MOVIMENTADO."},
+      {headers:headers(cid)});
+  }
   if(kind==="sale")
    throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED",
     "Comprovantes de venda ficam bloqueados até a confirmação transacional e fiscal do checkout. Não é permitido imprimir pagamento ainda não confirmado.");
