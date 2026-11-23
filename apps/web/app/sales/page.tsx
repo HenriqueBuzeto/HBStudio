@@ -341,6 +341,16 @@ export default function SalesPage(){
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
+     <div className={"rounded-xl border-2 p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+       <strong>{trainingMode?"TREINAMENTO ATIVO — NÃO É VENDA REAL":"TREINAMENTO DESATIVADO"}</strong>
+       <button type="button" onClick={()=>setTrainingMode(v=>!v)}
+        className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Ctrl + F1 • {trainingMode?"Desativar":"Ativar simulação"}</button>
+      </div>
+      <p className="mt-2">{trainingMode?
+       "Simulação para qualquer cliente e operador com acesso ao PDV. Não movimenta estoque, caixa, receita, contabilidade ou SEFAZ.":
+       "Para operações reais, continuam necessárias liquidação homologada e regras fiscais aplicáveis."}</p>
+     </div>
      <div className={"rounded-xl border-2 p-3 text-xs "+(documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
     <div className="flex flex-wrap items-center justify-between gap-2">
      <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
@@ -371,13 +381,40 @@ export default function SalesPage(){
        <p className="mt-3 text-amber-800">{readiness.checkoutBlocker}</p>
        <p className="mt-1 text-slate-600">{readiness.fiscalBlocker}</p>
       </div>}
-      <button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>
+      {trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
+        disabled={saving||!items.length||!sellerId||totalCents<=0||!isDiscountValid||
+         (discountCents>0&&!aux.capabilities.discountOverride)}
+        onClick={()=>void saveTraining()}>
+        <Receipt className="mr-2 inline h-4 w-4"/>{saving?"Salvando...":"Registrar venda SIMULADA — sem financeiro / fiscal"}
+       </button>}
+       {!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
     </section>
    </div>
   </div>
   :tab==="quotes"?<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-sm font-black text-slate-900">Orçamentos registrados no Neon</h2><p className="text-xs text-slate-500">Propostas comerciais não são venda nem comprovante de pagamento.</p></div><button className={primary} onClick={()=>setTab("pos")}><Plus className="h-4 w-4"/> Novo orçamento</button></div>
    {quotes.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhum orçamento encontrado para esta filial.</div>:<div className="divide-y divide-slate-100">{quotes.map(q=><div key={q.id} className="flex flex-wrap items-center justify-between gap-4 p-4"><div><strong className="font-mono text-xs text-violet-700">{q.number}</strong><p className="mt-1 text-xs text-slate-600">{q.customer||"Consumidor não identificado"} • Vendedor: {q.seller||"—"}</p><p className="text-[10px] text-slate-400">Criado em {dateText(q.createdAt)} • Válido até {dateText(q.validUntil)}</p></div><div className="flex items-center gap-3"><strong className="text-base text-slate-900">{money(q.total)}</strong><button className={button} onClick={()=>setSelectedQuote(q)}><ClipboardList className="h-4 w-4"/> Detalhes</button></div></div>)}</div>}
   </section>
+  :tab==="training"?<section className="rounded-2xl border-2 border-rose-200 bg-white shadow-sm">
+      <div className="border-b border-rose-200 bg-rose-50 p-5">
+       <h2 className="font-black text-rose-900">Vendas simuladas — treinamento</h2>
+       <p className="mt-1 text-xs text-rose-800">Valores aqui não compõem vendas reais, faturamento, caixa, estoques ou relatórios financeiros oficiais.</p>
+      </div>
+      {trainingLastUrl&&<a href={trainingLastUrl} target="_blank" rel="noopener noreferrer"
+        className="m-4 inline-block rounded-xl bg-rose-700 px-4 py-2 text-xs font-bold text-white">Imprimir última simulação</a>}
+      {trainingSales.length===0?<p className="p-8 text-sm text-slate-500">Nenhuma simulação registrada nesta filial.</p>:
+       <div className="overflow-x-auto"><table className="w-full text-left text-xs">
+        <thead className="bg-slate-50"><tr>{["Número","Data","Cliente","Vendedor","Total simulado","Status","Ações"].map(x=><th key={x} className="px-3 py-3">{x}</th>)}</tr></thead>
+        <tbody>{trainingSales.map(t=><tr key={t.id} className="border-t">
+         <td className="px-3 py-3 font-mono text-[10px]">{t.number}</td><td className="px-3 py-3">{dateText(t.createdAt)}</td>
+         <td className="px-3 py-3">{t.customer||"Não identificado"}</td><td className="px-3 py-3">{t.seller}</td>
+         <td className="px-3 py-3 font-bold">{money(Number(t.totalCents)/100)}</td>
+         <td className="px-3 py-3">{t.status==="VOIDED"?"Cancelada":"Simulação"}</td>
+         <td className="px-3 py-3"><div className="flex gap-2">
+          <a href={buildPrintUrl("training-sale",t.id,"80")} target="_blank" rel="noopener noreferrer" className={button}>Imprimir</a>
+          {t.status==="SIMULATED"&&hasPermission("sales.cancel")&&<button type="button" className={button} onClick={()=>void voidTraining(t.id)}>Cancelar</button>}
+         </div></td>
+        </tr>)}</tbody></table></div>}
+     </section>
   :<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="text-sm font-black text-slate-900">Histórico de vendas persistidas</h2><p className="text-xs text-slate-500">Nenhuma autorização fiscal é presumida. Status refletido diretamente no Neon.</p></div>
    {history.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhuma venda cadastrada nesta filial.</div>:<div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr>{["Venda","Data","Cliente","Vendedor","Total","Status","Detalhes"].map(x=><th key={x} className="px-4 py-3">{x}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{history.map(s=><tr key={s.id}><td className="px-4 py-3 font-mono font-bold text-violet-700">{s.saleNumber}</td><td className="px-4 py-3">{dateText(s.createdAtUtc)}</td><td className="px-4 py-3">{s.customerName}</td><td className="px-4 py-3">{s.sellerName}</td><td className="px-4 py-3 font-bold">{money(s.totalAmount)}</td><td className="px-4 py-3"><span className="rounded-lg bg-slate-100 px-2 py-1">{statusSale[s.status]||"Desconhecido"}</span></td><td className="px-4 py-3"><button className={button} onClick={()=>setSelectedSale(s)}>Visualizar</button></td></tr>)}</tbody></table></div>}
   </section>}
