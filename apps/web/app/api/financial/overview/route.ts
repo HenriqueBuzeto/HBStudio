@@ -9,7 +9,7 @@ export async function GET(request:NextRequest){
   const ctx=await authorizeFleet(request,"finance.reports.view");
   const canPayables=ctx.permissions.has("finance.payables.view");
   const canReceivables=ctx.permissions.has("finance.receivables.view");
-  const [journals,payables,receivables]=await Promise.all([
+  const [journals,payables,receivables,acquirerMetrics]=await Promise.all([
    ctx.db.query(`SELECT e."Id"::text AS id,e."DocumentNumber" AS "documentNumber",
     e."Description" AS description,e."SourceType" AS "sourceType",
     e."CompetenceDateUtc" AS "competenceDate",
@@ -34,18 +34,27 @@ export async function GET(request:NextRequest){
     COALESCE(c."Name",'Cliente não identificado') AS party
     FROM accounts_receivable r LEFT JOIN parties c ON c."Id"=r."CustomerPartyId" AND c."TenantId"=r."TenantId"
     WHERE r."TenantId"=$1::uuid AND r."BranchId"=$2::uuid
-    ORDER BY r."DueDateUtc" DESC LIMIT 150`,[ctx.tenantId,ctx.branchId]):Promise.resolve([])
+    ORDER BY r."DueDateUtc" DESC LIMIT 150`,[ctx.tenantId,ctx.branchId]):Promise.resolve([]),
+   ctx.db.query(`SELECT COUNT(*)::integer AS "transactionCount",
+       COUNT(*) FILTER (WHERE "Status"='SETTLED')::integer AS "settledCount",
+       COALESCE(SUM("GrossCents"),0)::bigint::text AS "grossCents",
+       COALESCE(SUM("MdrFeeCents"+"AnticipationFeeCents"+"FixedFeeCents"),0)::bigint::text AS "expectedFeeCents",
+       COALESCE(SUM("NetExpectedCents"),0)::bigint::text AS "netExpectedCents",
+       COALESCE(SUM("NetSettledCents") FILTER (WHERE "Status"='SETTLED'),0)::bigint::text AS "netSettledCents"
+     FROM payment_acquirer_fee_snapshots
+     WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid`,[ctx.tenantId,ctx.branchId])
   ]);
   const inconsistent=journals.filter((j:any)=>j.lineCount<2||
    Math.abs(Number(j.debits)-Number(j.credits))>0.009||
    Math.abs(Number(j.recordedTotal)-Number(j.debits))>0.009);
   return NextResponse.json({
     journals,payables,receivables,
+    acquirerMetrics:acquirerMetrics[0]||null,
     allowed:{payables:canPayables,receivables:canReceivables},
     journalIntegrity:{reviewed:journals.length,inconsistent:inconsistent.length,
      unbalancedEntryIds:inconsistent.map((j:any)=>j.id)},
     dreAvailable:false,
-    note:"Este painel apresenta títulos e lançamentos reais; DRE gerencial exige plano de contas classificado e fechamento homologado."
+    note:"Os valores de adquirente só refletem pagamentos com snapshot persistido. EXPECTED é previsão, SETTLED é repasse conciliado. DRE exige classificação e fechamento."
   },{headers:hdr(cid)});
  }catch(e){
   if(e instanceof FleetError)return NextResponse.json({code:e.code,error:e.message},{status:e.status,headers:hdr(cid)});
