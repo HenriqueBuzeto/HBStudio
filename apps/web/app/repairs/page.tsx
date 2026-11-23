@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {
   Wrench,
@@ -41,6 +41,7 @@ export default function RepairsPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const createRequestKey = useRef<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tvMode, setTvMode] = useState(false);
@@ -109,13 +110,15 @@ export default function RepairsPage() {
     }
     try {
       setSaving(true); setErrorMessage(null);setSuccessMessage(null);
+      if (!createRequestKey.current) createRequestKey.current = crypto.randomUUID();
       const data = await readApi(await fetch("/api/repairs/orders",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({customerId:selectedCustomerId||undefined,customerName:createCustomerName.trim()||undefined,
+        body:JSON.stringify({requestKey:createRequestKey.current,customerId:selectedCustomerId||undefined,customerName:createCustomerName.trim()||undefined,
           equipmentType,brand,model,color,serialNumber,equipmentDetails,reportedDefect,items:initialItems})
       }));
       setShowCreateModal(false);
       resetCreateForm();
+      createRequestKey.current = "";
       setSuccessMessage(`OS ${data.orderNumber} cadastrada no Neon.`);
       await loadOrders();
     } catch(err) {
@@ -330,7 +333,7 @@ export default function RepairsPage() {
             </button>
 
             <button
-              onClick={() => {setErrorMessage(null);setShowCreateModal(true);}}
+              onClick={() => {setErrorMessage(null);createRequestKey.current="";setShowCreateModal(true);}}
               className="h-10 px-5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
