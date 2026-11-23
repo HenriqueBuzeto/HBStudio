@@ -90,3 +90,51 @@ COMMENT ON TABLE payment_acquirer_rate_rules IS
  'MDR, antecipacao efetiva contratada e tarifas fixas por operadora e 1-18 parcelas. Sem juros repassados ao comprador.';
 COMMENT ON TABLE payment_acquirer_fee_snapshots IS
  'Snapshots futuros de pagamentos verificados. EXPECTED nao equivale a liquidado; reconciliar retorno adquirente antes de SETTLED.';
+
+
+-- Defense in depth: an already published contract must not be silently rewritten.
+CREATE OR REPLACE FUNCTION payment_acquirer_reject_published_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $auditguard$
+BEGIN
+ RAISE EXCEPTION 'ACQUIRER_PUBLISHED_RATES_IMMUTABLE' USING ERRCODE='23514';
+END $auditguard$;
+CREATE TRIGGER "TR_payment_acquirer_rate_versions_immutable"
+ BEFORE UPDATE OR DELETE ON payment_acquirer_rate_versions
+ FOR EACH ROW EXECUTE FUNCTION payment_acquirer_reject_published_mutation();
+CREATE TRIGGER "TR_payment_acquirer_rate_rules_immutable"
+ BEFORE UPDATE OR DELETE ON payment_acquirer_rate_rules
+ FOR EACH ROW EXECUTE FUNCTION payment_acquirer_reject_published_mutation();
+
+-- An expected receivable snapshot must belong to the same tenant and branch as the sale.
+-- Its agreed gross and contractual fees never change when payment status changes.
+CREATE OR REPLACE FUNCTION payment_acquirer_snapshot_integrity()
+RETURNS trigger LANGUAGE plpgsql AS $snapshotguard$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM sale_payment_intents pi
+   JOIN sales s ON s."Id"=pi."SaleId" AND s."TenantId"=pi."TenantId"
+   WHERE pi."Id"=NEW."SalePaymentIntentId" AND pi."TenantId"=NEW."TenantId"
+     AND s."BranchId"=NEW."BranchId"
+ ) THEN RAISE EXCEPTION 'ACQUIRER_SNAPSHOT_SCOPE_MISMATCH' USING ERRCODE='23514'; END IF;
+ IF TG_OP='UPDATE' THEN
+   IF (OLD."TenantId",OLD."BranchId",OLD."SalePaymentIntentId",OLD."RateRuleId",
+       OLD."GrossCents",OLD."MdrFeeCents",OLD."AnticipationFeeCents",
+       OLD."FixedFeeCents",OLD."NetExpectedCents")
+      IS DISTINCT FROM
+      (NEW."TenantId",NEW."BranchId",NEW."SalePaymentIntentId",NEW."RateRuleId",
+       NEW."GrossCents",NEW."MdrFeeCents",NEW."AnticipationFeeCents",
+       NEW."FixedFeeCents",NEW."NetExpectedCents")
+   THEN RAISE EXCEPTION 'ACQUIRER_SNAPSHOT_FEE_IMMUTABLE' USING ERRCODE='23514'; END IF;
+   IF OLD."Status"='REVERSED' OR
+      (OLD."Status"='SETTLED' AND NEW."Status"='EXPECTED') THEN
+      RAISE EXCEPTION 'ACQUIRER_SETTLEMENT_INVALID_TRANSITION' USING ERRCODE='23514';
+   END IF;
+ END IF;
+ IF NEW."Status"='SETTLED' AND
+    (NEW."ProcessorReference" IS NULL OR length(trim(NEW."ProcessorReference"))<6)
+ THEN RAISE EXCEPTION 'ACQUIRER_SETTLEMENT_REFERENCE_REQUIRED' USING ERRCODE='23514'; END IF;
+ RETURN NEW;
+END $snapshotguard$;
+CREATE TRIGGER "TR_payment_acquirer_snapshot_integrity"
+ BEFORE INSERT OR UPDATE ON payment_acquirer_fee_snapshots
+ FOR EACH ROW EXECUTE FUNCTION payment_acquirer_snapshot_integrity();
