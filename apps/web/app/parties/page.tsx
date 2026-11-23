@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
-import {formatCpfCnpj,formatPhoneBr,formatCep,formatDateBr,normalizeDocument,normalizePhoneBr,normalizeCep,maskPhoneInput} from "@/lib/br-format";
+import {formatCpfCnpj,formatPhoneBr,formatCep,formatDateBr,onlyDigits,normalizeDocument,normalizePhoneBr,normalizeCep,maskPhoneInput} from "@/lib/br-format";
 import {
   Users,
   UserPlus,
@@ -408,8 +408,10 @@ export default function PartiesPage() {
 
     const matchName = p.name.toLowerCase().includes(term);
     const matchTrade = p.tradeName?.toLowerCase().includes(term);
-    const matchDoc = p.documentNumber?.includes(term.replace(/\D/g, ""));
-    const matchPhone = p.contacts.some(c => c.phone?.includes(term) || c.whatsApp?.includes(term));
+    const digits=onlyDigits(term);
+    const matchDoc = digits.length>0 && !!p.documentNumber && onlyDigits(p.documentNumber).includes(digits);
+    const matchPhone = digits.length>0 && p.contacts.some(c =>
+      (c.phone&&onlyDigits(c.phone).includes(digits))||(c.whatsApp&&onlyDigits(c.whatsApp).includes(digits)));
     const matchEmail = p.contacts.some(c => c.email?.toLowerCase().includes(term));
     const matchEquipment = p.equipments.some(e =>
       e.model.toLowerCase().includes(term) ||
@@ -1443,7 +1445,7 @@ export default function PartiesPage() {
                           type="radio"
                           name="personType"
                           checked={newType === 1}
-                          onChange={() => setNewType(1)}
+                          onChange={() => {setNewType(1);setNewDoc(formatCpfCnpj(newDoc,1));}}
                           className="text-purple-600"
                         />
                         Pessoa Física (PF)
@@ -1453,7 +1455,7 @@ export default function PartiesPage() {
                           type="radio"
                           name="personType"
                           checked={newType === 2}
-                          onChange={() => setNewType(2)}
+                          onChange={() => {setNewType(2);setNewDoc(formatCpfCnpj(newDoc,2));}}
                           className="text-purple-600"
                         />
                         Pessoa Jurídica (PJ)
