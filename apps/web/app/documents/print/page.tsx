@@ -8,7 +8,7 @@ import {Printer,FileDown,MessageCircle,RefreshCw,AlertTriangle,FileText,ShieldAl
 
 type Paper="58"|"80"|"A4";
 type Document={
- kind:"quote"|"training"|"service"|"contract";documentType:string;number:string;issuedAt:string;
+ kind:"quote"|"training"|"training-sale"|"service"|"contract";documentType:string;number:string;issuedAt:string;
  organization:{name:string;legalName:string;branch:string;cnpj:string|null;address:string};
  customer:string;items:Array<{sku?:string;description:string;quantity:number;unitPrice:number;discount:number;category?:string}>;
  totals:{subtotal:number;discount:number;shipping:number;total:number};
@@ -38,7 +38,7 @@ export default function DocumentPrintPage(){
   const defaultPaper=getBrowserPrintSettings().paper;
   const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:defaultPaper;
   setPaper(docKind==="contract"?"A4":selected);
-  if(!["quote","training","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
+  if(!["quote","training","training-sale","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
    setError("Documento ou identificador inválido.");setLoading(false);return;
   }
   const controller=new AbortController();
@@ -87,7 +87,7 @@ export default function DocumentPrintPage(){
 
  const isContract=kind==="contract";
  const effectivePaper=isContract?"A4":paper;
- const title=kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
+ const title=kind==="training-sale"?"VENDA SIMULADA — TREINAMENTO":kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
  const shareText=document?
   [title+` ${document.number}`,`Cliente: ${document.customer}`,
     `Total informado: ${money(document.totals.total)}`,
@@ -137,7 +137,7 @@ export default function DocumentPrintPage(){
    {loading&&<div className="rounded-xl border bg-white p-6 text-sm">Consultando documento no Neon...</div>}
    {error&&<div role="alert" className="hb-print-actions flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
    {document&&<>
-    {kind==="training"&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: gera apenas uma prévia imprimível do orçamento. Não registra venda, pagamento, movimentação de estoque ou valor em caixa.</div>}
+    {(kind==="training"||kind==="training-sale")&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: gera apenas uma prévia imprimível do orçamento. Não registra venda, pagamento, movimentação de estoque ou valor em caixa.</div>}
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
