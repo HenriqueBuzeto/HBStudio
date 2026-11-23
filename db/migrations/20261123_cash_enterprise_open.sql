@@ -183,3 +183,99 @@ BEGIN
 END $cash$;
 
 REVOKE ALL ON FUNCTION cash_enterprise_move(uuid,uuid,uuid,text,uuid,text,numeric,text,uuid,text,numeric) FROM PUBLIC;
+
+-- Strict cash close: no discrepancy can be silently accepted as balanced.
+-- A discrepant close requires a separate approval workflow, not implemented by this function.
+CREATE TABLE IF NOT EXISTS cash_close_requests (
+  "TenantId" uuid NOT NULL REFERENCES tenants("Id") ON DELETE RESTRICT,
+  "RequestKey" uuid NOT NULL,
+  "PayloadFingerprint" text NOT NULL,
+  "CashShiftId" uuid NOT NULL REFERENCES cash_shifts("Id") ON DELETE RESTRICT,
+  "ClosedAtUtc" timestamptz NOT NULL,
+  "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("TenantId","RequestKey")
+);
+
+CREATE OR REPLACE FUNCTION cash_enterprise_close_shift(
+  p_tenant uuid,p_branch uuid,p_actor uuid,p_email text,
+  p_shift uuid,p_counted numeric,p_expected_balance numeric,
+  p_notes text,p_request uuid,p_correlation text
+) RETURNS TABLE ("shiftId" uuid,"closedAtUtc" timestamptz)
+LANGUAGE plpgsql AS $cash$
+DECLARE
+ v_shift cash_shifts%ROWTYPE;
+ v_old record;
+ v_fingerprint text;
+ v_movement_balance numeric(18,2);
+ v_closed timestamptz;
+BEGIN
+ IF p_tenant IS NULL OR p_branch IS NULL OR p_actor IS NULL
+   OR p_shift IS NULL OR p_request IS NULL
+   OR p_counted IS NULL OR p_counted<0 OR p_counted>1000000
+   OR scale(p_counted)>2
+   OR p_expected_balance IS NULL OR scale(p_expected_balance)>2
+   OR p_notes IS NOT NULL AND length(p_notes)>500
+ THEN RAISE EXCEPTION 'CASH_CLOSE_INVALID_REQUEST' USING ERRCODE='23514'; END IF;
+
+ PERFORM pg_advisory_xact_lock(hashtextextended('cash.close:'||p_tenant::text||':'||p_request::text,0));
+ v_fingerprint:=md5(jsonb_build_object('branch',p_branch,'actor',p_actor,
+   'shift',p_shift,'counted',p_counted,'expected',p_expected_balance,
+   'notes',coalesce(trim(p_notes),''))::text);
+ SELECT "PayloadFingerprint","CashShiftId","ClosedAtUtc" INTO v_old
+   FROM cash_close_requests WHERE "TenantId"=p_tenant AND "RequestKey"=p_request;
+ IF FOUND THEN
+   IF v_old."PayloadFingerprint"<>v_fingerprint THEN
+     RAISE EXCEPTION 'CASH_IDEMPOTENCY_CONFLICT' USING ERRCODE='23514';
+   END IF;
+   RETURN QUERY SELECT v_old."CashShiftId",v_old."ClosedAtUtc";
+   RETURN;
+ END IF;
+
+ SELECT * INTO v_shift FROM cash_shifts
+ WHERE "TenantId"=p_tenant AND "BranchId"=p_branch AND "Id"=p_shift FOR UPDATE;
+ IF NOT FOUND OR v_shift."Status"<>1 THEN
+   RAISE EXCEPTION 'CASH_SHIFT_NOT_OPEN' USING ERRCODE='23514';
+ END IF;
+ IF v_shift."OperatorUserId"<>p_actor THEN
+   RAISE EXCEPTION 'CASH_NOT_SHIFT_OPERATOR' USING ERRCODE='23514';
+ END IF;
+ IF v_shift."CurrentBalance" IS DISTINCT FROM p_expected_balance THEN
+   RAISE EXCEPTION 'CASH_BALANCE_CONFLICT' USING ERRCODE='40001';
+ END IF;
+ SELECT coalesce(sum(CASE WHEN m."Direction"=1 THEN m."Amount"
+                                WHEN m."Direction"=2 THEN -m."Amount" ELSE 0 END),0)
+ INTO v_movement_balance FROM cash_movements m
+ WHERE m."TenantId"=p_tenant AND m."BranchId"=p_branch AND m."CashShiftId"=p_shift;
+ IF v_movement_balance IS DISTINCT FROM v_shift."CurrentBalance" THEN
+   RAISE EXCEPTION 'CASH_LEDGER_MISMATCH' USING ERRCODE='23514';
+ END IF;
+ IF p_counted IS DISTINCT FROM v_shift."CurrentBalance" THEN
+   RAISE EXCEPTION 'CASH_COUNT_DISCREPANCY_REQUIRES_APPROVAL' USING ERRCODE='23514';
+ END IF;
+
+ v_closed:=clock_timestamp();
+ UPDATE cash_shifts SET "Status"=5,
+  "ClosingStartedAtUtc"=coalesce("ClosingStartedAtUtc",v_closed),
+  "ClosedAtUtc"=v_closed,"ClosedByUserId"=p_actor,
+  "ClosingNotes"=nullif(trim(p_notes),''),
+  "ExpectedCashBalance"=v_shift."CurrentBalance",
+  "CountedCashBalance"=p_counted,"DiscrepancyAmount"=0,
+  "DiscrepancyType"=NULL,"UpdatedAtUtc"=v_closed
+ WHERE "Id"=p_shift AND "TenantId"=p_tenant AND "BranchId"=p_branch;
+
+ INSERT INTO audit_events ("Id","TenantId","BranchId","EntityType","EntityId",
+   "Action","ActorId","ActorEmail","CorrelationId","BeforeStateJson",
+   "AfterStateJson","CreatedAtUtc","Version")
+ VALUES(gen_random_uuid(),p_tenant,p_branch,'CashShift',p_shift::text,
+   'CashShiftClosed',p_actor,coalesce(p_email,''),p_correlation,
+   jsonb_build_object('status',1,'balance',v_shift."CurrentBalance"),
+   jsonb_build_object('status',5,'counted',p_counted,'closedAt',v_closed),now(),1);
+
+ INSERT INTO cash_close_requests("TenantId","RequestKey","PayloadFingerprint",
+   "CashShiftId","ClosedAtUtc")
+ VALUES(p_tenant,p_request,v_fingerprint,p_shift,v_closed);
+ RETURN QUERY SELECT p_shift,v_closed;
+END $cash$;
+
+REVOKE ALL ON FUNCTION cash_enterprise_close_shift(
+ uuid,uuid,uuid,text,uuid,numeric,numeric,text,uuid,text) FROM PUBLIC;
