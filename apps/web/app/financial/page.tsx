@@ -3,7 +3,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
-import {Wallet,FileSpreadsheet,RefreshCw,AlertTriangle,LockKeyhole,Receipt,ArrowDownRight,ArrowUpRight} from "lucide-react";
+import {Wallet,FileSpreadsheet,RefreshCw,AlertTriangle,LockKeyhole,Receipt,ArrowDownRight,ArrowUpRight,CreditCard} from "lucide-react";
 
 type TitleRow={id:string;titleNumber:string;description:string;dueDate:string;originalAmount:number;settledAmount:number;balance:number;status:number;party:string};
 type JournalRow={id:string;documentNumber:string;description:string;sourceType:string;competenceDate:string;recordedTotal:number;debits:number;credits:number;lineCount:number};
@@ -37,7 +37,10 @@ export default function FinancialPage(){
     <div><span className="rounded-lg bg-violet-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Controladoria e Financeiro</span>
      <h1 className="mt-2 text-xl font-extrabold text-slate-900">Financeiro Geral & Integridade Contábil</h1>
      <p className="mt-1 max-w-xl text-xs text-slate-500">Contas e partidas contábeis persistidas no Neon, separadas por empresa e filial.</p></div>
-    <button onClick={()=>void load()} disabled={loading} className={nav+" inline-flex items-center gap-2 disabled:opacity-50"}><RefreshCw className="h-4 w-4"/>{loading?"Consultando...":"Atualizar"}</button>
+    <div className="flex flex-wrap gap-2">
+     <a href="/financial/acquirers" className={nav+" inline-flex items-center gap-2 border-violet-200 text-violet-700"}><CreditCard className="h-4 w-4"/>Crédito / Débito & Pix — taxas da maquininha</a>
+     <button onClick={()=>void load()} disabled={loading} className={nav+" inline-flex items-center gap-2 disabled:opacity-50"}><RefreshCw className="h-4 w-4"/>{loading?"Consultando...":"Atualizar"}</button>
+    </div>
    </header>
    {error&&<div role="alert" className="flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800"><AlertTriangle className="h-4 w-4 shrink-0"/>{error}</div>}
    <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
