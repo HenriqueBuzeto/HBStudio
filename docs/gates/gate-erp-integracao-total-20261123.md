@@ -40,6 +40,18 @@ Este documento **não significa que todos os módulos estão prontos**. A branch
 7. Só disparar fidelidade após evento canônico liquidado, e compensar em cancelamento/devolução.
 8. Fiscal: documentos autorizados apenas por retorno válido SEFAZ; eventuais pendências fiscais precisam permanecer visíveis e resolúveis.
 
+## Evidência adicional de integração (23/11/2026)
+- Nova branch QA isolada Neon `qa-erp-integracao-20261123-todos-gates` (ID `br-withered-frost-b6aomdyr`) clonada da principal sem alterá-la.
+- As migrations `20261123_repairs_enterprise_atomic.sql` e `20261123_cash_enterprise_open.sql` foram executadas conjuntamente em uma **transação** sobre essa branch: **16 comandos aplicados com sucesso**. Isso comprova compatibilidade de definição, não homologa dados em runtime nem aplicação em produção.
+- Caixa QA anterior: fechamento sem divergência gravado em estado 5; divergência física recusada; reenvio idempotente sem duplicar.
+- CRM QA: consultas de funis, estágios e oportunidades sem erros.
+- `GET /api/sales/readiness` consulta condições reais de operação (caixa, estoque, depósito e contas contábeis), retorna bloqueio de checkout/fiscal e nunca declara liquidação aprovada. SQL dessa consulta validado na QA Neon.
+- Frontend PDV apresenta lista de pré-requisitos por filial em vez de habilitar um checkout incompleto.
+- Última execução CI do SHA de integração precisa ser verificada após esta alteração documental.
+
+### Contrato de commit final
+O histórico intermediário fica em `integration/erp-end-to-end-20261123`. Apenas **squash merge** da branch aprovada produzirá um commit consolidado na `master`. Enquanto os gates P0 (pagamento + estoque + financeiro + fiscal e fluxo autenticado) não forem aprovados, **não mesclar**.
+
 ## Evidências recentes disponíveis
 
 - Assistência: criação atômica, duplicidade, concorrência, OCC, Kanban e entrega foram testados na branch Neon QA isolada no PR #12; testes autenticados permanecem necessários.
