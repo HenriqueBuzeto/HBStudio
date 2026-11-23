@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS cash_movement_requests (
  "RequestKey" uuid NOT NULL,
  "PayloadFingerprint" text NOT NULL,
  "CashMovementId" uuid NOT NULL REFERENCES cash_movements("Id") ON DELETE RESTRICT,
+ "BalanceAfter" numeric NOT NULL,
  "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
  PRIMARY KEY ("TenantId","RequestKey")
 );
@@ -115,7 +116,7 @@ DECLARE
 BEGIN
  IF p_tenant IS NULL OR p_branch IS NULL OR p_actor IS NULL
    OR p_shift IS NULL OR p_request IS NULL
-   OR p_type NOT IN ('SUPPLY','WITHDRAWAL')
+   OR p_type IS NULL OR p_type NOT IN ('SUPPLY','WITHDRAWAL')
    OR p_amount IS NULL OR p_amount<=0 OR p_amount>1000000
    OR scale(p_amount)>2
    OR coalesce(length(trim(p_reason)),0)<5 OR length(p_reason)>500 THEN
@@ -125,16 +126,13 @@ BEGIN
  v_fingerprint:=md5(jsonb_build_object(
    'branch',p_branch,'actor',p_actor,'shift',p_shift,'type',p_type,
    'amount',p_amount,'reason',trim(p_reason))::text);
- SELECT "CashMovementId","PayloadFingerprint" INTO v_previous
+ SELECT "CashMovementId","PayloadFingerprint","BalanceAfter" INTO v_previous
    FROM cash_movement_requests WHERE "TenantId"=p_tenant AND "RequestKey"=p_request;
  IF FOUND THEN
    IF v_fingerprint<>v_previous."PayloadFingerprint" THEN
      RAISE EXCEPTION 'CASH_IDEMPOTENCY_CONFLICT' USING ERRCODE='23514';
    END IF;
-   SELECT sh."CurrentBalance" INTO v_new_balance FROM cash_movements cm
-     JOIN cash_shifts sh ON sh."Id"=cm."CashShiftId"
-     WHERE cm."Id"=v_previous."CashMovementId" AND cm."TenantId"=p_tenant;
-   RETURN QUERY SELECT v_previous."CashMovementId",v_new_balance;
+   RETURN QUERY SELECT v_previous."CashMovementId",v_previous."BalanceAfter";
    RETURN;
  END IF;
  SELECT * INTO v_shift FROM cash_shifts
@@ -179,8 +177,8 @@ BEGIN
    p_actor,coalesce(p_email,''),p_correlation,
    jsonb_build_object('shiftId',p_shift,'previousBalance',v_shift."CurrentBalance"),
    jsonb_build_object('amount',p_amount,'newBalance',v_new_balance),now(),1);
- INSERT INTO cash_movement_requests ("TenantId","RequestKey","PayloadFingerprint","CashMovementId")
- VALUES(p_tenant,p_request,v_fingerprint,v_movement);
+ INSERT INTO cash_movement_requests ("TenantId","RequestKey","PayloadFingerprint","CashMovementId","BalanceAfter")
+ VALUES(p_tenant,p_request,v_fingerprint,v_movement,v_new_balance);
  RETURN QUERY SELECT v_movement,v_new_balance;
 END $cash$;
 
