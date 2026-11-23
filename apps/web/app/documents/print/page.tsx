@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
+import {getBrowserPrintSettings,saveBrowserPrintSettings} from "@/lib/browser-print";
 import RootShellLayout from "@/components/RootShellLayout";
 import {Printer,FileDown,MessageCircle,RefreshCw,AlertTriangle,FileText,ShieldAlert} from "lucide-react";
 
@@ -25,16 +26,16 @@ export default function DocumentPrintPage(){
  const [paper,setPaper]=useState<Paper>("80");
  const [loading,setLoading]=useState(true),[error,setError]=useState("");
  const [reference,setReference]=useState("");
+ const attemptedAutoPrint=useRef(false);
+ const [autoMessage,setAutoMessage]=useState("");
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search);
   const docKind=params.get("kind")||"";
   const docId=params.get("id")||"";
   const requestedPaper=params.get("paper");
   setKind(docKind);setId(docId);
-  let defaultPaper:string|null=null;
-  try{defaultPaper=localStorage.getItem("hbstudio:printer-paper:v1");}catch{/* Storage may be blocked in privacy mode. */}
-  const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:
-    defaultPaper==="58"||defaultPaper==="80"||defaultPaper==="A4"?defaultPaper:"80";
+  const defaultPaper=getBrowserPrintSettings().paper;
+  const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:defaultPaper;
   setPaper(docKind==="contract"?"A4":selected);
   if(!["quote","training","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
    setError("Documento ou identificador inválido.");setLoading(false);return;
@@ -49,6 +50,40 @@ export default function DocumentPrintPage(){
    .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
   return ()=>controller.abort();
  },[]);
+ // An automatic print attempt only follows a successfully retrieved, authorized document.
+ // Guard per tab against React StrictMode double effects, refresh and browser back.
+ useEffect(()=>{
+  if(!document||attemptedAutoPrint.current)return;
+  const params=new URLSearchParams(window.location.search);
+  if(params.get("auto")!=="1")return;
+  const prefs=getBrowserPrintSettings();
+  const authorizedPreference=
+    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService);
+  if(!authorizedPreference)return;
+  attemptedAutoPrint.current=true;
+  const onceKey=`hbstudio:autoprint:v1:${kind}:${id}`;
+  try{
+   if(sessionStorage.getItem(onceKey)==="attempted")return;
+   sessionStorage.setItem(onceKey,"attempted");
+  }catch{
+   setAutoMessage("Autoimpressão não iniciada: armazenamento de sessão indisponível. Use Imprimir.");
+   return;
+  }
+  // window.print requests a print dialog or kiosk job; it does not prove paper was printed.
+  const launch=async()=>{
+   try{
+    await window.document.fonts?.ready;
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    if(!window.location.pathname.endsWith("/documents/print"))return;
+    setAutoMessage("Impressão solicitada ao navegador. Confirme o papel na impressora.");
+    window.print();
+   }catch{
+    setAutoMessage("A impressão automática foi bloqueada. Clique em Imprimir.");
+   }
+  };
+  void launch();
+ },[document,kind,id]);
+
  const isContract=kind==="contract";
  const effectivePaper=isContract?"A4":paper;
  const title=kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
@@ -105,7 +140,7 @@ export default function DocumentPrintPage(){
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
-       <button type="button" key={option.code} onClick={()=>{setPaper(option.code);try{localStorage.setItem("hbstudio:printer-paper:v1",option.code);}catch{/* Printing remains available without persistence. */}}}
+       <button type="button" key={option.code} onClick={()=>{setPaper(option.code);const p=getBrowserPrintSettings();saveBrowserPrintSettings({...p,paper:option.code});}}
         className={"rounded-lg border px-3 py-2 text-xs font-bold "+(effectivePaper===option.code?"border-violet-700 bg-violet-50 text-violet-800":"border-slate-200 text-slate-600")}>
         {option.name}
        </button>)}
@@ -118,6 +153,7 @@ export default function DocumentPrintPage(){
      </div>
      <p className="text-xs text-slate-600">Para PDF, escolha <strong>Salvar como PDF</strong> como destino na janela de impressão. O WhatsApp receberá o resumo; anexe o PDF manualmente após salvar. A impressão direta e silenciosa exige um conector local instalado e autorizado.</p>
      {reference&&<p role="status" className="text-xs font-semibold text-emerald-700">{reference}</p>}
+     {autoMessage&&<p role="status" className="text-xs font-semibold text-amber-800">{autoMessage}</p>}
     </div>
     <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"80mm":"58mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"anywhere"}}>
      <div className="border-b-2 border-slate-900 pb-3 text-center">

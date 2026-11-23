@@ -4,6 +4,7 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
 import {distributeInstallments} from "@/lib/pos-installments";
+import {buildPrintUrl,getBrowserPrintSettings} from "@/lib/browser-print";
 import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
  CreditCard,Wallet,Banknote,QrCode,UserRound,Wrench,ShieldAlert,CheckCircle2,
  AlertTriangle,X,Printer,ScanBarcode,ChevronRight,Calculator,Info,Clock,Package,
@@ -55,6 +56,7 @@ export default function SalesPage(){
  const [discountMode,setDiscountMode]=useState<"value"|"percent">("value"),[discountInput,setDiscountInput]=useState("");
  const [method,setMethod]=useState<Method>("Pix"),[installments,setInstallments]=useState(1),[cashReceived,setCashReceived]=useState("");
  const [selectedQuote,setSelectedQuote]=useState<Quote|null>(null),[selectedSale,setSelectedSale]=useState<Sale|null>(null);
+ const [printRetryUrl,setPrintRetryUrl]=useState("");
  const [repairId,setRepairId]=useState("");
  const [documentMode,setDocumentMode]=useState<"FISCAL"|"INTERNAL">("FISCAL");
  const [documentModeError,setDocumentModeError]=useState("");
@@ -137,6 +139,11 @@ export default function SalesPage(){
  };
  const saveQuote=async()=>{
   if(!canQuote||saving)return;
+  const prefs=getBrowserPrintSettings();
+  // Reserve a tab synchronously during the click: browsers often block windows
+  // opened asynchronously after the network request has completed.
+  const pendingPrint=prefs.autoPrintQuote?window.open("about:blank","_blank"):null;
+  setPrintRetryUrl("");
   setSaving(true);setError("");setNotice("");
   try{
    const paymentTerms=method==="CreditCard"?("Cartão de crédito "+installments+"x ("+selectedParts.map(v=>money(v/100)).join(" + ")+")").slice(0,100):methodName[method]+" à vista";
@@ -146,10 +153,20 @@ export default function SalesPage(){
     paymentTerms,
    });
    setNotice("Orçamento "+response.quote.number+" salvo no Neon. Nenhum pagamento, estoque ou NFC-e foi movimentado.");
+   if(prefs.autoPrintQuote){
+    const printUrl=buildPrintUrl("quote",response.quote.id,prefs.paper,true);
+    setPrintRetryUrl(printUrl);
+    if(pendingPrint&&!pendingPrint.closed){
+      try{pendingPrint.location.replace(new URL(printUrl,window.location.origin).href);}
+      catch{setNotice("Orçamento salvo, mas a janela de impressão foi bloqueada. Utilize Imprimir agora.");}
+    }else{
+      setNotice("Orçamento salvo. O navegador bloqueou a impressão automática; use Imprimir agora.");
+    }
+   }
    setItems([]);setDiscountInput("");setQuery("");setRepairId("");setTab("quotes");
    const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
    setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
-  }catch(e){setError(e instanceof Error?e.message:"Orçamento não foi salvo.");}
+  }catch(e){if(pendingPrint&&!pendingPrint.closed)pendingPrint.close();setError(e instanceof Error?e.message:"Orçamento não foi salvo.");}
   finally{setSaving(false);}
  };
  return <RootShellLayout><style>{`@media print { body * { visibility: hidden !important; } #quote-print, #quote-print * { visibility: visible !important; } #quote-print { position: fixed !important; inset: 0 auto auto 0 !important; width: 100% !important; padding: 24px !important; background: white !important; box-shadow: none !important; border: 0 !important; } .no-print { display: none !important; } }`}</style><div className="space-y-5 pb-12">
@@ -165,6 +182,10 @@ export default function SalesPage(){
    </div>
   </header>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
+  {printRetryUrl&&<div role="status" className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-violet-800">
+    <Printer className="h-4 w-4"/><span>Orçamento salvo. A impressão não é garantia de papel emitido.</span>
+    <a href={printRetryUrl} target="_blank" rel="noopener noreferrer" className="ml-auto rounded-lg bg-violet-700 px-3 py-2 text-white">Abrir / imprimir novamente</a>
+  </div>}
   {!authLoading&&!permitted?<div className="rounded-xl bg-white p-12 text-center text-sm text-slate-500">Acesso negado. Permissão <strong>sales.pos.use</strong> necessária.</div>
   :loading?<div className="rounded-xl bg-white p-16 text-center text-sm text-slate-500"><RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin"/>Consultando o Neon...</div>
   :tab==="pos"?<div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
