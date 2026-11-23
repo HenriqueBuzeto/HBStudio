@@ -142,7 +142,7 @@ export default function RepairsPage() {
         const url=buildPrintUrl("service",data.id,prefs.paper,true);
         setPrintRetryUrl(url);
         if(pendingPrint&&!pendingPrint.closed){
-          try{pendingPrint.location.replace(url);}
+          try{pendingPrint.location.replace(new URL(url,window.location.origin).href);}
           catch{setSuccessMessage(`OS ${data.orderNumber} salva; abra o documento para imprimir.`);}
         }else{
           setSuccessMessage(`OS ${data.orderNumber} salva. A impressão foi bloqueada; use o botão de reimpressão.`);
