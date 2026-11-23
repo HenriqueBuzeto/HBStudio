@@ -26,6 +26,7 @@ type MerchantFeePreview={
  quote?:{grossCents:number;mdrFeeCents:number;anticipationFeeCents:number;fixedFeeCents:number;netExpectedCents:number;feeTotalCents:number;settlementDays:number;settlementMode:string;merchantExpectedInstallmentsCents:number[]}|null;
  explanation?:string;disclaimer?:string;
 };
+type TrainingSale={id:string;number:string;method:number;installments:number;subtotalCents:string;discountCents:string;totalCents:string;status:"SIMULATED"|"CANCELLED";createdAt:string;customer:string;seller:string;items:Array<{sku:string;description:string;quantity:number;priceCents:string}>};
 type Method="Pix"|"CreditCard"|"DebitCard"|"Cash";
 const money=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
 const cents=(v:number)=>Math.round(v*100);
@@ -54,9 +55,11 @@ export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
  const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
- const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
+ const [tab,setTab]=useState<"pos"|"quotes"|"history"|"training">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
+ const [trainingSales,setTrainingSales]=useState<TrainingSale[]>([]);
+ const trainingRequest=useRef<{signature:string;key:string}|null>(null);
  const [readiness,setReadiness]=useState<Readiness|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [customerId,setCustomerId]=useState(""),[sellerId,setSellerId]=useState(""),[cpf,setCpf]=useState("");
@@ -79,8 +82,8 @@ export default function SalesPage(){
   if(!permitted){setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
+   const [a,q,s,r,tr]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null),api<{simulations:TrainingSale[]}>("/api/sales/training")]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);setTrainingSales(tr.simulations);
    setSellerId(old=>a.sellers.some(x=>x.id===old)?old:(a.sellers.find(x=>x.id===user?.id)?.id||""));
   }catch(e){setError(e instanceof Error?e.message:"Falha ao consultar o Neon.");}
   finally{setLoading(false);}
@@ -172,6 +175,46 @@ export default function SalesPage(){
   if(matched)addProduct(matched);
   else setError("Código não encontrado no catálogo da sua empresa. Selecione um resultado da busca.");
  };
+ const simulateTrainingSale=async()=>{
+  if(!canQuote||saving)return;
+  const payload={customerId:customerId||null,sellerId,items:items.map(x=>({id:x.product.id,quantity:x.quantity})),
+    discountCents,method:methodCode[method],installments:method==="CreditCard"?installments:1};
+  const signature=JSON.stringify(payload);
+  if(!trainingRequest.current||trainingRequest.current.signature!==signature)
+    trainingRequest.current={signature,key:crypto.randomUUID()};
+  const prefs=getBrowserPrintSettings();
+  const popup=prefs.autoPrintSale?window.open("about:blank","_blank"):null;
+  setSaving(true);setError("");setNotice("");setPrintRetryUrl("");
+  try{
+   const result=await api<{simulation:{id:string;number:string}}>(
+    "/api/sales/training","POST",{...payload,idempotencyKey:trainingRequest.current.key});
+   const url="/documents/print?"+new URLSearchParams({kind:"simulation",id:result.simulation.id,
+      paper:prefs.paper,...(prefs.autoPrintSale?{auto:"1"}:{})});
+   setPrintRetryUrl(url);
+   if(popup&&!popup.closed)popup.location.replace(new URL(url,window.location.origin).href);
+   trainingRequest.current=null;setItems([]);setDiscountInput("");setTab("training");
+   setNotice("SIMULAÇÃO "+result.simulation.number+" salva. Nenhum recebimento, estoque, caixa, receita ou SEFAZ foi movimentado.");
+   const refreshed=await api<{simulations:TrainingSale[]}>("/api/sales/training");
+   setTrainingSales(refreshed.simulations);
+  }catch(e){if(popup&&!popup.closed)popup.close();setError(e instanceof Error?e.message:"Simulação não registrada.");}
+  finally{setSaving(false);}
+ };
+ const cancelTraining=async(entry:TrainingSale)=>{
+  const reason=window.prompt("Motivo do cancelamento da simulação (mínimo 6 caracteres):");
+  if(reason===null)return;
+  if(reason.trim().length<6){setError("Informe o motivo do cancelamento.");return;}
+  setSaving(true);setError("");
+  try{
+   const response=await fetch("/api/sales/training/"+encodeURIComponent(entry.id),{
+    method:"PATCH",headers:{"Content-Type":"application/json"},credentials:"same-origin",
+    body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Falha ao cancelar.");
+   const updated=await api<{simulations:TrainingSale[]}>("/api/sales/training");
+   setTrainingSales(updated.simulations);setNotice("Simulação cancelada sem impacto financeiro.");
+  }catch(e){setError(e instanceof Error?e.message:"Não foi possível cancelar.");}
+  finally{setSaving(false);}
+ };
  const saveQuote=async()=>{
   if(!canQuote||saving)return;
   const prefs=getBrowserPrintSettings();
@@ -203,8 +246,8 @@ export default function SalesPage(){
     }
    }
    setItems([]);setDiscountInput("");setQuery("");setRepairId("");setTab("quotes");
-   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
+   const [a,q,s,r,tr]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null),api<{simulations:TrainingSale[]}>("/api/sales/training")]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);setTrainingSales(tr.simulations);
   }catch(e){if(pendingPrint&&!pendingPrint.closed)pendingPrint.close();setError(e instanceof Error?e.message:"Orçamento não foi salvo.");}
   finally{setSaving(false);}
  };
@@ -217,12 +260,13 @@ export default function SalesPage(){
    <div className="flex flex-wrap gap-2"><button className={button} onClick={()=>void load()} disabled={loading}><RefreshCw className={"h-4 w-4 "+(loading?"animate-spin":"")}/> Atualizar</button>
     <button className={tab==="pos"?primary:button} onClick={()=>setTab("pos")}><ShoppingCart className="h-4 w-4"/> Frente de caixa</button>
     <button className={tab==="quotes"?primary:button} onClick={()=>setTab("quotes")}><FileText className="h-4 w-4"/> Orçamentos ({quotes.length})</button>
-    <button className={tab==="history"?primary:button} onClick={()=>setTab("history")}><Receipt className="h-4 w-4"/> Vendas ({history.length})</button>
+    <button className={tab==="history"?primary:button} onClick={()=>setTab("history")}><Receipt className="h-4 w-4"/> Vendas reais ({history.length})</button>
+     <button className={tab==="training"?primary:button} onClick={()=>setTab("training")}><ClipboardList className="h-4 w-4"/> Simulações ({trainingSales.length})</button>
    </div>
   </header>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
   {printRetryUrl&&<div role="status" className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-violet-800">
-    <Printer className="h-4 w-4"/><span>Orçamento salvo. A impressão não é garantia de papel emitido.</span>
+    <Printer className="h-4 w-4"/><span>Documento salvo. A impressão não é garantia de papel emitido.</span>
     <a href={printRetryUrl} target="_blank" rel="noopener noreferrer" className="ml-auto rounded-lg bg-violet-700 px-3 py-2 text-white">Abrir / imprimir novamente</a>
   </div>}
   {!authLoading&&!permitted?<div className="rounded-xl bg-white p-12 text-center text-sm text-slate-500">Acesso negado. Permissão <strong>sales.pos.use</strong> necessária.</div>
@@ -326,7 +370,11 @@ export default function SalesPage(){
        <p className="mt-3 text-amber-800">{readiness.checkoutBlocker}</p>
        <p className="mt-1 text-slate-600">{readiness.fiscalBlocker}</p>
       </div>}
-      <button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>
+      <button className={primary+" w-full"} type="button" disabled={!canQuote||saving} onClick={()=>void simulateTrainingSale()}>
+       <Receipt className="h-4 w-4"/> {saving?"Registrando simulação...":"SIMULAR venda de treinamento"}
+      </button>
+      <p className="text-[11px] font-semibold text-rose-700">SIMULAÇÃO — qualquer cliente e forma de pagamento. Sem cobrança, baixa de estoque, movimentação de caixa, receita ou documento fiscal.</p>
+      <button className={button+" w-full"} disabled title="Checkout real exige liquidação, estoque, caixa e conformidade fiscal"><LockKeyhole className="h-4 w-4"/> Concluir venda real — não homologada</button>
     </section>
    </div>
   </div>
