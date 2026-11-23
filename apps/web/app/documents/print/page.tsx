@@ -75,7 +75,7 @@ export default function DocumentPrintPage(){
     #hb-printed-document {position:absolute!important;left:0!important;top:0!important;
       border:0!important;box-shadow:none!important;margin:0!important;
       padding:${effectivePaper==="A4"?"0":"3mm 2mm"}!important;
-      width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"76mm":"54mm"}!important;
+      width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"72mm":"48mm"}!important;
       max-width:none!important;min-height:auto!important;background:#fff!important;
       color:#000!important;overflow:visible!important;print-color-adjust:exact;}
     .hb-print-actions {display:none!important;}
