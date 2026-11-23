@@ -77,7 +77,7 @@ BEGIN
       "itemType" integer,"description" text,"quantity" numeric,"unitPrice" numeric,"productSkuId" uuid)
   LOOP
     v_count:=v_count+1;
-    IF v_item."itemType" NOT IN (1,2) OR coalesce(length(trim(v_item."description")),0)=0
+    IF (v_item."itemType" IS NULL OR v_item."itemType" NOT IN (1,2)) OR coalesce(length(trim(v_item."description")),0)=0
       OR v_item."quantity" IS NULL OR v_item."quantity"<=0 OR v_item."quantity">10000
       OR v_item."unitPrice" IS NULL OR v_item."unitPrice"<0 OR v_item."unitPrice">100000000
       OR scale(v_item."unitPrice")>2 OR scale(v_item."quantity")>3 THEN
@@ -167,7 +167,7 @@ BEGIN
     FOR v_item IN SELECT x.* FROM jsonb_to_recordset(p_items) AS x(
       "itemType" integer,"description" text,"quantity" numeric,"unitPrice" numeric,"productSkuId" uuid)
     LOOP
-      IF v_item."itemType" NOT IN (1,2) OR coalesce(length(trim(v_item."description")),0)=0
+      IF (v_item."itemType" IS NULL OR v_item."itemType" NOT IN (1,2)) OR coalesce(length(trim(v_item."description")),0)=0
         OR v_item."quantity" IS NULL OR v_item."quantity"<=0 OR v_item."quantity">10000
         OR v_item."unitPrice" IS NULL OR v_item."unitPrice"<0 OR v_item."unitPrice">100000000
         OR scale(v_item."unitPrice")>2 OR scale(v_item."quantity")>3 THEN
@@ -195,7 +195,7 @@ BEGIN
     "TotalLaborPrice"=v_labor,"TotalPartsPrice"=v_parts,
     "FinalPrice"=v_labor+v_parts-"TotalDiscount",
     "DeliveredAtUtc"=CASE WHEN v_next=12 AND "Status"<>12 THEN now() ELSE "DeliveredAtUtc" END,
-    "UpdatedAtUtc"=clock_timestamp()
+    "UpdatedAtUtc"=date_trunc('milliseconds',clock_timestamp())
   WHERE "TenantId"=p_tenant AND "BranchId"=p_branch AND "Id"=p_order
   RETURNING * INTO v_current;
   IF p_expected_status<>v_next THEN
