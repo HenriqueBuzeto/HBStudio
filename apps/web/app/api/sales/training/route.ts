@@ -78,7 +78,7 @@ export async function POST(request:NextRequest){
   const hash=crypto.createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
   const [row]=await ctx.db.query(
    'SELECT pos_training_create($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::text,$8::integer,$9::integer,$10::bigint,$11::jsonb) AS result',
-   [ctx.tenantId,ctx.branchId,ctx.userId,seller,customer,key,hash,method,installments,discount,JSON.stringify(items)]
+   [ctx.tenantId,ctx.branchId,ctx.userId,seller,customer,key,hash,method,installments,discount,JSON.stringify(items.map(item=>({id:item.id,qty:item.quantity})))]
   );
   if(!row?.result)throw new Error("Training transaction returned no ID");
   return NextResponse.json({simulation:row.result,
