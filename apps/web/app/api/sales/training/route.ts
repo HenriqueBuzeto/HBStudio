@@ -18,14 +18,14 @@ export async function GET(request:NextRequest){
      t."DiscountCents"::text "discountCents",t."PaymentMethod" "paymentMethod",
      t."Installments" installments,t."ItemsSnapshot" items,
      p."Name" customer,u."FullName" seller
-    FROM pos_training_sales t
+    FROM pos_training_checkout_records t
     LEFT JOIN parties p ON p."TenantId"=t."TenantId" AND p."Id"=t."CustomerPartyId"
     JOIN users u ON u."TenantId"=t."TenantId" AND u."Id"=t."SellerUserId"
     WHERE t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid
     ORDER BY t."CreatedAtUtc" DESC LIMIT 100`,[ctx.tenantId,ctx.branchId]);
   const count=await ctx.db.query(`SELECT COUNT(*)::integer n,
     COALESCE(SUM("TotalCents") FILTER(WHERE "Status"='SIMULATED'),0)::text "simulatedTotalCents"
-    FROM pos_training_sales WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid`,
+    FROM pos_training_checkout_records WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid`,
     [ctx.tenantId,ctx.branchId]);
   return NextResponse.json({sales:rows,simulationCount:count[0].n,
     simulatedTotalCents:count[0].simulatedTotalCents,
@@ -91,7 +91,7 @@ export async function POST(request:NextRequest){
   const number="SIM-"+id.toUpperCase();
   const rows=await ctx.db.query(`
     WITH created AS (
-      INSERT INTO pos_training_sales ("Id","TenantId","BranchId","CreatedByUserId",
+      INSERT INTO pos_training_checkout_records ("Id","TenantId","BranchId","CreatedByUserId",
        "CustomerPartyId","SellerUserId","RequestKey","Number","PaymentMethod","Installments",
        "ItemsSnapshot","SubtotalCents","DiscountCents","TotalCents","RequestHash")
       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8,
@@ -109,7 +109,7 @@ export async function POST(request:NextRequest){
       true AS created FROM created c JOIN audited a ON true
     UNION ALL
     SELECT t."Id"::text id,t."Number" number,t."RequestHash" hash,
-      false AS created FROM pos_training_sales t
+      false AS created FROM pos_training_checkout_records t
     WHERE t."TenantId"=$2::uuid AND t."BranchId"=$3::uuid AND t."RequestKey"=$7::uuid
       AND NOT EXISTS (SELECT 1 FROM created)
     LIMIT 1`,
