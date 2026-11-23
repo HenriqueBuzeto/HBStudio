@@ -7,11 +7,20 @@ CREATE TABLE IF NOT EXISTS repair_order_counters (
   PRIMARY KEY ("TenantId","Year")
 );
 
+CREATE TABLE IF NOT EXISTS repair_order_create_requests (
+  "TenantId" uuid NOT NULL REFERENCES tenants("Id") ON DELETE RESTRICT,
+  "RequestKey" uuid NOT NULL,
+  "PayloadFingerprint" text NOT NULL,
+  "RepairOrderId" uuid NOT NULL REFERENCES repair_orders("Id") ON DELETE RESTRICT,
+  "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("TenantId","RequestKey")
+);
+
 CREATE OR REPLACE FUNCTION repair_enterprise_create(
   p_tenant uuid, p_branch uuid, p_actor uuid, p_actor_email text, p_correlation text,
   p_customer uuid, p_customer_name text, p_equipment_type text, p_brand text,
   p_model text, p_color text, p_serial text, p_equipment_notes text,
-  p_defect text, p_condition text, p_items jsonb
+  p_defect text, p_condition text, p_items jsonb, p_request_key uuid
 )
 RETURNS TABLE (id uuid, "orderNumber" text)
 LANGUAGE plpgsql AS $repair$
@@ -26,7 +35,30 @@ DECLARE
   v_parts numeric(18,2) := 0;
   v_item record;
   v_count integer := 0;
+  v_fingerprint text;
+  v_previous record;
 BEGIN
+  IF p_request_key IS NULL THEN
+    RAISE EXCEPTION 'REPAIR_IDEMPOTENCY_KEY_REQUIRED' USING ERRCODE='23514';
+  END IF;
+  -- Lock just this tenant/request pair; duplicate submissions cannot create two OS records.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_tenant::text||':'||p_request_key::text,0));
+  v_fingerprint := md5(jsonb_build_object(
+    'customerId',p_customer,'customerName',p_customer_name,'equipmentType',p_equipment_type,
+    'brand',p_brand,'model',p_model,'color',p_color,'serial',p_serial,
+    'details',p_equipment_notes,'defect',p_defect,'condition',p_condition,'items',p_items)::text);
+  SELECT req."RepairOrderId",req."PayloadFingerprint" INTO v_previous
+    FROM repair_order_create_requests req
+    WHERE req."TenantId"=p_tenant AND req."RequestKey"=p_request_key;
+  IF FOUND THEN
+    IF v_previous."PayloadFingerprint"<>v_fingerprint THEN
+      RAISE EXCEPTION 'REPAIR_IDEMPOTENCY_MISMATCH' USING ERRCODE='23514';
+    END IF;
+    SELECT ro."OrderNumber" INTO v_number FROM repair_orders ro
+      WHERE ro."TenantId"=p_tenant AND ro."Id"=v_previous."RepairOrderId";
+    RETURN QUERY SELECT v_previous."RepairOrderId",v_number;
+    RETURN;
+  END IF;
   IF p_tenant IS NULL OR p_branch IS NULL OR p_actor IS NULL THEN
     RAISE EXCEPTION 'REPAIR_CONTEXT_REQUIRED' USING ERRCODE='23514';
   END IF;
@@ -119,6 +151,9 @@ BEGIN
     jsonb_build_object('orderNumber',v_number,'status',1,'customerId',v_customer,'itemCount',v_count),
     now(),1);
 
+  INSERT INTO repair_order_create_requests ("TenantId","RequestKey","PayloadFingerprint","RepairOrderId")
+    VALUES(p_tenant,p_request_key,v_fingerprint,v_order);
+
   RETURN QUERY SELECT v_order,v_number;
 END $repair$;
 
@@ -142,7 +177,7 @@ BEGIN
     WHERE "Id"=p_order AND "TenantId"=p_tenant AND "BranchId"=p_branch FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'REPAIR_NOT_FOUND' USING ERRCODE='P0002'; END IF;
   IF p_expected_status IS DISTINCT FROM v_current."Status"
-    OR p_expected_updated IS DISTINCT FROM v_current."UpdatedAtUtc" THEN
+    OR date_trunc('milliseconds',p_expected_updated) IS DISTINCT FROM date_trunc('milliseconds',v_current."UpdatedAtUtc") THEN
     RAISE EXCEPTION 'REPAIR_CONFLICT' USING ERRCODE='40001';
   END IF;
   v_next:=coalesce(p_status,v_current."Status");
@@ -212,5 +247,5 @@ BEGIN
 END $repair$;
 
 -- Grant only to the database role used by the protected BFF; API controls per-user permissions.
-REVOKE ALL ON FUNCTION repair_enterprise_create(uuid,uuid,uuid,text,text,uuid,text,text,text,text,text,text,text,text,text,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION repair_enterprise_create(uuid,uuid,uuid,text,text,uuid,text,text,text,text,text,text,text,text,text,jsonb,uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION repair_enterprise_update(uuid,uuid,uuid,text,text,uuid,integer,timestamptz,integer,text,text,text,jsonb) FROM PUBLIC;
