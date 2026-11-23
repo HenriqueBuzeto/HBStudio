@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS fiscal_sku_tax_profiles (
  "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT "CK_fiscal_sku_tax_profile_window" CHECK ("ValidUntilUtc" IS NULL OR "ValidUntilUtc">"ValidFromUtc"),
  CONSTRAINT "CK_fiscal_sku_tax_profile_mei_nfce" CHECK (
-   "Regime" <> 4 OR "FiscalModel" <> 65 OR "Csosn" IN ('102','300')
+   "Regime" <> 4 OR "FiscalModel" <> 65 OR COALESCE("Csosn" IN ('102','300'),false)
  )
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "UX_fiscal_sku_tax_active"
