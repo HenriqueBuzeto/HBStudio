@@ -1,57 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import { authorizeFleet, FleetError } from "@/lib/fleet-session";
 
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-
-    const sql = getDb();
-
-    // Buscar clientes
-    const parties = await sql.query(
-      `SELECT "Id", "Name", "TradeName", "DocumentNumber"
-       FROM parties
-       WHERE "TenantId" = $1 AND "IsActive" = true
-       ORDER BY "Name" ASC
-       LIMIT 100;`,
-      [tenantId]
-    );
-
-    // Buscar produtos/SKUs
-    const skus = await sql.query(
-      `SELECT "Id", "SkuCode", "VariantName", "DefaultPrice"
-       FROM product_skus
-       WHERE "TenantId" = $1 AND "IsActive" = true
-       ORDER BY "VariantName" ASC
-       LIMIT 100;`,
-      [tenantId]
-    );
-
-    return NextResponse.json({
-      customers: parties.map((p: any) => ({
-        id: p.Id,
-        name: p.Name || p.TradeName || "Cliente sem nome",
-        document: p.DocumentNumber || "",
-      })),
-      products: skus.map((s: any) => ({
-        id: s.Id,
-        skuCode: s.SkuCode,
-        name: s.VariantName || s.SkuCode,
-        price: Number(s.DefaultPrice || 0),
-      })),
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: "Erro ao buscar dados auxiliares." }, { status: 500 });
-  }
+export async function GET(request:NextRequest) {
+ const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
+ try {
+  const ctx=await authorizeFleet(request,"repairs.view");
+  const [parties,skus]=await Promise.all([
+   ctx.db.query(`SELECT "Id"::text AS id,"Name" AS name,"DocumentNumber" AS document
+    FROM parties WHERE "TenantId"=$1::uuid AND "IsActive"=true
+    ORDER BY "Name" LIMIT 200`,[ctx.tenantId]),
+   ctx.db.query(`SELECT "Id"::text AS id,"SkuCode" AS "skuCode",
+    "VariantName" AS name,"DefaultPrice"::float8 AS price
+    FROM product_skus WHERE "TenantId"=$1::uuid AND "IsActive"=true
+    ORDER BY "VariantName" LIMIT 200`,[ctx.tenantId])
+  ]);
+  return NextResponse.json({
+   customers:parties.map((p:any)=>({id:p.id,name:p.name,
+    document:ctx.permissions.has("customers.sensitive.view")?p.document:null})),
+   products:skus
+  },{headers:{"X-Correlation-Id":cid,"Cache-Control":"no-store"}});
+ } catch(e) {
+  if(e instanceof FleetError)return NextResponse.json({code:e.code,error:e.message},{status:e.status});
+  console.error("[Repairs]["+cid+"] auxiliary query failed");
+  return NextResponse.json({error:"Dados de apoio indisponíveis."},{status:503});
+ }
 }
