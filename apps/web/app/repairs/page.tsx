@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {getBrowserPrintSettings,buildPrintUrl} from "@/lib/browser-print";
 import { useAuth } from "@/lib/auth";
 import {
   Wrench,
@@ -51,6 +52,7 @@ export default function RepairsPage() {
   const [saving, setSaving] = useState(false);
   const createRequestKey = useRef<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [printRetryUrl,setPrintRetryUrl] = useState("");
   const [deliveryRequest, setDeliveryRequest] = useState<string | null>(null);
   const [deliveryRecipient, setDeliveryRecipient] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
@@ -117,6 +119,9 @@ export default function RepairsPage() {
   const handleCreateSubmit = async (event:React.FormEvent) => {
     event.preventDefault();
     if(saving) return;
+    const prefs=getBrowserPrintSettings();
+    const pendingPrint=prefs.autoPrintService?window.open("about:blank","_blank"):null;
+    setPrintRetryUrl("");
     if (!reportedDefect.trim() || (!selectedCustomerId && !createCustomerName.trim())) {
       setErrorMessage("Informe o cliente e o defeito relatado.");
       return;
@@ -133,8 +138,19 @@ export default function RepairsPage() {
       resetCreateForm();
       createRequestKey.current = "";
       setSuccessMessage(`OS ${data.orderNumber} cadastrada no Neon.`);
+      if(prefs.autoPrintService){
+        const url=buildPrintUrl("service",data.id,prefs.paper,true);
+        setPrintRetryUrl(url);
+        if(pendingPrint&&!pendingPrint.closed){
+          try{pendingPrint.location.replace(new URL(url,window.location.origin).href);}
+          catch{setSuccessMessage(`OS ${data.orderNumber} salva; abra o documento para imprimir.`);}
+        }else{
+          setSuccessMessage(`OS ${data.orderNumber} salva. A impressão foi bloqueada; use o botão de reimpressão.`);
+        }
+      }
       await loadOrders();
     } catch(err) {
+      if(pendingPrint&&!pendingPrint.closed)pendingPrint.close();
       setErrorMessage(err instanceof Error ? err.message : "Erro ao cadastrar OS.");
     } finally {setSaving(false);}
   };
@@ -324,6 +340,10 @@ export default function RepairsPage() {
       <div className="space-y-6">
         {errorMessage && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{errorMessage}<button type="button" onClick={()=>setErrorMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>}
         {successMessage && <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{successMessage}<button type="button" onClick={()=>setSuccessMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>}
+        {printRetryUrl && <div role="status" className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs font-bold text-violet-800">
+          A OS foi salva. A impressão depende do navegador e da impressora.
+          <a href={printRetryUrl} target="_blank" rel="noopener noreferrer" className="ml-3 underline">Abrir e imprimir novamente</a>
+        </div>}
         {/* Header Oficial do Módulo HBVisionX */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex-1">
@@ -907,6 +927,20 @@ export default function RepairsPage() {
                   </div>
                 </div>
 
+                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                  <a href={"/documents/print?kind=service&id="+encodeURIComponent(selectedOrder.id)+"&paper=80"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-800">
+                    Imprimir OS • 58/80 mm
+                  </a>
+                  <a href={"/documents/print?kind=service&id="+encodeURIComponent(selectedOrder.id)+"&paper=A4"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                    OS A4 / PDF / WhatsApp
+                  </a>
+                  <a href={"/documents/print?kind=contract&id="+encodeURIComponent(selectedOrder.id)+"&paper=A4"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                    Minuta de contrato A4
+                  </a>
+                </div>
                 {/* Botões do Rodapé */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <button
