@@ -52,6 +52,7 @@ function Modal({title,children,onClose}:{title:string;children:React.ReactNode;o
 export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
+ const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
  const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
@@ -131,7 +132,7 @@ export default function SalesPage(){
  const total=totalCents/100;
  const paymentMethod=method==="Pix"?"PIX":method==="DebitCard"?"DEBIT":method==="CreditCard"?"CREDIT":null;
  useEffect(()=>{
-  if(!permitted||!paymentMethod||totalCents<=0){
+  if(!permitted||!canSeeMerchantFees||!paymentMethod||totalCents<=0){
    setMerchantFees(null);setMerchantFeeError("");setMerchantFeeLoading(false);return;
   }
   const controller=new AbortController();
@@ -150,7 +151,7 @@ export default function SalesPage(){
     }})
     .finally(()=>{if(!controller.signal.aborted)setMerchantFeeLoading(false);});
   return ()=>controller.abort();
- },[permitted,paymentMethod,installments,totalCents,acquirerId]);
+ },[permitted,canSeeMerchantFees,paymentMethod,installments,totalCents,acquirerId]);
 
  const selectedParts=distributeInstallments(totalCents,method==="CreditCard"?installments:1);
  const visibleParts=distributeInstallments(totalCents,installments);
@@ -262,7 +263,7 @@ export default function SalesPage(){
       {selectedParts.length>0&&<div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between font-bold"><span>Plano selecionado</span><span>{installments}x</span></div><p className="mt-1 text-slate-500">{selectedParts.every(x=>x===selectedParts[0])?installments+" parcelas de "+money(selectedParts[0]/100):selectedParts.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p><p className="mt-1 text-[10px] text-slate-500">O cliente não paga juros nesta simulação. As taxas da maquininha são despesas da loja, mostradas abaixo. Nenhuma transação foi autorizada.</p></div>}
      </div>}
      {method==="Cash"&&<div><label className="mb-1 block text-[11px] font-bold text-slate-600">Valor recebido (simulação)</label><input type="number" min="0" step="0.01" className={field} value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/><p className="mt-1 text-xs font-bold text-emerald-700">Troco previsto: {money(change)}</p></div>}
-     {paymentMethod&&totalCents>0&&<div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+     {canSeeMerchantFees&&paymentMethod&&totalCents>0&&<div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
        <div className="flex flex-wrap justify-between gap-2 font-black text-slate-900">
         <span>Previsão de repasse da maquininha — despesas da loja</span>
         <a href="/financial/acquirers" className="font-semibold text-violet-700 underline">Configurar taxas</a>
