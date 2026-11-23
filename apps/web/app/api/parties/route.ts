@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeFleet, guardOrigin, FleetError } from "@/lib/fleet-session";
 import crypto from "crypto";
+import {normalizePhoneBr,normalizeCep,normalizeDocument} from "@/lib/br-format";
 
 // GET /api/parties - Listar clientes e fornecedores do tenant com contatos, endereços e equipamentos
 export async function GET(request: NextRequest) {
@@ -188,13 +189,19 @@ export async function POST(request: NextRequest) {
 
     const type = body.type === 2 ? 2 : 1;
     const cleanDoc = typeof body.documentNumber === "string"
-      ? body.documentNumber.replace(/\D/g, "") || null
-      : null;
+      ? normalizeDocument(body.documentNumber) : null;
     if (cleanDoc && cleanDoc.length !== (type === 2 ? 14 : 11)) {
       return NextResponse.json({ error: "CPF ou CNPJ com quantidade inválida de dígitos." }, { status: 400 });
     }
     const address = body.address && typeof body.address === "object" ? body.address : null;
     const equipment = body.equipment && typeof body.equipment === "object" ? body.equipment : null;
+    const phoneInput=typeof body.primaryPhone==="string"?body.primaryPhone.trim():"";
+    const cleanPhone=normalizePhoneBr(phoneInput);
+    if(phoneInput&&!cleanPhone)return NextResponse.json({error:"Telefone inválido. Informe DDD e 8 ou 9 dígitos."},{status:400});
+    const postalInput=address&&typeof address.postalCode==="string"?address.postalCode:"";
+    const cleanPostal=normalizeCep(postalInput);
+    if(address&&(!cleanPostal||cleanPostal.length!==8))
+      return NextResponse.json({error:"CEP inválido: informe exatamente oito dígitos."},{status:400});
     if (address && (!address.street?.trim() || !address.city?.trim() || !address.state?.trim()
       || !address.postalCode?.trim() || !address.neighborhood?.trim())) {
       return NextResponse.json({ error: "Endereço incompleto: informe rua, bairro, cidade, estado e CEP." }, { status: 400 });
@@ -240,12 +247,12 @@ export async function POST(request: NextRequest) {
         [crypto.randomUUID(), tenantId, partyId, body.paymentTerms?.trim() || null, body.supplyCategories?.trim() || null, now]
       ));
     }
-    if (body.primaryPhone?.trim() || body.primaryEmail?.trim()) {
+    if (cleanPhone || body.primaryEmail?.trim()) {
       operations.push(sql.query(
         `INSERT INTO party_contacts ("Id","TenantId","PartyId","Name","Email","Phone","WhatsApp","IsPrimary","CreatedAtUtc")
          VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8)`,
         [crypto.randomUUID(), tenantId, partyId, name, body.primaryEmail?.trim() || null,
-          body.primaryPhone?.trim() || null, body.primaryPhone?.trim() || null, now]
+          cleanPhone, cleanPhone, now]
       ));
     }
     if (address) {
@@ -255,7 +262,7 @@ export async function POST(request: NextRequest) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,$11)`,
         [crypto.randomUUID(), tenantId, partyId, address.street.trim(), address.number?.trim() || "S/N",
           address.complement?.trim() || null, address.neighborhood.trim(), address.city.trim(),
-          address.state.trim().toUpperCase(), address.postalCode.trim(), now]
+          address.state.trim().toUpperCase(), cleanPostal, now]
       ));
     }
     if (equipment) {
