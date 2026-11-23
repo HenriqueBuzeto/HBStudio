@@ -964,7 +964,7 @@ export default function RepairsPage() {
               e.preventDefault();
               if(!selectedOrder||selectedOrder.id!==itemDraft.orderId)return;
               const quantity=Number(itemDraft.quantity),unitPrice=Number(itemDraft.unitPrice);
-              if(!itemDraft.description.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitPrice)||unitPrice<0||!Number.isInteger(unitPrice*100)){
+              if(!itemDraft.description.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitPrice)||unitPrice<0||Math.abs(Math.round(unitPrice*100)-unitPrice*100)>0.000001){
                 setErrorMessage("Informe descrição, quantidade e preço válido em centavos.");return;
               }
               const ok=await handleSaveOrderItems(itemDraft.orderId,[...(selectedOrder.items||[]),{
