@@ -199,6 +199,14 @@ export default function AcquirerFeesPage(){
       <div><p className="text-xs text-slate-500">Antecipação + fixo</p><p className="font-black text-rose-700">− {moneyCents(preview.anticipationFeeCents+preview.fixedFeeCents)}</p></div>
       <div><p className="text-xs text-slate-500">Líquido previsto para a loja</p><p className="font-black text-emerald-700">{moneyCents(preview.netExpectedCents)}</p></div>
       <p className="col-span-full text-xs text-slate-500">Repasse contratual: {preview.settlementMode==="MONTHLY"?"mensal (parcelas previstas)":"único"} • primeiro prazo D+{preview.settlementDays}. Não representa dinheiro conciliado.</p>
+      {preview.settlementMode==="MONTHLY"&&preview.merchantExpectedInstallmentsCents.length>1&&
+       <div className="col-span-full rounded-lg border border-slate-100 bg-slate-50 p-3">
+        <p className="mb-2 font-bold text-slate-700">Distribuição estimada do recebível líquido ({preview.merchantExpectedInstallmentsCents.length} repasses)</p>
+        <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-6">
+         {preview.merchantExpectedInstallmentsCents.map((value,i)=><span key={i} className="rounded-md bg-white p-2">{i+1}ª: {moneyCents(value)}</span>)}
+        </div>
+        <p className="mt-2 text-[10px] text-slate-500">Prazos são estimados; feriados, antecipação e regras da operadora podem alterar o crédito. Compare depois com o extrato.</p>
+       </div>}
      </div>:<p className="mt-3 text-xs text-amber-700">Habilite e preencha a modalidade para simular. Esta simulação não grava recebimentos.</p>}
     </section>
    </>}
