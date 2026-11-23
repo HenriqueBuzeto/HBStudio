@@ -4,6 +4,7 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
 import {distributeInstallments} from "@/lib/pos-installments";
+import {formatCpfCnpj} from "@/lib/br-format";
 import {buildPrintUrl,getBrowserPrintSettings} from "@/lib/browser-print";
 import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
  CreditCard,Wallet,Banknote,QrCode,UserRound,Wrench,ShieldAlert,CheckCircle2,
@@ -253,7 +254,7 @@ export default function SalesPage(){
      <h2 className="flex items-center gap-2 border-b border-slate-100 pb-3 text-xs font-black text-slate-900"><UserRound className="h-4 w-4 text-violet-600"/> Identificação do atendimento</h2>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Cliente cadastrado</span><select className={field} value={customerId} onChange={e=>setCustomerId(e.target.value)}><option value="">Consumidor final não identificado</option>{aux.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
      {customer&&<p className="text-[10px] text-slate-500">Cliente selecionado: {customer.name}. Pontuação de fidelidade não integrada; nenhum ponto será creditado automaticamente.</p>}
-     <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">CPF/CNPJ para documento fiscal futuro</span><input className={field} value={cpf} onChange={e=>setCpf(e.target.value)} placeholder="Opcional — não utilizado no orçamento" maxLength={18}/></label>
+     <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">CPF/CNPJ para documento fiscal futuro</span><input className={field} value={cpf} onChange={e=>setCpf(formatCpfCnpj(e.target.value))} inputMode="numeric" placeholder="Opcional — não utilizado no orçamento" maxLength={18}/></label>
      <label className="block space-y-1"><span className="text-[11px] font-bold text-slate-600">Vendedor responsável *</span><select className={field} value={sellerId} onChange={e=>setSellerId(e.target.value)}><option value="">Selecione...</option>{aux.sellers.map(s=><option key={s.id} value={s.id}>{s.name} {s.jobTitle?"("+s.jobTitle+")":""}</option>)}</select></label>
      <p className="text-[10px] text-slate-400">Vínculo do vendedor persistido no orçamento; comissão financeira não será gerada sem módulo oficial.</p>
     </section>
