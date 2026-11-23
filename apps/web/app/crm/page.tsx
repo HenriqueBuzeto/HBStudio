@@ -153,7 +153,7 @@ export default function CrmPage(){
   await execute(()=>callApi("opportunities/"+o.id,"PATCH",{action:"move",stageId:stage.id,expectedVersion:o.version}),()=>{setOpenModal(null);}, "Etapa atualizada e auditada no Neon.");
  };
  const createPipeline=async(e:React.FormEvent)=>{e.preventDefault();await execute(()=>callApi<{id:string}>("pipelines","POST",{name:pipelineName}),result=>{setPipelineId(result.id);setPipelineName("");setOpenModal(null);},"Funil criado com etapas reais no banco.");};
- const createLead=async(e:React.FormEvent)=>{e.preventDefault();await execute(()=>callApi<{id:string}>("leads","POST",{...leadForm,phone:normalizePhoneBr(leadForm.phone)||null}),()=>{setOpenModal(null);setLeadForm({name:"",phone:"",email:"",source:"Balcão",interest:""});},"Lead cadastrado no Neon.");};
+ const createLead=async(e:React.FormEvent)=>{e.preventDefault();if(leadForm.phone.trim()&&!normalizePhoneBr(leadForm.phone)){setError("Telefone inválido: informe DDD e 8 ou 9 dígitos.");return;}await execute(()=>callApi<{id:string}>("leads","POST",{...leadForm,phone:normalizePhoneBr(leadForm.phone)||null}),()=>{setOpenModal(null);setLeadForm({name:"",phone:"",email:"",source:"Balcão",interest:""});},"Lead cadastrado no Neon.");};
  const saveOpportunity=async(e:React.FormEvent)=>{
   e.preventDefault();
   const payload={title:form.title,description:form.description,value:Number(form.value),priority:Number(form.priority),expectedClosingDate:form.expectedClosingDate?new Date(form.expectedClosingDate).toISOString():null,assignedUserId:form.assignedUserId||null};
