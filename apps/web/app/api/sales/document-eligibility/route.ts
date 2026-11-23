@@ -14,6 +14,13 @@ export async function GET(request:NextRequest){
   const ctx=await authorizeFleet(request,"sales.pos.use");
   const search=new URL(request.url).searchParams;
   const requestedCustomerId=search.get("customerId");
+  const fiscalRequested=search.get("fiscalRequested")==="true";
+  const operationType=search.get("operationType");
+  if(fiscalRequested||operationType!=="LOCAL_GOODS")return NextResponse.json({
+    eligible:false,documentMode:"FISCAL",reason:fiscalRequested?"BUYER_REQUESTED_FISCAL":"OPERATION_NOT_ELIGIBLE",
+    explanation:fiscalRequested?"O cliente solicitou documento fiscal.": "Esta pré-avaliação só abrange venda local de mercadorias. Serviços e outras operações exigem regra própria.",
+    checkoutEnabled:false
+  },{headers});
   if(requestedCustomerId)uuid(requestedCustomerId,"Cliente");
   // Customer is required for verified PF eligibility. Anonymous purchasers
   // are NOT assumed to be exempt merely because a CPF field is blank.
@@ -28,7 +35,12 @@ export async function GET(request:NextRequest){
     [ctx.tenantId,requestedCustomerId]
   );
   const document=String(customer[0]?.document||"").replace(/\D/g,"");
-  if(customer.length!==1||!customer[0].active||document.length!==11)return NextResponse.json({
+  const cpfValid=(cpf:string)=>{
+    if(!/^\d{11}$/.test(cpf)||/^(\d)\1{10}$/.test(cpf))return false;
+    const digit=(length:number)=>{const sum=cpf.slice(0,length).split("").reduce((total,d,i)=>total+Number(d)*(length+1-i),0);const mod=(sum*10)%11;return mod===10?0:mod;};
+    return digit(9)===Number(cpf[9])&&digit(10)===Number(cpf[10]);
+  };
+  if(customer.length!==1||!customer[0].active||Number(customer[0].type)!==1||!cpfValid(document))return NextResponse.json({
     eligible:false,documentMode:"FISCAL",reason:"BUYER_NOT_VERIFIED_PF",
     explanation:"A operação exige cliente pessoa física identificado; cliente CNPJ e documento ausente não autorizam comprovante interno.",
     checkoutEnabled:false
