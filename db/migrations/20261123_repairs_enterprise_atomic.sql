@@ -181,11 +181,20 @@ BEGIN
     RAISE EXCEPTION 'REPAIR_CONFLICT' USING ERRCODE='40001';
   END IF;
   v_next:=coalesce(p_status,v_current."Status");
+  -- Canonical workflow: triage -> bench -> awaiting -> tested -> delivered.
+  -- A delivered OS is terminal; rework from tested must return to the bench first.
   IF v_next NOT IN (1,2,3,4,7,8,10,11,12)
     OR (v_current."Status"=12 AND v_next<>12)
-    OR (v_current."Status" IN (10,11) AND v_next IN (1,2))
-    OR (v_current."Status" IN (3,4,7,8) AND v_next IN (1,2))
-    OR (v_current."Status"=1 AND v_next=12) THEN
+    OR (v_next<>v_current."Status" AND NOT CASE v_current."Status"
+      WHEN 1 THEN v_next IN (2,3,8)
+      WHEN 2 THEN v_next IN (3,8,4)
+      WHEN 3 THEN v_next IN (8,7,4,10)
+      WHEN 8 THEN v_next IN (3,7,4,10)
+      WHEN 7 THEN v_next IN (3,8,4)
+      WHEN 4 THEN v_next IN (3,8,7)
+      WHEN 10 THEN v_next IN (11,8,12)
+      WHEN 11 THEN v_next IN (8,12)
+      ELSE false END) THEN
     RAISE EXCEPTION 'REPAIR_INVALID_TRANSITION' USING ERRCODE='23514';
   END IF;
 
@@ -195,8 +204,8 @@ BEGIN
     IF jsonb_typeof(p_items)<>'array' OR jsonb_array_length(p_items)>100 THEN
       RAISE EXCEPTION 'REPAIR_INVALID_ITEMS' USING ERRCODE='23514';
     END IF;
-    IF v_current."Status"=12 THEN
-      RAISE EXCEPTION 'REPAIR_DELIVERED_IMMUTABLE' USING ERRCODE='23514';
+    IF v_current."Status" IN (10,11,12) THEN
+      RAISE EXCEPTION 'REPAIR_FINALIZED_ITEMS_LOCKED' USING ERRCODE='23514';
     END IF;
     v_labor:=0;v_parts:=0;
     FOR v_item IN SELECT x.* FROM jsonb_to_recordset(p_items) AS x(
