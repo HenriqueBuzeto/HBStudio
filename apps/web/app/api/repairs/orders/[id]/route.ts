@@ -55,7 +55,7 @@ export async function PUT(request:NextRequest,{params}:{params:Promise<{id:strin
       if(typeof item.description!=="string"||!item.description.trim()||
         !Number.isFinite(quantity)||quantity<=0||quantity>10000||
         !Number.isFinite(price)||price<0||price>100000000||
-        Math.round(price*100)!==price*100)
+        Math.abs(Math.round(price*100)-price*100)>0.000001)
         throw new FleetError(422,"VALIDATION_ERROR","Quantidade ou preço inválido.");
       return {itemType:item.itemType,description:item.description.trim(),quantity,
         unitPrice:price,productSkuId:item.productSkuId?uuid(item.productSkuId,"SKU"):null};
