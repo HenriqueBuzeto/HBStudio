@@ -1,296 +1,119 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { authorizeFleet, guardOrigin, FleetError, uuid } from "@/lib/fleet-session";
 
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("MISSING_AUTH_SECRET: A variável AUTH_SECRET não está configurada.");
+const headers = (cid: string) => ({ "X-Correlation-Id": cid, "Cache-Control": "no-store" });
+function failure(error: unknown, cid: string) {
+  if (error instanceof FleetError) {
+    return NextResponse.json({ code: error.code, error: error.message }, { status: error.status, headers: headers(cid) });
   }
-  return secret;
+  const message = error instanceof Error ? error.message : "";
+  const code = message.match(/REPAIR_[A-Z_]+/)?.[0];
+  if (code) {
+    const status = code.includes("CONFLICT") ? 409 : code.includes("NOT_FOUND") ? 404 : 422;
+    return NextResponse.json({ code, error: "Os dados não atendem às regras da ordem de serviço.", }, { status, headers: headers(cid) });
+  }
+  console.error("[Repairs][" + cid + "] database failure:", error instanceof Error ? error.name : "unknown");
+  return NextResponse.json({ code: "REPAIRS_UNAVAILABLE", error: "Não foi possível concluir a operação de OS." }, { status: 503, headers: headers(cid) });
+}
+const required = (input: unknown, label: string, max: number) => {
+  if (typeof input !== "string" || input.trim().length < 2 || input.trim().length > max)
+    throw new FleetError(422, "VALIDATION_ERROR", label + " obrigatório ou inválido.");
+  return input.trim();
+};
+const optional = (value: unknown, max=2000): string | null => {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || value.length > max) throw new FleetError(422,"VALIDATION_ERROR","Texto muito longo.");
+  return value.trim() || null;
+};
+function validateItems(input: unknown) {
+  if (!Array.isArray(input) || input.length > 100) throw new FleetError(422,"REPAIR_INVALID_ITEMS","A lista de serviços e peças é inválida.");
+  return input.map((item: any) => {
+    if (!item || typeof item !== "object" || ![1,2].includes(item.itemType))
+      throw new FleetError(422,"REPAIR_INVALID_ITEM","Tipo de item inválido.");
+    const description = required(item.description,"Descrição",400);
+    const quantity = Number(item.quantity), unitPrice = Number(item.unitPrice);
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000 ||
+        !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 100000000 ||
+        Math.round(unitPrice*100)!==unitPrice*100) {
+      throw new FleetError(422,"REPAIR_INVALID_ITEM","Quantidade ou preço inválido.");
+    }
+    return { itemType:item.itemType,description,quantity,unitPrice,
+      productSkuId: item.productSkuId ? uuid(item.productSkuId,"SKU") : null };
+  });
 }
 
-// 1. GET /api/repairs/orders - Listar todas as OS com filtros e dados consolidados
+// GET: tenant and branch scoped, hide sensitive cost unless authorized.
 export async function GET(request: NextRequest) {
-  const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
-
+  const cid = request.headers.get("x-correlation-id") || crypto.randomUUID();
   try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-    }
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-
-    const sql = getDb();
-
-    // Query principal de ordens de serviço unindo cliente e equipamento
-    const orders = await sql.query(
-      `SELECT 
-        ro."Id",
-        ro."OrderNumber",
-        ro."Status",
-        ro."CustomerId",
-        p."Name" AS "CustomerName",
-        ro."CustomerEquipmentId",
-        ce."EquipmentType",
-        ce."Brand",
-        ce."Model",
-        ce."Color",
-        ce."SerialNumber",
-        ce."Notes" AS "EquipmentDetails",
-        ro."ReportedDefect",
-        ro."PhysicalConditionNotes",
-        ro."DiagnosticNotes",
-        ro."ResolutionNotes",
-        ro."TotalPartsPrice",
-        ro."TotalLaborPrice",
-        ro."TotalDiscount",
-        ro."FinalPrice",
-        ro."ReceivedAtUtc",
-        ro."EstimatedCompletionUtc",
-        ro."DeliveredAtUtc",
-        ro."CreatedAtUtc"
-       FROM repair_orders ro
-       LEFT JOIN parties p ON ro."CustomerId" = p."Id"
-       LEFT JOIN customer_equipments ce ON ro."CustomerEquipmentId" = ce."Id"
-       WHERE ro."TenantId" = $1
-       ORDER BY ro."CreatedAtUtc" DESC;`,
-      [tenantId]
+    const ctx = await authorizeFleet(request,"repairs.view");
+    const rows = await ctx.db.query(
+      `SELECT ro."Id"::text AS id,ro."OrderNumber" AS "orderNumber",
+        ro."Status" AS status,ro."CustomerId"::text AS "customerId",p."Name" AS "customerName",
+        ro."CustomerEquipmentId"::text AS "customerEquipmentId",
+        ce."EquipmentType" AS "equipmentType",ce."Brand" AS brand,
+        ce."Model" AS model,ce."Color" AS color,ce."SerialNumber" AS "serialNumber",
+        ce."Notes" AS "equipmentDetails",ro."ReportedDefect" AS "reportedDefect",
+        ro."PhysicalConditionNotes" AS "physicalConditionNotes",
+        ro."DiagnosticNotes" AS "diagnosticNotes",ro."ResolutionNotes" AS "resolutionNotes",
+        ro."TotalPartsPrice"::float8 AS "totalPartsPrice",
+        ro."TotalLaborPrice"::float8 AS "totalLaborPrice",
+        ro."TotalDiscount"::float8 AS "totalDiscount",
+        ro."FinalPrice"::float8 AS "finalPrice",
+        ro."ReceivedAtUtc" AS "receivedAtUtc",
+        ro."EstimatedCompletionUtc" AS "estimatedCompletionUtc",
+        ro."DeliveredAtUtc" AS "deliveredAtUtc",
+        ro."CreatedAtUtc" AS "createdAtUtc",ro."UpdatedAtUtc" AS "updatedAtUtc"
+      FROM repair_orders ro
+      JOIN parties p ON p."Id"=ro."CustomerId" AND p."TenantId"=ro."TenantId"
+      JOIN customer_equipments ce ON ce."Id"=ro."CustomerEquipmentId" AND ce."TenantId"=ro."TenantId"
+      WHERE ro."TenantId"=$1::uuid AND ro."BranchId"=$2::uuid
+      ORDER BY ro."CreatedAtUtc" DESC LIMIT 500`,
+      [ctx.tenantId,ctx.branchId]
     );
-
-    // Buscar itens de cada OS
-    const orderIds = orders.map((o: any) => o.Id);
-    let allItems: any[] = [];
-    if (orderIds.length > 0) {
-      allItems = await sql.query(
-        `SELECT "Id", "RepairOrderId", "ItemType", "Description", "Quantity", "UnitPrice", "UnitCost", "ProductSkuId"
-         FROM repair_estimate_items
-         WHERE "RepairOrderId" = ANY($1::uuid[])`,
-        [orderIds]
+    const ids=rows.map((r:any)=>r.id);
+    let items:any[]=[];
+    if (ids.length) {
+      items=await ctx.db.query(
+        `SELECT i."Id"::text AS id,i."RepairOrderId"::text AS "repairOrderId",
+          i."ItemType" AS "itemType",i."Description" AS description,
+          i."Quantity"::float8 AS quantity,i."UnitPrice"::float8 AS "unitPrice",
+          i."ProductSkuId"::text AS "productSkuId"
+         FROM repair_estimate_items i JOIN repair_orders ro
+           ON ro."Id"=i."RepairOrderId" AND ro."TenantId"=i."TenantId"
+         WHERE i."TenantId"=$1::uuid AND ro."BranchId"=$2::uuid AND i."RepairOrderId"=ANY($3::uuid[])`,
+        [ctx.tenantId,ctx.branchId,ids]
       );
     }
-
-    // Agrupar itens nas ordens
-    const itemsByOrder = new Map<string, any[]>();
-    for (const item of allItems) {
-      const list = itemsByOrder.get(item.RepairOrderId) || [];
-      list.push(item);
-      itemsByOrder.set(item.RepairOrderId, list);
-    }
-
-    const formatted = orders.map((o: any) => ({
-      id: o.Id,
-      orderNumber: o.OrderNumber,
-      status: o.Status,
-      customerId: o.CustomerId,
-      customerName: o.CustomerName || "Cliente Balcão",
-      customerEquipmentId: o.CustomerEquipmentId,
-      equipmentType: o.EquipmentType || "Geral",
-      brand: o.Brand || "",
-      model: o.Model || "",
-      color: o.Color || "",
-      serialNumber: o.SerialNumber || "S/N",
-      equipmentDetails: o.EquipmentDetails || "",
-      reportedDefect: o.ReportedDefect,
-      physicalConditionNotes: o.PhysicalConditionNotes || "",
-      diagnosticNotes: o.DiagnosticNotes || "",
-      resolutionNotes: o.ResolutionNotes || "",
-      totalPartsPrice: Number(o.TotalPartsPrice || 0),
-      totalLaborPrice: Number(o.TotalLaborPrice || 0),
-      totalDiscount: Number(o.TotalDiscount || 0),
-      finalPrice: Number(o.FinalPrice || 0),
-      receivedAtUtc: o.ReceivedAtUtc,
-      estimatedCompletionUtc: o.EstimatedCompletionUtc,
-      deliveredAtUtc: o.DeliveredAtUtc,
-      items: itemsByOrder.get(o.Id) || [],
-    }));
-
-    return NextResponse.json({ orders: formatted }, { headers: { "X-Correlation-Id": correlationId } });
-  } catch (err: any) {
-    console.error(`[${correlationId}] Erro ao buscar ordens de serviço:`, err);
-    return NextResponse.json(
-      { error: "Erro ao consultar ordens de serviço no Neon." },
-      { status: 500, headers: { "X-Correlation-Id": correlationId } }
-    );
-  }
+    const byOrder=new Map<string,any[]>();
+    for (const i of items) byOrder.set(i.repairOrderId,[...(byOrder.get(i.repairOrderId)||[]),i]);
+    return NextResponse.json({orders:rows.map((r:any)=>({...r,items:byOrder.get(r.id)||[]}))},{headers:headers(cid)});
+  } catch(err) {return failure(err,cid);}
 }
 
-// 2. POST /api/repairs/orders - Criar nova Ordem de Serviço
 export async function POST(request: NextRequest) {
-  const correlationId = request.headers.get("x-correlation-id") || crypto.randomUUID();
-
+  const cid = request.headers.get("x-correlation-id") || crypto.randomUUID();
   try {
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-    }
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
-    const branchId = decoded.branch_id || "b0000000-0000-0000-0000-000000000001";
-    const userId = decoded.sub || decoded.nameid;
-
-    const body = await request.json();
-    const {
-      customerId,
-      customerName,
-      customerPhone,
-      equipmentType,
-      brand,
-      model,
-      color,
-      serialNumber,
-      equipmentDetails,
-      reportedDefect,
-      physicalConditionNotes,
-      items, // array de { itemType, description, quantity, unitPrice, productSkuId }
-    } = body;
-
-    if (!reportedDefect) {
-      return NextResponse.json({ error: "Defeito/Serviço relatado é obrigatório." }, { status: 400 });
-    }
-
-    const sql = getDb();
-
-    // 1. Resolver ou criar Cliente (Party) se não selecionado
-    let finalCustomerId = customerId;
-    if (!finalCustomerId) {
-      const createdParty = await sql.query(
-        `INSERT INTO parties ("Id", "TenantId", "Type", "Name", "IsActive", "CreatedAtUtc")
-         VALUES (gen_random_uuid(), $1, 1, $2, true, NOW())
-         RETURNING "Id";`,
-        [tenantId, customerName?.trim() || "Cliente Balcão"]
-      );
-      finalCustomerId = createdParty[0].Id;
-    }
-
-    // 2. Criar CustomerEquipment
-    const createdEq = await sql.query(
-      `INSERT INTO customer_equipments (
-        "Id", "TenantId", "PartyId", "EquipmentType", "Brand", "Model", "Color", "SerialNumber", "Notes", "CreatedAtUtc"
-      )
-      VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, NOW()
-      )
-      RETURNING "Id";`,
-      [
-        tenantId,
-        finalCustomerId,
-        equipmentType || "Computador",
-        brand || "Gamer/Custom",
-        model || "Desktop",
-        color || "Branco",
-        serialNumber || "S/N",
-        equipmentDetails || "PC Gamer Branco Ryzen 7",
-      ]
+    guardOrigin(request);
+    const ctx=await authorizeFleet(request,"repairs.create");
+    const body=await request.json();
+    if(!body || typeof body!=="object" || Array.isArray(body))
+      throw new FleetError(422,"VALIDATION_ERROR","Dados da OS inválidos.");
+    const customerId=body.customerId ? uuid(body.customerId,"Cliente") : null;
+    const customerName=customerId ? null : required(body.customerName,"Cliente",180);
+    const equipmentType=required(body.equipmentType,"Tipo de aparelho",100);
+    const brand=required(body.brand,"Marca",120);
+    const model=required(body.model,"Modelo",160);
+    const defect=required(body.reportedDefect,"Defeito relatado",2000);
+    const items=validateItems(body.items||[]);
+    const rows=await ctx.db.query(
+      'SELECT * FROM repair_enterprise_create($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::text,$14::text,$15::text,$16::jsonb)',
+      [ctx.tenantId,ctx.branchId,ctx.userId,ctx.email,cid,customerId,customerName,equipmentType,
+        brand,model,optional(body.color,100),optional(body.serialNumber,120),
+        optional(body.equipmentDetails,2000),defect,optional(body.physicalConditionNotes,2000),JSON.stringify(items)]
     );
-    const finalEquipmentId = createdEq[0].Id;
-
-    // 3. Gerar número de OS sequencial amigável: OS-2026-XXXX
-    const countRes = await sql.query(
-      `SELECT COUNT(*)::int AS total FROM repair_orders WHERE "TenantId" = $1;`,
-      [tenantId]
-    );
-    const nextSeq = (countRes[0]?.total || 0) + 1;
-    const year = new Date().getFullYear();
-    const orderNumber = `OS-${year}-${String(nextSeq).padStart(4, "0")}`;
-
-    // 4. Calcular totais de peças e serviços
-    let totalLabor = 0;
-    let totalParts = 0;
-    const cleanItems = Array.isArray(items) ? items : [];
-    for (const it of cleanItems) {
-      const subtotal = Number(it.quantity || 1) * Number(it.unitPrice || 0);
-      if (it.itemType === 1) {
-        totalLabor += subtotal;
-      } else {
-        totalParts += subtotal;
-      }
-    }
-    const finalPrice = totalLabor + totalParts;
-
-    // 5. Inserir a Ordem de Serviço (Status inicial 1 = Received / Triagem)
-    const orderRes = await sql.query(
-      `INSERT INTO repair_orders (
-        "Id", "TenantId", "BranchId", "OrderNumber", "CustomerId", "CustomerEquipmentId",
-        "AssignedTechnicianId", "Status", "ReportedDefect", "PhysicalConditionNotes",
-        "ReceivedAtUtc", "LegalWarrantyDays", "AdditionalWarrantyDays",
-        "TotalLaborPrice", "TotalPartsPrice", "TotalDiscount", "FinalPrice",
-        "TotalPartsCost", "TotalLaborCost", "CreatedAtUtc"
-      )
-      VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5,
-        $6, 1, $7, $8,
-        NOW(), 90, 0,
-        $9, $10, 0, $11,
-        0, 0, NOW()
-      )
-      RETURNING "Id", "OrderNumber";`,
-      [
-        tenantId,
-        branchId,
-        orderNumber,
-        finalCustomerId,
-        finalEquipmentId,
-        userId,
-        reportedDefect.trim(),
-        physicalConditionNotes?.trim() || null,
-        totalLabor,
-        totalParts,
-        finalPrice,
-      ]
-    );
-
-    const newOrderId = orderRes[0].Id;
-
-    // 6. Inserir itens de estimativa / peças / serviços vinculados
-    for (const it of cleanItems) {
-      await sql.query(
-        `INSERT INTO repair_estimate_items (
-          "Id", "TenantId", "RepairOrderId", "ItemType", "Description", "Quantity", "UnitPrice", "UnitCost", "ProductSkuId", "CreatedAtUtc"
-        )
-        VALUES (
-          gen_random_uuid(), $1, $2, $3, $4, $5, $6, 0, $7, NOW()
-        );`,
-        [
-          tenantId,
-          newOrderId,
-          it.itemType || 1, // 1 = LaborService, 2 = Part
-          it.description || "Serviço de Manutenção",
-          Number(it.quantity || 1),
-          Number(it.unitPrice || 0),
-          it.productSkuId || null,
-        ]
-      );
-    }
-
-    // 7. Gravar status history de criação
-    await sql.query(
-      `INSERT INTO repair_status_history (
-        "Id", "TenantId", "RepairOrderId", "OldStatus", "NewStatus", "Notes", "ChangedByUserId", "CreatedAtUtc"
-      )
-      VALUES (
-        gen_random_uuid(), $1, $2, 1, 1, 'Ordem de Serviço criada no balcão.', $3, NOW()
-      );`,
-      [tenantId, newOrderId, userId]
-    );
-
-    return NextResponse.json(
-      {
-        message: "Ordem de serviço criada com sucesso.",
-        id: newOrderId,
-        orderNumber: orderRes[0].OrderNumber,
-      },
-      { status: 201, headers: { "X-Correlation-Id": correlationId } }
-    );
-  } catch (err: any) {
-    console.error(`[${correlationId}] Erro ao criar ordem de serviço:`, err);
-    return NextResponse.json(
-      { error: "Erro interno ao cadastrar ordem de serviço." },
-      { status: 500, headers: { "X-Correlation-Id": correlationId } }
-    );
-  }
+    return NextResponse.json({id:rows[0].id,orderNumber:rows[0].orderNumber,
+      message:"Ordem de serviço criada e auditada no Neon."},{status:201,headers:headers(cid)});
+  } catch(err) {return failure(err,cid);}
 }
