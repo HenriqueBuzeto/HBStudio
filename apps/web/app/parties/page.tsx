@@ -153,72 +153,6 @@ export interface Party {
   createdAtUtc: string;
 }
 
-const REWARDS_CATALOG: RewardItem[] = [
-  {
-    id: "rw-1",
-    title: "Película de Vidro 3D / Cerâmica",
-    category: "Acessório",
-    pointsRequired: 300,
-    estimatedValue: 40.0,
-    description: "Aplicação profissional inclusa com garantia de alinhamento.",
-    inStock: true
-  },
-  {
-    id: "rw-2",
-    title: "Cabo USB-C Trançado Reforçado 1m",
-    category: "Acessório",
-    pointsRequired: 500,
-    estimatedValue: 65.0,
-    description: "Compatível com recarga ultrarrápida Power Delivery (PD).",
-    inStock: true
-  },
-  {
-    id: "rw-3",
-    title: "Vale-Compras Balcão R$ 50,00",
-    category: "Vale-Compras",
-    pointsRequired: 600,
-    estimatedValue: 50.0,
-    description: "Válido para qualquer compra ou abatimento em acessórios e produtos.",
-    inStock: true
-  },
-  {
-    id: "rw-4",
-    title: "Limpeza Técnica & Higienização Interna",
-    category: "Serviço",
-    pointsRequired: 800,
-    estimatedValue: 90.0,
-    description: "Limpeza de conectores, microfones, alto-falantes e desoxidação preventiva.",
-    inStock: true
-  },
-  {
-    id: "rw-5",
-    title: "Vale-Compras Balcão R$ 100,00",
-    category: "Vale-Compras",
-    pointsRequired: 1100,
-    estimatedValue: 100.0,
-    description: "Cupom de desconto abatido direto no PDV em produtos ou consertos.",
-    inStock: true
-  },
-  {
-    id: "rw-6",
-    title: "Carregador Turbo 20W USB-C Homologado",
-    category: "Acessório",
-    pointsRequired: 1250,
-    estimatedValue: 120.0,
-    description: "Carregador com proteção contra sobretensão e chip inteligente.",
-    inStock: true
-  },
-  {
-    id: "rw-7",
-    title: "Desconto de 50% em Mão de Obra de Reparo",
-    category: "Serviço",
-    pointsRequired: 1500,
-    estimatedValue: 180.0,
-    description: "Válido para troca de tela, bateria ou reparo em placa mãe.",
-    inStock: true
-  }
-];
-
 export default function PartiesPage() {
   const [parties, setParties] = useState<Party[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -364,13 +298,6 @@ export default function PartiesPage() {
   const [newNotes, setNewNotes] = useState("");
   const [isCustomerCheck, setIsCustomerCheck] = useState(true);
   const [isSupplierCheck, setIsSupplierCheck] = useState(false);
-
-  // Resgate de Brindes no Módulo de Gamificação (Pendente de motor transacional no backend)
-  const handleRedeemReward = (reward: RewardItem) => {
-    alert(
-      `O resgate do brinde "${reward.title}" requer processamento transacional pelo módulo de Fidelidade do backend, que se encontra em fase de homologação. Nenhuma dedução simulada foi realizada.`
-    );
-  };
 
   // Grava todos os vínculos juntos para evitar clientes incompletos.
   const handleCreateParty = async (e: React.FormEvent) => {
@@ -541,14 +468,14 @@ export default function PartiesPage() {
                 Gestão 360º de Clientes & Pessoas
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Clube HB & Gamificação Ativos
+                Fidelidade em homologação
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
               Clientes & Fornecedores Enterprise
             </h1>
             <p className="text-xs text-slate-500">
-              Visualização tabular unificada, cadastro em tela cheia, histórico de vendas e compras por CPF com acúmulo de pontos e resgate de brindes.
+              Cadastro de clientes e fornecedores com vínculos reais. Pontos, histórico de vendas e resgates aguardam integração completa com o módulo de fidelidade.
             </p>
           </div>
 
@@ -1029,7 +956,7 @@ export default function PartiesPage() {
                   <Gift className="w-4 h-4 text-amber-500" />
                   Módulo Gamificação & Resgate de Brindes
                   <span className="px-2 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold">
-                    {fullScreenParty.gamification?.pointsBalance ?? 0} pts
+                    Integração pendente
                   </span>
                 </button>
                 <button
@@ -1222,120 +1149,24 @@ export default function PartiesPage() {
                 {/* ABA 2: MÓDULO GAMIFICAÇÃO & RESGATE DE BRINDES            */}
                 {/* ========================================================= */}
                 {activeTab === "gamification" && (
-                  <div className="space-y-6">
-                    {/* Header do Clube de Fidelidade */}
-                    <div className="p-6 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-3xl text-white shadow-xl relative overflow-hidden">
-                      <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-purple-500/20 to-transparent pointer-events-none" />
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Award className="w-5 h-5 text-amber-400" />
-                            <span className="text-xs font-extrabold uppercase tracking-wider text-purple-300">
-                              Clube de Vantagens & Fidelidade HB Studio
-                            </span>
-                          </div>
-                          <h3 className="text-2xl font-black mt-1">
-                            {fullScreenParty.name} — Nível {fullScreenParty.gamification?.tier || "Bronze"}
-                          </h3>
-                          <p className="text-xs text-purple-200 mt-1 max-w-xl">
-                            Todas as compras e ordens de serviço faturadas neste CPF acumulam 1 ponto a cada R$ 10,00 gastos. Pontos podem ser trocados a qualquer momento por brindes e vales-compra no balcão.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
-                          <div>
-                            <span className="text-[10px] font-bold text-purple-200 block uppercase">Saldo Disponível</span>
-                            <span className="text-3xl font-black font-mono text-amber-300">{fullScreenParty.gamification?.pointsBalance ?? 0}</span>
-                            <span className="text-xs font-bold text-purple-200 ml-1">pts</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Barra de Progressão de Nível */}
-                      <div className="mt-6 pt-4 border-t border-white/15">
-                        <div className="flex justify-between text-xs font-bold mb-1.5 text-purple-200">
-                          <span>Nível Atual: {fullScreenParty.gamification?.tier || "Bronze"}</span>
-                          <span>Próximo Nível: {fullScreenParty.gamification?.tier === "Ouro" ? "Diamante (Faltam 550 pts)" : "Ouro"}</span>
-                        </div>
-                        <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
-                          <div className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full" style={{ width: "72%" }} />
-                        </div>
-                      </div>
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+                    <div className="flex items-center gap-3 text-amber-900">
+                      <Gift className="h-5 w-5" />
+                      <h3 className="text-sm font-extrabold">Fidelidade e recompensas em homologação</h3>
                     </div>
-
-                    {/* Catálogo de Brindes para Resgate */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-2xs space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div>
-                          <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                            <Gift className="w-4 h-4 text-purple-600" />
-                            Catálogo de Brindes & Recompensas Resgatáveis
-                          </h4>
-                          <p className="text-xs text-slate-500">
-                            Selecione o brinde desejado para o cliente e realize a baixa imediata no saldo de pontos.
-                          </p>
-                        </div>
-                        <span className="text-xs font-extrabold text-purple-700 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200">
-                          Saldo do Cliente: {fullScreenParty.gamification?.pointsBalance ?? 0} pts
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {REWARDS_CATALOG.map((reward) => {
-                          const canRedeem = (fullScreenParty.gamification?.pointsBalance ?? 0) >= reward.pointsRequired;
-                          return (
-                            <div
-                              key={reward.id}
-                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${canRedeem
-                                ? "bg-white border-purple-200/90 hover:border-purple-500 hover:shadow-md"
-                                : "bg-slate-50 border-slate-200 opacity-60"
-                                }`}
-                            >
-                              <div>
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-purple-100 text-purple-700">
-                                    {reward.category}
-                                  </span>
-                                  <span className="text-xs font-black font-mono text-amber-600 flex items-center gap-1">
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    {reward.pointsRequired} pts
-                                  </span>
-                                </div>
-                                <h5 className="font-extrabold text-slate-900 text-sm">{reward.title}</h5>
-                                <p className="text-xs text-slate-500 mt-1">{reward.description}</p>
-                                <div className="text-[11px] text-slate-400 mt-2 font-mono">
-                                  Valor estimado: R$ {reward.estimatedValue.toFixed(2)}
-                                </div>
-                              </div>
-
-                              <button
-                                onClick={() => handleRedeemReward(reward)}
-                                disabled={!canRedeem}
-                                className={`w-full mt-4 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${canRedeem
-                                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs"
-                                  : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                  }`}
-                              >
-                                {canRedeem ? (
-                                  <>
-                                    <Gift className="w-3.5 h-3.5" />
-                                    Resgatar Brinde Agora
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>Faltam {reward.pointsRequired - (fullScreenParty.gamification?.pointsBalance ?? 0)} pts</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-amber-900">
+                      Esta ficha ainda não está conectada ao extrato real de pontos, à política de cashback
+                      e ao catálogo de recompensas do Neon. Para proteger os dados do cliente, não são
+                      exibidos saldos, níveis, brindes ou resgates simulados.
+                    </p>
+                    <p className="mt-2 text-xs text-amber-800">
+                      A integração será habilitada somente após a conciliação do esquema de fidelidade,
+                      a validação do PDV e os testes de créditos, estornos e resgates.
+                    </p>
                   </div>
                 )}
 
-                {/* ========================================================= */}
+                                {/* ========================================================= */}
                 {/* ABA 3: HISTÓRICO DE VENDAS & OS                           */}
                 {/* ========================================================= */}
                 {activeTab === "history" && (
@@ -1355,7 +1186,7 @@ export default function PartiesPage() {
                     <div className="space-y-3">
                       {fullScreenParty.history.length === 0 ? (
                         <div className="text-center py-8 text-slate-400 text-xs">
-                          Nenhum histórico de compra ou ordem de serviço registrado ainda.
+                          O histórico de transações ainda não está integrado a esta ficha; consulte os módulos de Vendas e Assistência.
                         </div>
                       ) : (
                         fullScreenParty.history.map((item) => (
@@ -1537,12 +1368,12 @@ export default function PartiesPage() {
         {/* MODAL: NOVO CADASTRO COMPLETO NÍVEL SENIOR                                */}
         {/* ========================================================================= */}
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-3xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white w-full min-w-0 max-w-3xl rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[calc(100dvh-1rem)] sm:max-h-[90vh]">
 
               {/* Modal Header */}
-              <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-                <div className="flex items-center gap-3">
+              <div className="p-3 sm:p-5 border-b border-slate-200 flex justify-between items-center gap-2 bg-slate-50/50">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
                     <UserPlus className="w-5 h-5" />
                   </div>
@@ -1553,18 +1384,18 @@ export default function PartiesPage() {
                 </div>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="p-1.5 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
+                  className="shrink-0 p-1.5 hover:bg-slate-200 rounded-xl text-slate-400 hover:text-slate-700 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Steps */}
-              <div className="flex border-b border-slate-200 bg-white px-6">
+              <div className="flex min-w-0 shrink-0 overflow-x-auto border-b border-slate-200 bg-white px-2 sm:px-6" aria-label="Etapas do cadastro">
                 <button
                   type="button"
                   onClick={() => setFormStep("general")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "general" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1573,7 +1404,7 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("address")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "address" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1582,7 +1413,7 @@ export default function PartiesPage() {
                 <button
                   type="button"
                   onClick={() => setFormStep("equipment")}
-                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                  className={`shrink-0 whitespace-nowrap py-3 px-3 sm:px-4 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                     formStep === "equipment" ? "border-purple-600 text-purple-700" : "border-transparent text-slate-400 hover:text-slate-700"
                   }`}
                 >
@@ -1602,7 +1433,7 @@ export default function PartiesPage() {
               )}
 
               {/* Form Body */}
-              <form onSubmit={handleCreateParty} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <form onSubmit={handleCreateParty} className="min-w-0 min-h-0 p-3 sm:p-6 space-y-4 overflow-y-auto flex-1">
                 {formStep === "general" && (
                   <div className="space-y-4 animate-in fade-in">
                     <div className="flex items-center gap-4">

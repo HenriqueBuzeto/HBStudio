@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/serverless-db";
-import jwt from "jsonwebtoken";
-
-function getJwtSecret(): string {
-  const secret = process.env.AUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MISSING_AUTH_SECRET");
-  return secret;
-}
+import { authorizeFleet, guardOrigin, FleetError, uuid } from "@/lib/fleet-session";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("hb_access_token")?.value;
-    if (!token) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-
-    const decoded: any = jwt.verify(token, getJwtSecret());
-    const tenantId = decoded.tenant_id;
+    guardOrigin(request);
+    uuid(id, "Cadastro");
+    const ctx = await authorizeFleet(request, "customers.edit");
+    const tenantId = ctx.tenantId;
 
     const body = await request.json();
-    const isActive = Boolean(body.isActive);
+    if (typeof body.isActive !== "boolean") {
+      return NextResponse.json({ error: "O estado ativo/inativo deve ser um valor booleano." }, { status: 400 });
+    }
+    const isActive = body.isActive;
 
-    const sql = getDb();
-    const res = await sql(
+    const sql = ctx.db;
+    const res = await sql.query(
       `UPDATE parties
        SET "IsActive" = $1, "UpdatedAtUtc" = NOW()
        WHERE "Id" = $2 AND "TenantId" = $3
@@ -40,7 +35,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       message: `Status atualizado com sucesso para ${isActive ? "Ativo" : "Inativo"}.`
     });
   } catch (err: any) {
+    if (err instanceof FleetError) {
+      return NextResponse.json({ code: err.code, error: err.message }, { status: err.status });
+    }
     console.error("Erro ao alterar status:", err);
-    return NextResponse.json({ error: "Erro ao atualizar status", detail: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao atualizar status" }, { status: 500 });
   }
 }
