@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import { useAuth } from "@/lib/auth";
 import {
   Wrench,
   Smartphone,
@@ -38,6 +39,13 @@ const KANBAN_STAGES = [
 ];
 
 export default function RepairsPage() {
+  const {hasPermission,isLoading:authLoading}=useAuth();
+  const canView=hasPermission("repairs.view");
+  const canCreate=hasPermission("repairs.create");
+  const canQuote=hasPermission("repairs.quote");
+  const canExecute=hasPermission("repairs.execute");
+  const canQuality=hasPermission("repairs.quality");
+  const canDeliver=hasPermission("repairs.deliver");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -96,11 +104,12 @@ export default function RepairsPage() {
     }
   };
   useEffect(() => {
+    if(authLoading||!canView)return;
     void loadOrders();
     void loadAuxData();
     const interval = setInterval(() => { void loadOrders(); }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [authLoading,canView]);
   const handleAddInitialItem = (type: number) => {
     setInitialItems(previous => [...previous, {itemType:type,description:"",quantity:1,unitPrice:0}]);
   };
@@ -198,6 +207,8 @@ export default function RepairsPage() {
       return matchText && matchType;
     });
   }, [orders, filterQuery, filterType]);
+
+  if(!authLoading&&!canView) return <RootShellLayout><div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">Sem permissão para visualizar as ordens de serviço.</div></RootShellLayout>;
 
   // Se estiver no Modo TV Sala de Manutenção
   if (tvMode) {
@@ -345,6 +356,7 @@ export default function RepairsPage() {
 
             <button
               onClick={() => {setErrorMessage(null);createRequestKey.current="";setShowCreateModal(true);}}
+              disabled={!canCreate}
               className="h-10 px-5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
@@ -472,7 +484,7 @@ export default function RepairsPage() {
                           value={order.status}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => handleMoveStatus(order.id, Number(e.target.value))}
-                          disabled={saving}
+                          disabled={saving||!(canExecute||canQuality||canDeliver)}
                           className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md px-1.5 py-1 text-slate-700 cursor-pointer"
                         >
                           <option value={1}>Triagem / Não Iniciado</option>
@@ -705,7 +717,7 @@ export default function RepairsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving||!canCreate}
                     className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-extrabold rounded-xl shadow-md hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 cursor-pointer"
                   >
                     {saving ? "Salvando OS..." : "Gerar Ordem de Serviço"}
@@ -763,7 +775,7 @@ export default function RepairsPage() {
                         key={step.s}
                         type="button"
                         onClick={() => handleMoveStatus(selectedOrder.id, step.s)}
-                        disabled={saving}
+                        disabled={saving||!(step.s===12?canDeliver:step.s===10?canQuality:canExecute)}
                         className={`p-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           selectedOrder.status === step.s
                             ? "bg-purple-600 text-white border-purple-600 shadow-sm"
