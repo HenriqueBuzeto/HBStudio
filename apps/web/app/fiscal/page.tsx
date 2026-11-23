@@ -567,6 +567,7 @@ export default function FiscalPage() {
                       <option value="1">Simples Nacional</option>
                       <option value="2">Simples Nacional - Excesso Sublimite</option>
                       <option value="3">Regime Normal (Presumido/Real)</option>
+                      <option value="4">MEI — Simples Nacional (CRT 4)</option>
                     </select>
                   </div>
 
