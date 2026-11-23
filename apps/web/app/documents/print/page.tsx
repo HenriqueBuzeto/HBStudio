@@ -105,7 +105,7 @@ export default function DocumentPrintPage(){
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
-       <button type="button" key={option.code} onClick={()=>{setPaper(option.code);try{localStorage.setItem("hbstudio:printer-paper:v1",option.code);}catch{/* Printing remains available without persistence. */}}
+       <button type="button" key={option.code} onClick={()=>{setPaper(option.code);try{localStorage.setItem("hbstudio:printer-paper:v1",option.code);}catch{/* Printing remains available without persistence. */}}}
         className={"rounded-lg border px-3 py-2 text-xs font-bold "+(effectivePaper===option.code?"border-violet-700 bg-violet-50 text-violet-800":"border-slate-200 text-slate-600")}>
         {option.name}
        </button>)}
