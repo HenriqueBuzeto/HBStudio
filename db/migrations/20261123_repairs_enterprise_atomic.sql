@@ -162,7 +162,8 @@ END $repair$;
 CREATE OR REPLACE FUNCTION repair_enterprise_update(
   p_tenant uuid,p_branch uuid,p_actor uuid,p_actor_email text,p_correlation text,
   p_order uuid,p_expected_status integer,p_expected_updated timestamptz,
-  p_status integer,p_defect text,p_diagnostic text,p_resolution text,p_items jsonb
+  p_status integer,p_defect text,p_diagnostic text,p_resolution text,p_items jsonb,
+  p_delivered_person text,p_delivery_notes text
 )
 RETURNS TABLE ("status" integer,"finalPrice" numeric,"updatedAtUtc" timestamptz)
 LANGUAGE plpgsql AS $repair$
@@ -181,6 +182,10 @@ BEGIN
     RAISE EXCEPTION 'REPAIR_CONFLICT' USING ERRCODE='40001';
   END IF;
   v_next:=coalesce(p_status,v_current."Status");
+  IF v_next=12 AND v_current."Status"<>12
+    AND (coalesce(length(trim(p_delivered_person)),0)<2 OR length(trim(p_delivered_person))>180) THEN
+    RAISE EXCEPTION 'REPAIR_DELIVERY_RECIPIENT_REQUIRED' USING ERRCODE='23514';
+  END IF;
   -- Canonical workflow: triage -> bench -> awaiting -> tested -> delivered.
   -- A delivered OS is terminal; rework from tested must return to the bench first.
   IF v_next NOT IN (1,2,3,4,7,8,10,11,12)
@@ -239,6 +244,8 @@ BEGIN
     "TotalLaborPrice"=v_labor,"TotalPartsPrice"=v_parts,
     "FinalPrice"=v_labor+v_parts-"TotalDiscount",
     "DeliveredAtUtc"=CASE WHEN v_next=12 AND "Status"<>12 THEN now() ELSE "DeliveredAtUtc" END,
+    "DeliveredToPersonName"=CASE WHEN v_next=12 AND "Status"<>12 THEN trim(p_delivered_person) ELSE "DeliveredToPersonName" END,
+    "DeliveryNotes"=CASE WHEN v_next=12 AND "Status"<>12 THEN nullif(trim(p_delivery_notes),'') ELSE "DeliveryNotes" END,
     "UpdatedAtUtc"=date_trunc('milliseconds',clock_timestamp())
   WHERE "TenantId"=p_tenant AND "BranchId"=p_branch AND "Id"=p_order
   RETURNING * INTO v_current;
@@ -257,4 +264,4 @@ END $repair$;
 
 -- Grant only to the database role used by the protected BFF; API controls per-user permissions.
 REVOKE ALL ON FUNCTION repair_enterprise_create(uuid,uuid,uuid,text,text,uuid,text,text,text,text,text,text,text,text,text,jsonb,uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION repair_enterprise_update(uuid,uuid,uuid,text,text,uuid,integer,timestamptz,integer,text,text,text,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION repair_enterprise_update(uuid,uuid,uuid,text,text,uuid,integer,timestamptz,integer,text,text,text,jsonb,text,text) FROM PUBLIC;
