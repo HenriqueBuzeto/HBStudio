@@ -8,6 +8,8 @@ export async function GET(request:NextRequest) {
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try{
   const ctx=await authorizeFleet(request,"sales.pos.use");
+  if(!ctx.permissions.has("sales.cost.view")&&!ctx.permissions.has("finance.reports.view"))
+   throw new FleetError(403,"FORBIDDEN","Visualização das taxas da adquirente exige acesso financeiro ou ao custo da venda.");
   const url=new URL(request.url);
   const method=url.searchParams.get("method");
   if(method!=="PIX"&&method!=="DEBIT"&&method!=="CREDIT")
