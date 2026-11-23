@@ -35,7 +35,7 @@ function validateItems(input: unknown) {
     const quantity = Number(item.quantity), unitPrice = Number(item.unitPrice);
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000 ||
         !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 100000000 ||
-        Math.round(unitPrice*100)!==unitPrice*100) {
+        Math.abs(Math.round(unitPrice*100)-unitPrice*100)>0.000001) {
       throw new FleetError(422,"REPAIR_INVALID_ITEM","Quantidade ou preço inválido.");
     }
     return { itemType:item.itemType,description,quantity,unitPrice,
