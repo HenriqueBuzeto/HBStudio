@@ -22,7 +22,7 @@ export async function GET(request:NextRequest,context:Context){
        t."DiscountCents"::text AS discount,t."ItemsSnapshot" AS items,
        t."Status" AS status,p."Name" AS customer,
        b."Name" AS branchName,ten."Name" AS tenantName
-      FROM pos_training_sales t
+      FROM pos_training_checkout_records t
       JOIN branches b ON b."Id"=t."BranchId" AND b."TenantId"=t."TenantId"
       JOIN tenants ten ON ten."Id"=t."TenantId"
       LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
