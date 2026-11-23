@@ -180,7 +180,11 @@ export default function SalesPage(){
   setPrintRetryUrl("");
   setSaving(true);setError("");setNotice("");
   try{
-   const paymentTerms=method==="CreditCard"?("Cartão de crédito "+installments+"x ("+selectedParts.map(v=>money(v/100)).join(" + ")+")").slice(0,100):methodName[method]+" à vista";
+   const paymentTerms=method==="CreditCard"?
+    ("Crédito "+installments+"x sem juros ("+
+      Array.from(new Set(selectedParts)).map(value=>
+       selectedParts.filter(v=>v===value).length+"x de "+money(value/100)).join(" + ")+")")
+    :methodName[method]+" à vista";
    const response=await api<{quote:{id:string;number:string};message:string}>("/api/sales/quotes","POST",{
     customerId:customerId||null,sellerId,items:items.map(x=>({id:x.product.id,quantity:x.quantity,expectedPriceCents:cents(x.product.price)})),
     discountCents,method:methodCode[method],installments:method==="CreditCard"?installments:1,
