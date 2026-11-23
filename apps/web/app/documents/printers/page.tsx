@@ -49,8 +49,8 @@ export default function PrinterSetupPage(){
       <input type="checkbox" aria-label="Autoimpressão de ordens de serviço" checked={settings.autoPrintService} onChange={e=>change({...settings,autoPrintService:e.target.checked})}/>
      </label>
      <label className="flex items-start justify-between gap-3 text-sm">
-      <span><strong>Imprimir venda automaticamente após liquidação</strong>
-       <small className="mt-1 block text-xs text-amber-700">Preparado para o checkout, ainda bloqueado. Somente venda confirmada e documento permitido pela política fiscal.</small></span>
+      <span><strong>Autoimprimir simulações de PDV (vendas reais após homologação)</strong>
+       <small className="mt-1 block text-xs text-amber-700">O cupom de treinamento abre após a simulação salva. Vendas reais somente após pagamento confirmado e documentação fiscal aplicável.</small></span>
       <input type="checkbox" aria-label="Autoimpressão de vendas quando homologadas" checked={settings.autoPrintSale} onChange={e=>change({...settings,autoPrintSale:e.target.checked})}/>
      </label>
     </div>
