@@ -17,6 +17,7 @@ type Quote={id:string;number:string;status:number;customerId:string|null;custome
 type Sale={id:string;saleNumber:string;status:number;paymentStatus:number;fulfillmentStatus:number;customerName:string;sellerName:string;subtotal:number;discountTotal:number;chargesTotal:number;totalAmount:number;createdAtUtc:string;items:Array<{skuCode:string;description:string;quantity:number;unitPrice:number}>;payments:Array<{method:number;amount:number;installments:number;status:number;reference:string|null}>;fiscalDocuments:Array<{status:number;accessKey:string;protocol:string|null;sefazStatus:number|null}>};
 type Cart={product:Product;quantity:number};
 type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
+type Readiness={checks:Array<{code:string;ready:boolean;label:string;module:string}>;checkoutEnabled:boolean;checkoutBlocker:string;fiscalIssuanceReady:boolean;fiscalBlocker:string};
 type Method="Pix"|"CreditCard"|"DebitCard"|"Cash";
 const money=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
 const cents=(v:number)=>Math.round(v*100);
@@ -47,6 +48,7 @@ export default function SalesPage(){
  const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
+ const [readiness,setReadiness]=useState<Readiness|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [customerId,setCustomerId]=useState(""),[sellerId,setSellerId]=useState(""),[cpf,setCpf]=useState("");
  const [items,setItems]=useState<Cart[]>([]),[query,setQuery]=useState("");
@@ -59,8 +61,8 @@ export default function SalesPage(){
   if(!permitted){setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const [a,q,s]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales")]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);
+   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
    setSellerId(old=>a.sellers.some(x=>x.id===old)?old:(a.sellers.find(x=>x.id===user?.id)?.id||""));
   }catch(e){setError(e instanceof Error?e.message:"Falha ao consultar o Neon.");}
   finally{setLoading(false);}
@@ -108,8 +110,8 @@ export default function SalesPage(){
    });
    setNotice("Orçamento "+response.quote.number+" salvo no Neon. Nenhum pagamento, estoque ou NFC-e foi movimentado.");
    setItems([]);setDiscountInput("");setQuery("");setRepairId("");setTab("quotes");
-   const [a,q,s]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales")]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);
+   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
   }catch(e){setError(e instanceof Error?e.message:"Orçamento não foi salvo.");}
   finally{setSaving(false);}
  };
@@ -174,7 +176,18 @@ export default function SalesPage(){
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
-     <button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>
+     {readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+       <strong className="block text-slate-800">Pré-requisitos verificados nesta filial</strong>
+       <ul className="mt-2 space-y-1.5">
+        {readiness.checks.map(check=><li key={check.code} className="flex items-center justify-between gap-2">
+         <span className={check.ready?"text-emerald-700":"text-amber-800"}>{check.ready?"✓":"•"} {check.label}</span>
+         {!check.ready&&<a href={check.module} className="font-semibold underline">Ver módulo</a>}
+        </li>)}
+       </ul>
+       <p className="mt-3 text-amber-800">{readiness.checkoutBlocker}</p>
+       <p className="mt-1 text-slate-600">{readiness.fiscalBlocker}</p>
+      </div>}
+      <button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>
     </section>
    </div>
   </div>
