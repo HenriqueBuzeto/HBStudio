@@ -236,6 +236,9 @@ BEGIN
     FROM jsonb_to_recordset(p_items) AS x("itemType" integer,"description" text,
       "quantity" numeric,"unitPrice" numeric,"productSkuId" uuid);
   END IF;
+  IF v_labor+v_parts < v_current."TotalDiscount" THEN
+    RAISE EXCEPTION 'REPAIR_INVALID_DISCOUNT' USING ERRCODE='23514';
+  END IF;
   UPDATE repair_orders SET
     "Status"=v_next,
     "ReportedDefect"=coalesce(nullif(trim(p_defect),''),"ReportedDefect"),
