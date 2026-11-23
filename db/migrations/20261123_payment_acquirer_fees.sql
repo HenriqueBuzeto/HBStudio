@@ -48,10 +48,14 @@ CREATE TABLE IF NOT EXISTS payment_acquirer_rate_rules (
   CHECK ("Method"='CREDIT' OR "Installments"=1),
   CHECK ("MdrBps"+"AnticipationBps"<10000),
   CHECK ("SettlementMode"='SINGLE' OR "Method"='CREDIT'),
+  UNIQUE ("TenantId","BranchId","Id"),
   UNIQUE ("TenantId","BranchId","RateVersionId","Method","Installments"),
   FOREIGN KEY ("TenantId","BranchId","RateVersionId")
     REFERENCES payment_acquirer_rate_versions("TenantId","BranchId","Id") ON DELETE RESTRICT
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_sale_payment_intents_tenant_id"
+ ON sale_payment_intents ("TenantId","Id");
 
 -- Historic snapshot: ONLY the eventual verified payment coordinator may write it.
 -- No triggers are installed that would make a pending payment look settled.
@@ -59,8 +63,8 @@ CREATE TABLE IF NOT EXISTS payment_acquirer_fee_snapshots (
   "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "TenantId" uuid NOT NULL REFERENCES tenants("Id") ON DELETE RESTRICT,
   "BranchId" uuid NOT NULL REFERENCES branches("Id") ON DELETE RESTRICT,
-  "SalePaymentIntentId" uuid NOT NULL REFERENCES sale_payment_intents("Id") ON DELETE RESTRICT,
-  "RateRuleId" uuid NOT NULL REFERENCES payment_acquirer_rate_rules("Id") ON DELETE RESTRICT,
+  "SalePaymentIntentId" uuid NOT NULL,
+  "RateRuleId" uuid NOT NULL,
   "GrossCents" bigint NOT NULL CHECK ("GrossCents">0),
   "MdrFeeCents" bigint NOT NULL CHECK ("MdrFeeCents">=0),
   "AnticipationFeeCents" bigint NOT NULL CHECK ("AnticipationFeeCents">=0),
@@ -72,6 +76,8 @@ CREATE TABLE IF NOT EXISTS payment_acquirer_fee_snapshots (
   "ProcessorReference" varchar(160),
   "CreatedAtUtc" timestamptz NOT NULL DEFAULT now(),
   UNIQUE ("TenantId","SalePaymentIntentId"),
+  FOREIGN KEY ("TenantId","SalePaymentIntentId") REFERENCES sale_payment_intents("TenantId","Id") ON DELETE RESTRICT,
+  FOREIGN KEY ("TenantId","BranchId","RateRuleId") REFERENCES payment_acquirer_rate_rules("TenantId","BranchId","Id") ON DELETE RESTRICT,
   CHECK ("GrossCents"="MdrFeeCents"+"AnticipationFeeCents"+"FixedFeeCents"+"NetExpectedCents"),
   CHECK (("Status"='SETTLED' AND "NetSettledCents" IS NOT NULL AND "SettledAtUtc" IS NOT NULL)
       OR ("Status"<>'SETTLED' AND "NetSettledCents" IS NULL AND "SettledAtUtc" IS NULL))
