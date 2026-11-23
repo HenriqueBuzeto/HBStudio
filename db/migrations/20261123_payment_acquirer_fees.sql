@@ -1,4 +1,5 @@
 -- Enterprise acquiring fee configurations: additive, immutable versions, no seeded percentages.
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_branches_tenant_id_acquiring" ON branches ("TenantId","Id");
 -- Fee quote describes an estimated net receivable, not an authorization, capture or settlement.
 CREATE TABLE IF NOT EXISTS payment_acquirer_profiles (
   "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -14,6 +15,12 @@ CREATE TABLE IF NOT EXISTS payment_acquirer_profiles (
   UNIQUE ("TenantId","BranchId","Id"),
   UNIQUE ("TenantId","BranchId","Name")
 );
+
+ALTER TABLE payment_acquirer_profiles
+ ADD CONSTRAINT "FK_payment_acquirer_profiles_tenant_branch"
+ FOREIGN KEY ("TenantId","BranchId") REFERENCES branches("TenantId","Id") ON DELETE RESTRICT;
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_payment_acquirer_profile_name_ci"
+ ON payment_acquirer_profiles ("TenantId","BranchId",lower("Name"));
 
 CREATE TABLE IF NOT EXISTS payment_acquirer_rate_versions (
   "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
