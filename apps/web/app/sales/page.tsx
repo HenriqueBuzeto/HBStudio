@@ -19,6 +19,12 @@ type Sale={id:string;saleNumber:string;status:number;paymentStatus:number;fulfil
 type Cart={product:Product;quantity:number};
 type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
 type Readiness={checks:Array<{code:string;ready:boolean;label:string;module:string}>;checkoutEnabled:boolean;checkoutBlocker:string;fiscalIssuanceReady:boolean;fiscalBlocker:string};
+type MerchantFeePreview={
+ configured:boolean;profiles:Array<{id:string;name:string;provider:string;version:number}>;
+ selectedProfileId?:string;profileVersion?:number;customerInterestCents:number;
+ quote?:{grossCents:number;mdrFeeCents:number;anticipationFeeCents:number;fixedFeeCents:number;netExpectedCents:number;feeTotalCents:number;settlementDays:number;settlementMode:string;merchantExpectedInstallmentsCents:number[]}|null;
+ explanation?:string;disclaimer?:string;
+};
 type Method="Pix"|"CreditCard"|"DebitCard"|"Cash";
 const money=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v);
 const cents=(v:number)=>Math.round(v*100);
@@ -46,6 +52,7 @@ function Modal({title,children,onClose}:{title:string;children:React.ReactNode;o
 export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
+ const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
  const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
@@ -55,6 +62,10 @@ export default function SalesPage(){
  const [items,setItems]=useState<Cart[]>([]),[query,setQuery]=useState("");
  const [discountMode,setDiscountMode]=useState<"value"|"percent">("value"),[discountInput,setDiscountInput]=useState("");
  const [method,setMethod]=useState<Method>("Pix"),[installments,setInstallments]=useState(1),[cashReceived,setCashReceived]=useState("");
+ const [acquirerId,setAcquirerId]=useState("");
+ const [merchantFees,setMerchantFees]=useState<MerchantFeePreview|null>(null);
+ const [merchantFeeLoading,setMerchantFeeLoading]=useState(false);
+ const [merchantFeeError,setMerchantFeeError]=useState("");
  const [selectedQuote,setSelectedQuote]=useState<Quote|null>(null),[selectedSale,setSelectedSale]=useState<Sale|null>(null);
  const [printRetryUrl,setPrintRetryUrl]=useState("");
  const [repairId,setRepairId]=useState("");
@@ -119,6 +130,29 @@ export default function SalesPage(){
  const discountCents=Math.min(subtotalCents,Math.round(maxDiscount));
  const totalCents=Math.max(0,subtotalCents-discountCents);
  const total=totalCents/100;
+ const paymentMethod=method==="Pix"?"PIX":method==="DebitCard"?"DEBIT":method==="CreditCard"?"CREDIT":null;
+ useEffect(()=>{
+  if(!permitted||!canSeeMerchantFees||!paymentMethod||totalCents<=0){
+   setMerchantFees(null);setMerchantFeeError("");setMerchantFeeLoading(false);return;
+  }
+  const controller=new AbortController();
+  setMerchantFeeLoading(true);setMerchantFeeError("");
+  const params=new URLSearchParams({method:paymentMethod,installments:String(paymentMethod==="CREDIT"?installments:1),
+    grossCents:String(totalCents)});
+  if(acquirerId)params.set("profileId",acquirerId);
+  fetch("/api/sales/acquirer-fees?"+params,{cache:"no-store",signal:controller.signal})
+    .then(async res=>{
+     const payload=await res.json().catch(()=>({}));
+     if(!res.ok)throw new Error(payload.error||"Não foi possível consultar a taxa contratada.");
+     if(!controller.signal.aborted)setMerchantFees(payload as MerchantFeePreview);
+    })
+    .catch(err=>{if(!controller.signal.aborted){
+     setMerchantFees(null);setMerchantFeeError(err instanceof Error?err.message:"Taxas indisponíveis.");
+    }})
+    .finally(()=>{if(!controller.signal.aborted)setMerchantFeeLoading(false);});
+  return ()=>controller.abort();
+ },[permitted,canSeeMerchantFees,paymentMethod,installments,totalCents,acquirerId]);
+
  const selectedParts=distributeInstallments(totalCents,method==="CreditCard"?installments:1);
  const visibleParts=distributeInstallments(totalCents,installments);
  const change=Math.max(0,cents(Number(cashReceived||0))-totalCents)/100;
@@ -224,11 +258,35 @@ export default function SalesPage(){
      <div><div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-600"><span>Desconto global</span><div className="flex gap-1">{(["value","percent"] as const).map(m=><button key={m} type="button" onClick={()=>setDiscountMode(m)} className={"rounded-lg px-2 py-1 text-[10px] "+(discountMode===m?"bg-violet-600 text-white":"bg-slate-100 text-slate-600")}>{m==="value"?"R$":"%"}</button>)}</div></div><input className={field} type="number" min="0" max={discountMode==="percent"?100:undefined} step="0.01" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} placeholder={discountMode==="value"?"Desconto em R$":"Desconto em %"}/>
       {discountCents>0&&!aux.capabilities.discountOverride&&<p className="mt-1 text-[10px] text-rose-600">Sua permissão não permite conceder descontos.</p>}</div>
      <div><span className="mb-2 block text-[11px] font-bold text-slate-600">Forma prevista de pagamento</span><div className="grid grid-cols-2 gap-2">{([{id:"Pix",label:"Pix",icon:QrCode},{id:"CreditCard",label:"Crédito",icon:CreditCard},{id:"DebitCard",label:"Débito",icon:Wallet},{id:"Cash",label:"Dinheiro",icon:Banknote}] as const).map(p=><button key={p.id} type="button" onClick={()=>{setMethod(p.id);setInstallments(1);}} className={"flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold "+(method===p.id?"border-violet-500 bg-violet-50 text-violet-700":"border-slate-200 bg-slate-50 text-slate-600")}><p.icon className="h-4 w-4"/>{p.label}</button>)}</div></div>
-     {method==="CreditCard"&&<div><label className="mb-2 block text-[11px] font-bold text-slate-600">Parcelamento de 1x a 12x (simulação sem taxas)</label>
-      <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">{Array.from({length:12},(_,i)=>i+1).map(n=>{const values=distributeInstallments(totalCents,n);return <button key={n} type="button" onClick={()=>setInstallments(n)} className={"rounded-xl border px-2 py-2 text-left transition-colors "+(installments===n?"border-violet-500 bg-violet-50":"border-slate-200 bg-slate-50 hover:bg-white")}><strong className="block text-xs text-slate-900">{n}x</strong><span className="text-[11px] font-bold text-violet-700">{money((values[0]||0)/100)}</span></button>;})}</div>
-      {selectedParts.length>0&&<div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between font-bold"><span>Plano selecionado</span><span>{installments}x</span></div><p className="mt-1 text-slate-500">{selectedParts.every(x=>x===selectedParts[0])?installments+" parcelas de "+money(selectedParts[0]/100):selectedParts.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p><p className="mt-1 text-[10px] text-slate-400">Taxas e condições reais dependem da adquirente. Nenhuma transação foi autorizada.</p></div>}
+     {method==="CreditCard"&&<div><label className="mb-2 block text-[11px] font-bold text-slate-600">Parcelamento de 1x a 18x — sem juros para o cliente</label>
+      <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3">{Array.from({length:18},(_,i)=>i+1).map(n=>{const values=distributeInstallments(totalCents,n);return <button key={n} type="button" onClick={()=>setInstallments(n)} className={"rounded-xl border px-2 py-2 text-left transition-colors "+(installments===n?"border-violet-500 bg-violet-50":"border-slate-200 bg-slate-50 hover:bg-white")}><strong className="block text-xs text-slate-900">{n}x</strong><span className="text-[11px] font-bold text-violet-700">{money((values[0]||0)/100)}</span></button>;})}</div>
+      {selectedParts.length>0&&<div className="mt-2 rounded-xl bg-slate-50 p-3 text-xs"><div className="flex justify-between font-bold"><span>Plano selecionado</span><span>{installments}x</span></div><p className="mt-1 text-slate-500">{selectedParts.every(x=>x===selectedParts[0])?installments+" parcelas de "+money(selectedParts[0]/100):selectedParts.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p><p className="mt-1 text-[10px] text-slate-500">O cliente não paga juros nesta simulação. As taxas da maquininha são despesas da loja, mostradas abaixo. Nenhuma transação foi autorizada.</p></div>}
      </div>}
      {method==="Cash"&&<div><label className="mb-1 block text-[11px] font-bold text-slate-600">Valor recebido (simulação)</label><input type="number" min="0" step="0.01" className={field} value={cashReceived} onChange={e=>setCashReceived(e.target.value)}/><p className="mt-1 text-xs font-bold text-emerald-700">Troco previsto: {money(change)}</p></div>}
+     {canSeeMerchantFees&&paymentMethod&&totalCents>0&&<div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+       <div className="flex flex-wrap justify-between gap-2 font-black text-slate-900">
+        <span>Previsão de repasse da maquininha — despesas da loja</span>
+        <a href="/financial/acquirers" className="font-semibold text-violet-700 underline">Configurar taxas</a>
+       </div>
+       {(merchantFees?.profiles.length||0)>1&&<label className="block text-xs">Maquininha
+        <select value={acquirerId} onChange={e=>setAcquirerId(e.target.value)} className={field+" mt-1"}>
+         <option value="">Selecione a maquininha</option>
+         {merchantFees?.profiles.map(p=><option key={p.id} value={p.id}>{p.name} — {p.provider}</option>)}
+        </select>
+       </label>}
+       {merchantFeeLoading?<p className="text-slate-500">Calculando taxas contratadas no Neon...</p>:
+        merchantFeeError?<p role="alert" className="font-semibold text-amber-800">{merchantFeeError}</p>:
+        merchantFees?.configured&&merchantFees.quote?<div className="space-y-1.5">
+         <div className="flex justify-between"><span>Venda bruta — cliente</span><strong>{money(merchantFees.quote.grossCents/100)}</strong></div>
+         <div className="flex justify-between text-rose-700"><span>MDR da operadora</span><strong>− {money(merchantFees.quote.mdrFeeCents/100)}</strong></div>
+         <div className="flex justify-between text-rose-700"><span>Antecipação e tarifa fixa</span><strong>− {money((merchantFees.quote.anticipationFeeCents+merchantFees.quote.fixedFeeCents)/100)}</strong></div>
+         <div className="flex justify-between border-t pt-2 text-emerald-700"><span>Líquido previsto para a empresa</span><strong>{money(merchantFees.quote.netExpectedCents/100)}</strong></div>
+         <p className="text-[10px] text-slate-500">Tabela v{merchantFees.profileVersion} • Repasse {merchantFees.quote.settlementMode==="MONTHLY"?"mensal (estimado)":"único"} • D+{merchantFees.quote.settlementDays}. Somente a conciliação confirma o líquido real.</p>
+         {merchantFees.quote.settlementMode==="MONTHLY"&&merchantFees.quote.merchantExpectedInstallmentsCents.length>1&&
+          <p className="text-[10px] text-slate-500">Previsão de recebíveis: {merchantFees.quote.merchantExpectedInstallmentsCents.map((v,i)=>(i+1)+"ª "+money(v/100)).join(" • ")}</p>}
+        </div>:<p className="text-amber-800">{merchantFees?.explanation||"Nenhuma taxa de adquirente disponível. O sistema não presume taxa zero nem líquido igual ao bruto."}</p>}
+       <p className="text-[10px] text-slate-400">Simulação informativa: não cria pagamento, contas a receber nem liquidação.</p>
+      </div>}
      <div className="space-y-1.5 rounded-2xl border border-violet-100 bg-violet-50 p-4"><div className="flex justify-between text-xs text-slate-600"><span>Subtotal</span><span>{money(subtotalCents/100)}</span></div><div className="flex justify-between text-xs text-slate-600"><span>Desconto</span><span>− {money(discountCents/100)}</span></div><div className="mt-2 flex items-center justify-between border-t border-violet-100 pt-3 font-black text-violet-800"><span>TOTAL PREVISTO</span><span className="text-2xl">{money(total)}</span></div></div>
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
