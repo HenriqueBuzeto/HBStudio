@@ -43,7 +43,7 @@ export function saveBrowserPrintSettings(value:BrowserPrintSettings):boolean {
   } catch {return false;}
 }
 /** Preview only: receipt routes must authorize and verify a persisted record server-side. */
-export function buildPrintUrl(kind:"quote"|"training"|"service"|"contract",id:string,paper?:PrinterPaper,auto=false) {
+export function buildPrintUrl(kind:"quote"|"training"|"training-sale"|"service"|"contract",id:string,paper?:PrinterPaper,auto=false) {
   const q=new URLSearchParams({kind,id});
   if(paper)q.set("paper",paper);
   if(auto)q.set("auto","1");
