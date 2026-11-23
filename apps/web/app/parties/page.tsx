@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCpfCnpj,formatPhoneBr,formatCep,formatDateBr,onlyDigits,normalizeDocument,normalizePhoneBr,normalizeCep,maskPhoneInput} from "@/lib/br-format";
 import {
   Users,
   UserPlus,
@@ -320,7 +321,7 @@ export default function PartiesPage() {
       type: newType,
       name: newName.trim(),
       tradeName: newType === 2 ? newTradeName.trim() : null,
-      documentNumber: newDoc.trim() || null,
+      documentNumber: normalizeDocument(newDoc),
       stateRegistration: newType === 2 ? newStateReg.trim() : null,
       municipalRegistration: null,
       birthDate: newBirthDate ? new Date(newBirthDate).toISOString() : null,
@@ -330,7 +331,7 @@ export default function PartiesPage() {
       customerNotes: newNotes.trim() || null,
       supplyCategories: null,
       paymentTerms: null,
-      primaryPhone: newPhone.trim() || null,
+      primaryPhone: normalizePhoneBr(newPhone),
       primaryEmail: newEmail.trim() || null,
       address: newStreet.trim() ? {
         street: newStreet.trim(),
@@ -339,7 +340,7 @@ export default function PartiesPage() {
         neighborhood: newNeighborhood.trim(),
         city: newCity.trim(),
         state: newState.trim().toUpperCase(),
-        postalCode: newPostalCode.trim()
+        postalCode: normalizeCep(newPostalCode)
       } : null,
       equipment: newEquipmentModel.trim() ? {
         equipmentType: "Smartphone",
@@ -407,8 +408,10 @@ export default function PartiesPage() {
 
     const matchName = p.name.toLowerCase().includes(term);
     const matchTrade = p.tradeName?.toLowerCase().includes(term);
-    const matchDoc = p.documentNumber?.includes(term.replace(/\D/g, ""));
-    const matchPhone = p.contacts.some(c => c.phone?.includes(term) || c.whatsApp?.includes(term));
+    const digits=onlyDigits(term);
+    const matchDoc = digits.length>0 && !!p.documentNumber && onlyDigits(p.documentNumber).includes(digits);
+    const matchPhone = digits.length>0 && p.contacts.some(c =>
+      (c.phone&&onlyDigits(c.phone).includes(digits))||(c.whatsApp&&onlyDigits(c.whatsApp).includes(digits)));
     const matchEmail = p.contacts.some(c => c.email?.toLowerCase().includes(term));
     const matchEquipment = p.equipments.some(e =>
       e.model.toLowerCase().includes(term) ||
@@ -639,7 +642,7 @@ export default function PartiesPage() {
 
                         {/* Documento */}
                         <td className="py-3.5 px-4 font-mono text-slate-600 font-semibold">
-                          {party.documentNumber || "Não informado"}
+                          {party.documentNumber?formatCpfCnpj(party.documentNumber,party.type):"Não informado"}
                         </td>
 
                         {/* Contato */}
@@ -647,7 +650,7 @@ export default function PartiesPage() {
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5 text-slate-800 font-medium">
                               <Phone className="w-3.5 h-3.5 text-purple-600" />
-                              <span>{primaryContact?.phone || primaryContact?.whatsApp || "Sem telefone"}</span>
+                              <span>{primaryContact?.phone||primaryContact?.whatsApp?formatPhoneBr(primaryContact?.phone||primaryContact?.whatsApp):"Sem telefone"}</span>
                             </div>
                             {primaryContact?.email && (
                               <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
@@ -827,7 +830,7 @@ export default function PartiesPage() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-mono mt-1">
                       <span>{fullScreenParty.type === 1 ? "Pessoa Física" : "Pessoa Jurídica"}</span>
                       <span>•</span>
-                      <span>Doc: {fullScreenParty.documentNumber || "Não cadastrado"}</span>
+                      <span>Doc: {fullScreenParty.documentNumber?formatCpfCnpj(fullScreenParty.documentNumber,fullScreenParty.type):"Não cadastrado"}</span>
                       {fullScreenParty.rgNumber && (
                         <>
                           <span>•</span>
@@ -1018,7 +1021,7 @@ export default function PartiesPage() {
                           </div>
                           <div>
                             <span className="text-slate-400 font-medium block">{fullScreenParty.type === 1 ? "CPF:" : "CNPJ:"}</span>
-                            <span className="font-bold font-mono text-slate-800">{fullScreenParty.documentNumber || "Não informado"}</span>
+                            <span className="font-bold font-mono text-slate-800">{fullScreenParty.documentNumber?formatCpfCnpj(fullScreenParty.documentNumber,fullScreenParty.type):"Não informado"}</span>
                           </div>
                           <div>
                             <span className="text-slate-400 font-medium block">{fullScreenParty.type === 1 ? "RG / Órgão Emissor:" : "Inscrição Estadual (IE):"}</span>
@@ -1028,7 +1031,7 @@ export default function PartiesPage() {
                             <>
                               <div>
                                 <span className="text-slate-400 font-medium block">Data de Nascimento:</span>
-                                <span className="font-bold text-slate-800">{fullScreenParty.birthDate || "Não informado"}</span>
+                                <span className="font-bold text-slate-800">{fullScreenParty.birthDate?formatDateBr(fullScreenParty.birthDate):"Não informado"}</span>
                               </div>
                               <div>
                                 <span className="text-slate-400 font-medium block">Gênero / Estado Civil:</span>
@@ -1086,13 +1089,13 @@ export default function PartiesPage() {
                                   {contact.phone && (
                                     <div className="flex items-center gap-1">
                                       <Phone className="w-3 h-3 text-slate-400" />
-                                      <span>{contact.phone}</span>
+                                      <span>{formatPhoneBr(contact.phone)}</span>
                                     </div>
                                   )}
                                   {contact.whatsApp && (
                                     <div className="flex items-center gap-1 text-emerald-700 font-semibold">
                                       <MessageCircle className="w-3 h-3 text-emerald-600" />
-                                      <span>{contact.whatsApp}</span>
+                                      <span>{formatPhoneBr(contact.whatsApp)}</span>
                                     </div>
                                   )}
                                   {contact.email && (
@@ -1136,7 +1139,7 @@ export default function PartiesPage() {
                               {addr.neighborhood} — {addr.city} / {addr.state}
                             </div>
                             <div className="text-xs font-mono text-purple-700 font-bold mt-1">
-                              CEP: {addr.postalCode}
+                              CEP: {formatCep(addr.postalCode)}
                             </div>
                           </div>
                         ))}
@@ -1442,7 +1445,7 @@ export default function PartiesPage() {
                           type="radio"
                           name="personType"
                           checked={newType === 1}
-                          onChange={() => setNewType(1)}
+                          onChange={() => {setNewType(1);setNewDoc(formatCpfCnpj(newDoc,1));}}
                           className="text-purple-600"
                         />
                         Pessoa Física (PF)
@@ -1452,7 +1455,7 @@ export default function PartiesPage() {
                           type="radio"
                           name="personType"
                           checked={newType === 2}
-                          onChange={() => setNewType(2)}
+                          onChange={() => {setNewType(2);setNewDoc(formatCpfCnpj(newDoc,2));}}
                           className="text-purple-600"
                         />
                         Pessoa Jurídica (PJ)
@@ -1494,7 +1497,10 @@ export default function PartiesPage() {
                         <input
                           type="text"
                           value={newDoc}
-                          onChange={(e) => setNewDoc(e.target.value)}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={newType===1?14:18}
+                          onChange={(e) => setNewDoc(formatCpfCnpj(e.target.value,newType))}
                           placeholder={newType === 1 ? "000.000.000-00" : "00.000.000/0000-00"}
                           className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 font-mono"
                         />
@@ -1518,7 +1524,10 @@ export default function PartiesPage() {
                         <input
                           type="text"
                           value={newPhone}
-                          onChange={(e) => setNewPhone(e.target.value)}
+                          inputMode="tel"
+                          autoComplete="tel"
+                          maxLength={15}
+                          onChange={(e) => setNewPhone(maskPhoneInput(e.target.value))}
                           placeholder="(17) 99999-9999"
                           className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600"
                         />
@@ -1577,7 +1586,10 @@ export default function PartiesPage() {
                         <input
                           type="text"
                           value={newPostalCode}
-                          onChange={(e) => setNewPostalCode(e.target.value)}
+                           inputMode="numeric"
+                           autoComplete="postal-code"
+                           maxLength={9}
+                          onChange={(e) => setNewPostalCode(formatCep(e.target.value))}
                           placeholder="00000-000"
                           className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 font-mono"
                         />
