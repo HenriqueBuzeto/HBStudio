@@ -295,7 +295,7 @@ export default function RepairsPage() {
     <RootShellLayout>
       <div className="space-y-6">
         {errorMessage && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{errorMessage}<button type="button" onClick={()=>setErrorMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>}
-        {successMessage && <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{successMessage}<button type="button" onClick={()=>setSuccessMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>
+        {successMessage && <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{successMessage}<button type="button" onClick={()=>setSuccessMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>}
         {/* Header Oficial do Módulo HBVisionX */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex-1">
