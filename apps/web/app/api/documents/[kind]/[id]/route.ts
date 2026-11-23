@@ -9,10 +9,10 @@ export async function GET(request:NextRequest,context:Context){
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try{
   const {kind,id}=await context.params;
-  if(!["quote","training","service","contract","sale"].includes(kind))
+  if(!["quote","training","simulation","service","contract","sale"].includes(kind))
    throw new FleetError(404,"DOCUMENT_NOT_FOUND","Tipo de documento não encontrado.");
   uuid(id,"Documento");
-  const permission=kind==="quote"||kind==="training"||kind==="sale"?"sales.pos.use":"repairs.view";
+  const permission=kind==="quote"||kind==="training"||kind==="simulation"||kind==="sale"?"sales.pos.use":"repairs.view";
   const ctx=await authorizeFleet(request,permission);
   if(kind==="sale")
    throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED",
@@ -38,6 +38,43 @@ export async function GET(request:NextRequest,context:Context){
    branch:String(issuer.branchName),cnpj:issuer.cnpj||null,
    address:[issuer.street,issuer.streetNumber,issuer.city,issuer.state].filter(Boolean).join(", ")
   };
+  if(kind==="simulation"){
+    const rows=await ctx.db.query(
+     `SELECT t."TrainingNumber" AS number,t."CreatedAtUtc" AS "createdAt",
+       t."Status" AS status,t."PaymentMethod" AS method,t."Installments" AS installments,
+       t."SubtotalCents"::text AS subtotal,t."DiscountCents"::text AS discount,
+       t."TotalCents"::text AS total,p."Name" AS customer,
+       u."FullName" AS seller
+      FROM pos_training_sales t
+      LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
+      JOIN users u ON u."Id"=t."SellerUserId" AND u."TenantId"=t."TenantId"
+      WHERE t."Id"=$3::uuid AND t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid`,
+      [ctx.tenantId,ctx.branchId,id]
+    );
+    if(!rows.length)throw new FleetError(404,"DOCUMENT_NOT_FOUND","Simulação não encontrada nesta filial.");
+    const x=rows[0];
+    const items=await ctx.db.query(
+      `SELECT "SkuCode" AS sku,"Description" AS description,
+        "Quantity" AS quantity,"UnitPriceCents"::text AS "priceCents"
+       FROM pos_training_sale_items
+       WHERE "TenantId"=$1::uuid AND "BranchId"=$2::uuid AND "TrainingSaleId"=$3::uuid
+       ORDER BY "CreatedAtUtc","Id"`,
+      [ctx.tenantId,ctx.branchId,id]
+    );
+    const names:{[n:number]:string}={1:"Dinheiro simulado",2:"Pix simulado",3:"Cartão de crédito simulado",4:"Débito simulado"};
+    return NextResponse.json({kind,documentType:"SIMULATION",number:x.number,
+      issuedAt:x.createdAt,organization,customer:x.customer||"Consumidor não identificado",
+      items:items.map((i:any)=>({sku:i.sku,description:i.description,quantity:Number(i.quantity),
+         unitPrice:Number(i.priceCents)/100,discount:0})),
+      totals:{subtotal:Number(x.subtotal)/100,discount:Number(x.discount)/100,
+        shipping:0,total:Number(x.total)/100},
+      paymentTerms:(names[Number(x.method)]||"Pagamento simulado")+
+        (Number(x.method)===3?" em "+x.installments+"x":""),
+      notes:"Vendedor: "+x.seller+" | Estado: "+x.status+
+        ". Os valores são exclusivamente de treinamento.",
+      disclaimer:"SIMULAÇÃO / TESTE — NÃO É DOCUMENTO FISCAL. NÃO É VENDA, NÃO COMPROVA PAGAMENTO, NÃO MOVIMENTA ESTOQUE OU CAIXA, NÃO É RECEITA. NÃO ENVIADO À SEFAZ."},
+      {headers:headers(cid)});
+  }
   if(kind==="quote"||kind==="training"){
    const rows=await ctx.db.query(
     `SELECT q."QuoteNumber" AS number,q."CreatedAtUtc" AS "createdAt",
