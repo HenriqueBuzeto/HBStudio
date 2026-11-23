@@ -261,6 +261,7 @@ export default function SalesPage(){
    <div className="no-print flex flex-wrap gap-2">
     <a className={button} href={"/documents/print?kind=quote&id="+encodeURIComponent(selectedQuote.id)+"&paper=80"} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4"/> Bobina 80/58 mm</a>
     <a className={button} href={"/documents/print?kind=quote&id="+encodeURIComponent(selectedQuote.id)+"&paper=A4"} target="_blank" rel="noopener noreferrer"><FileText className="h-4 w-4"/> A4 / PDF / WhatsApp</a>
+    <a className={button} href={"/documents/print?kind=training&id="+encodeURIComponent(selectedQuote.id)+"&paper=80"} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4"/> Teste de cupom (SIMULAÇÃO)</a>
    </div>
    </div>
   </Modal>}
