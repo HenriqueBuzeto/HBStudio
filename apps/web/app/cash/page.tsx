@@ -24,6 +24,12 @@ export default function CashPage(){
  const [movementShift,setMovementShift]=useState<Shift|null>(null);
  const [movementType,setMovementType]=useState<"SUPPLY"|"WITHDRAWAL">("SUPPLY");
  const [movementAmount,setMovementAmount]=useState(""),[movementReason,setMovementReason]=useState("");
+ const canClose=hasPermission("cash.close");
+ const [closingShift,setClosingShift]=useState<Shift|null>(null);
+ const [countedAmount,setCountedAmount]=useState("");
+ const [closingNotes,setClosingNotes]=useState("");
+ const closingKey=useRef("");
+
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
@@ -72,6 +78,27 @@ export default function CashPage(){
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível registrar o movimento.");}
   finally{setSaving(false);}
  };
+ const closeShift=async(e:React.FormEvent)=>{
+  e.preventDefault();
+  if(!closingShift||saving)return;
+  const counted=Number(countedAmount);
+  if(!Number.isFinite(counted)||counted<0||Math.abs(counted*100-Math.round(counted*100))>0.000001){
+   setError("Informe o valor físico contado em reais e centavos.");return;
+  }
+  if(!closingKey.current)closingKey.current=crypto.randomUUID();
+  setSaving(true);setError("");setNotice("");
+  try{
+   const res=await fetch("/api/cash/close",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({shiftId:closingShift.id,requestKey:closingKey.current,
+     expectedBalance:closingShift.recordedBalance,countedAmount:counted,notes:closingNotes})});
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok)throw new Error(data.error||"Fechamento não realizado.");
+   setNotice("Turno encerrado com contagem conferida e auditoria registrada.");
+   setClosingShift(null);setCountedAmount("");setClosingNotes("");closingKey.current="";
+   await load();
+  }catch(e){setError(e instanceof Error?e.message:"Erro no fechamento. Nenhum registro foi presumido.");}
+  finally{setSaving(false);}
+ };
  if(!authLoading&&!canView)return <RootShellLayout><div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-sm text-amber-900" role="alert">Sem permissão para visualizar os turnos de caixa.</div></RootShellLayout>;
  const open=data?.shifts.filter(s=>s.status===1)||[];
  const eligible=data?.registers.filter(r=>r.status===1&&!open.some(s=>s.registerId===r.id))||[];
@@ -105,10 +132,10 @@ export default function CashPage(){
       <tbody className="divide-y divide-slate-100">{data.shifts.map(s=><tr key={s.id}><td className="p-3 font-bold">{s.registerName}</td><td className="p-3">{date(s.openedAtUtc)}</td>
        <td className="p-3">{s.status===1?"Aberto":s.status===5?"Encerrado":`Estado ${s.status}`}</td>
        <td className="p-3 text-right">{money(s.openingFloat)}</td><td className="p-3 text-right font-bold">{money(s.recordedBalance)}</td>
-       <td className="p-3 text-right">{s.movementCount}</td><td className={s.reconciliationMismatch?"p-3 font-bold text-rose-700":"p-3 text-emerald-700"}>{s.reconciliationMismatch?"Divergência — revisar":"Soma consistente"}</td><td className="p-3">{s.status===1&&s.operatorId===user?.id?<div className="flex gap-2">{canSupply&&<button type="button" disabled={saving} onClick={()=>{setMovementShift(s);setMovementType("SUPPLY");setError("");movementKey.current="";}} className="rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700">Suprimento</button>}{canWithdraw&&<button type="button" disabled={saving} onClick={()=>{setMovementShift(s);setMovementType("WITHDRAWAL");setError("");movementKey.current="";}} className="rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">Sangria</button>}</div>:<span className="text-slate-400">—</span>}</td></tr>)}</tbody>
+       <td className="p-3 text-right">{s.movementCount}</td><td className={s.reconciliationMismatch?"p-3 font-bold text-rose-700":"p-3 text-emerald-700"}>{s.reconciliationMismatch?"Divergência — revisar":"Soma consistente"}</td><td className="p-3">{s.status===1&&s.operatorId===user?.id?<div className="flex gap-2">{canSupply&&<button type="button" disabled={saving} onClick={()=>{setMovementShift(s);setMovementType("SUPPLY");setError("");movementKey.current="";}} className="rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700">Suprimento</button>}{canWithdraw&&<button type="button" disabled={saving} onClick={()=>{setMovementShift(s);setMovementType("WITHDRAWAL");setError("");movementKey.current="";}} className="rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">Sangria</button>}{canClose&&<button type="button" disabled={saving} onClick={()=>{setClosingShift(s);setError("");closingKey.current="";setCountedAmount("");setClosingNotes("");}} className="rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-bold text-white">Fechar</button>}</div>:<span className="text-slate-400">—</span>}</td></tr>)}</tbody>
      </table></div>}
    </div>
-   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800"><LockKeyhole className="mr-2 inline h-4 w-4"/>Abertura, suprimentos e sangrias persistem no Neon. Fechamento cego, conciliação bancária, vendas e liquidações seguem bloqueados até aprovação dos respectivos gates. Esta tela não cria pagamentos.</div>
+   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800"><LockKeyhole className="mr-2 inline h-4 w-4"/>Abertura, suprimentos e sangrias persistem no Neon. Fechamento sem diferença exige contagem física exata; divergências exigem fluxo de aprovação separado. Conciliação bancária, vendas e liquidações seguem bloqueadas até aprovação dos respectivos gates. Esta tela não cria pagamentos.</div>
   </div>
   {showOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-3" role="dialog" aria-modal="true" aria-label="Abrir turno de caixa">
    <form onSubmit={e=>void openShift(e)} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
@@ -142,6 +169,26 @@ export default function CashPage(){
     </label>
     <div className="flex justify-end gap-2"><button type="button" disabled={saving} onClick={()=>{setMovementShift(null);setError("");movementKey.current="";}} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold">Cancelar</button>
      <button type="submit" disabled={saving} className="rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving?"Registrando...":"Confirmar movimento"}</button></div>
+   </form>
+  </div>}
+  {closingShift&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-3" role="dialog" aria-modal="true" aria-label="Fechamento do turno">
+   <form onSubmit={e=>void closeShift(e)} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+    <h2 className="text-lg font-extrabold">Conferência e fechamento do caixa</h2>
+    <p className="text-xs text-slate-500">Conte fisicamente o dinheiro antes de informar o valor. Turnos com diferença não serão encerrados automaticamente.</p>
+    {error&&<div role="alert" className="rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-800">{error}</div>}
+    <label className="block text-xs font-bold">Total contado em dinheiro (R$)
+     <input required type="number" min="0" step="0.01" value={countedAmount}
+      onChange={e=>setCountedAmount(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm" />
+    </label>
+    <label className="block text-xs font-bold">Observações
+     <textarea maxLength={500} rows={3} value={closingNotes} onChange={e=>setClosingNotes(e.target.value)}
+      className="mt-1 w-full rounded-lg border p-2.5 text-sm"/>
+    </label>
+    <div className="flex justify-end gap-2"><button type="button" disabled={saving}
+      onClick={()=>{setClosingShift(null);closingKey.current="";setError("");}}
+      className="rounded-xl border px-4 py-2 text-xs font-bold">Cancelar</button>
+     <button type="submit" disabled={saving} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
+      {saving?"Conferindo...":"Conferir e fechar"}</button></div>
    </form>
   </div>}
  </RootShellLayout>;
