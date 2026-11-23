@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCpfCnpj} from "@/lib/br-format";
 import {
   ShoppingCart,
   CheckCircle2,
@@ -912,7 +913,7 @@ export default function ProcurementPage() {
                     <option value="">Selecione o Fornecedor...</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} {s.document ? `(${s.document})` : ""}
+                        {s.name} {s.document ? `(${formatCpfCnpj(s.document)})` : ""}
                       </option>
                     ))}
                   </select>
@@ -1104,7 +1105,7 @@ export default function ProcurementPage() {
                       <option value="">Selecione o Cliente / Pessoa...</option>
                       {suppliers.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.name} {s.document ? `(${s.document})` : ""}
+                          {s.name} {s.document ? `(${formatCpfCnpj(s.document)})` : ""}
                         </option>
                       ))}
                     </select>

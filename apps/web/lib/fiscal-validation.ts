@@ -43,7 +43,7 @@ export function validateFiscalEstablishment(value:unknown):FiscalEstablishmentIn
  const ie=digits(v.stateRegistration);
  if(ie.length!==12)throw new FleetError(400,"INVALID_IE","Inscrição Estadual SP deve ter 12 dígitos. Valide sua situação no CADESP.");
  const regime=Number(v.regime),env=Number(v.environment);
- if(![1,2,3].includes(regime))throw new FleetError(400,"INVALID_REGIME","Regime tributário inválido.");
+ if(![1,2,3,4].includes(regime))throw new FleetError(400,"INVALID_REGIME","Regime tributário inválido.");
  if(env!==2)throw new FleetError(409,"PRODUCTION_LOCKED","Produção fiscal está bloqueada até homologação externa da SEFAZ. Selecione homologação.");
  const cityCodeIbge=digits(v.cityCodeIbge),postalCode=digits(v.postalCode),cnae=digits(v.cnae);
  if(!/^35\d{5}$/.test(cityCodeIbge))throw new FleetError(400,"INVALID_CITY_IBGE","Informe código IBGE de município paulista com 7 dígitos.");

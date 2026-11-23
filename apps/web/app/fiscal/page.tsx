@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCnpj,formatCep,normalizeDocument,normalizeCep} from "@/lib/br-format";
 import {
   FileText,
   ShieldCheck,
@@ -72,7 +73,7 @@ export default function FiscalPage() {
           const e = data.establishment;
           setCorporateName(e.corporateName || "");
           setTradeName(e.tradeName || "");
-          setCnpj(e.cnpj || "");
+          setCnpj(formatCnpj(e.cnpj));
           setStateRegistration(e.stateRegistration || "");
           setMunicipalRegistration(e.municipalRegistration || "");
           setCnae(e.cnae || "");
@@ -85,7 +86,7 @@ export default function FiscalPage() {
           setNeighborhood(e.neighborhood || "");
           setCityName(e.cityName || "");
           setState(e.state || "");
-          setPostalCode(e.postalCode || "");
+          setPostalCode(formatCep(e.postalCode));
           setCscId(data.csc?.cscId || "");
           setNfceDefaultSeries(String(e.nfceDefaultSeries || 1));
           setNfceNextNumber(String(e.nfceNextNumber || 1));
@@ -121,7 +122,7 @@ export default function FiscalPage() {
         body: JSON.stringify({
           corporateName,
           tradeName,
-          cnpj,
+          cnpj:normalizeDocument(cnpj),
           stateRegistration,
           municipalRegistration,
           cnae,
@@ -133,7 +134,7 @@ export default function FiscalPage() {
           cityName,
           state,
           cityCodeIbge,
-          postalCode,
+          postalCode:normalizeCep(postalCode),
           environment: Number(environment),
           nfceDefaultSeries: Number(nfceDefaultSeries),
           nfceNextNumber: Number(nfceNextNumber),
@@ -389,7 +390,7 @@ export default function FiscalPage() {
                   {hasConfig ? est.tradeName || est.corporateName : "Não Configurado"}
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  {hasConfig ? `CNPJ: ${est.cnpj} • ${est.state}` : "Preencha na aba Cadastros Fiscais"}
+                  {hasConfig ? `CNPJ: ${formatCnpj(est.cnpj)} • ${est.state}` : "Preencha na aba Cadastros Fiscais"}
                 </div>
               </div>
 
@@ -525,7 +526,8 @@ export default function FiscalPage() {
                     <input
                       type="text"
                       value={cnpj}
-                      onChange={(e) => setCnpj(e.target.value)}
+                      inputMode="numeric" maxLength={18}
+                      onChange={(e) => setCnpj(formatCnpj(e.target.value))}
                       required
                       placeholder="00.000.000/0000-00"
                       className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
@@ -567,6 +569,7 @@ export default function FiscalPage() {
                       <option value="1">Simples Nacional</option>
                       <option value="2">Simples Nacional - Excesso Sublimite</option>
                       <option value="3">Regime Normal (Presumido/Real)</option>
+                      <option value="4">MEI — Simples Nacional (CRT 4)</option>
                     </select>
                   </div>
 
@@ -658,7 +661,8 @@ export default function FiscalPage() {
                         type="text"
                         placeholder="CEP (Ex: 01310-100)"
                         value={postalCode}
-                        onChange={(e) => setPostalCode(e.target.value)}
+                        inputMode="numeric" maxLength={9}
+                        onChange={(e) => setPostalCode(formatCep(e.target.value))}
                         className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-mono"
                       />
                     </div>

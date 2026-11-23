@@ -31,7 +31,7 @@ export async function POST(request:NextRequest){
   const sellerId=uuid(b.sellerId,"Vendedor");
   const customerId=b.customerId?uuid(b.customerId,"Cliente"):null;
   const m=Number(b.method),installments=Number(b.installments);
-  if(![1,2,3,4].includes(m)||!Number.isInteger(installments)||installments<1||installments>12||(m!==3&&installments!==1))throw new FleetError(400,"VALIDATION_ERROR","Pagamento/parcelas inválidos.");
+  if(![1,2,3,4].includes(m)||!Number.isInteger(installments)||installments<1||installments>18||(m!==3&&installments!==1))throw new FleetError(400,"VALIDATION_ERROR","Pagamento/parcelas inválidos.");
   const discountCents=Number(b.discountCents??0);
   if(!Number.isSafeInteger(discountCents)||discountCents<0||discountCents>100000000)throw new FleetError(400,"VALIDATION_ERROR","Desconto inválido.");
   if(discountCents>0&&!ctx.permissions.has("sales.discount.override"))throw new FleetError(403,"FORBIDDEN","Desconto exige permissão sales.discount.override.");

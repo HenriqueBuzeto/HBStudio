@@ -1,0 +1,29 @@
+name: Brazilian input formatting gate (no deployment)
+on:
+  push:
+    branches: [feat/br-input-masks-consistency-20261123]
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/br-format-gate.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/test-br-format.cjs
+      - run: npx tsc --noEmit
+      - run: npm run build

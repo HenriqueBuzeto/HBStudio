@@ -1,0 +1,34 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const vm=require("node:vm");
+const path=require("node:path");
+const ts=require("typescript");
+const moduleForTest={exports:{}};
+const source=fs.readFileSync(path.join(__dirname,"../lib/br-format.ts"),"utf8");
+const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+vm.runInNewContext(js,{module:moduleForTest,exports:moduleForTest.exports},{filename:"br-format.ts"});
+const {formatCpf,formatCnpj,formatCpfCnpj,formatCep,formatPhoneBr,maskPhoneInput,
+ normalizeDocument,normalizeCep,normalizePhoneBr,formatDateBr,onlyDigits}=moduleForTest.exports;
+assert.equal(formatCpf("48951071839"),"489.510.718-39");
+assert.equal(formatCpf("489.510.718-39"),"489.510.718-39");
+assert.equal(formatCpf("489"),"489");
+assert.equal(formatCnpj("11222333000181"),"11.222.333/0001-81");
+assert.equal(formatCpfCnpj("11222333000181"),"11.222.333/0001-81");
+assert.equal(formatCpfCnpj("48951071839",1),"489.510.718-39");
+assert.equal(formatCep("14770000"),"14770-000");
+assert.equal(formatCep("14770-000"),"14770-000");
+assert.equal(formatPhoneBr("17992651033"),"(17) 99265-1033");
+assert.equal(formatPhoneBr("1732651033"),"(17) 3265-1033");
+assert.equal(formatPhoneBr("+5517992651033"),"+55 (17) 99265-1033");
+assert.equal(formatPhoneBr("(17) 99265-1033"),"(17) 99265-1033");
+assert.equal(maskPhoneInput("17992651033"),"(17) 99265-1033");
+assert.equal(normalizePhoneBr("(17) 99265-1033"),"17992651033");
+assert.equal(normalizePhoneBr("+55 (17) 99265-1033"),"17992651033");
+assert.equal(normalizePhoneBr("123"),null);
+assert.equal(normalizeCep("14770-000"),"14770000");
+assert.equal(normalizeDocument("489.510.718-39"),"48951071839");
+assert.equal(formatDateBr("2026-11-23T01:00:00.000Z"),"23/11/2026");
+assert.equal(formatDateBr(""),"");
+assert.equal(onlyDigits("IPH15P-128-NAT"),"15128");
+// SKU, IMEI, fiscal keys and alphanumeric serials must NEVER be implicitly passed to masks.
+console.log("BR masks: PASS — CPF/CNPJ, phone (DDD/9th digit/+55), CEP, dates and canonical transport");
