@@ -381,6 +381,26 @@ export default function SalesPage(){
   :tab==="quotes"?<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-sm font-black text-slate-900">Orçamentos registrados no Neon</h2><p className="text-xs text-slate-500">Propostas comerciais não são venda nem comprovante de pagamento.</p></div><button className={primary} onClick={()=>setTab("pos")}><Plus className="h-4 w-4"/> Novo orçamento</button></div>
    {quotes.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhum orçamento encontrado para esta filial.</div>:<div className="divide-y divide-slate-100">{quotes.map(q=><div key={q.id} className="flex flex-wrap items-center justify-between gap-4 p-4"><div><strong className="font-mono text-xs text-violet-700">{q.number}</strong><p className="mt-1 text-xs text-slate-600">{q.customer||"Consumidor não identificado"} • Vendedor: {q.seller||"—"}</p><p className="text-[10px] text-slate-400">Criado em {dateText(q.createdAt)} • Válido até {dateText(q.validUntil)}</p></div><div className="flex items-center gap-3"><strong className="text-base text-slate-900">{money(q.total)}</strong><button className={button} onClick={()=>setSelectedQuote(q)}><ClipboardList className="h-4 w-4"/> Detalhes</button></div></div>)}</div>}
   </section>
+  :tab==="training"?<section className="overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-sm">
+    <header className="border-b border-rose-200 bg-rose-50 p-5">
+     <h2 className="text-sm font-black text-rose-900">Treinamento — simulações, não vendas</h2>
+     <p className="mt-1 text-xs text-rose-800">Histórico separado, sem receita, pagamento, imposto, caixa ou saída de estoque.</p>
+     <p className="mt-2 text-xs text-slate-700">{trainingSales.filter(x=>x.status==="SIMULATED").length} simulações ativas · Total simulado {money(trainingSales.filter(x=>x.status==="SIMULATED").reduce((v,x)=>v+Number(x.totalCents)/100,0))} · Receita reconhecida: R$ 0,00.</p>
+    </header>
+    {trainingSales.length===0?<p className="p-10 text-center text-xs text-slate-500">Monte um carrinho e clique em SIMULAR para testar.</p>:
+    <div className="divide-y divide-slate-100">{trainingSales.map(x=><div key={x.id} className="flex flex-wrap items-center justify-between gap-3 p-4 text-xs">
+     <div className="min-w-0"><strong className="font-mono text-rose-700">{x.number}</strong>
+      <p>{x.customer} · {x.seller} · {dateText(x.createdAt)}</p>
+      <p className="text-slate-500">{x.items.map(i=>i.quantity+"x "+i.description).join(" • ")}</p>
+      <p className={x.status==="CANCELLED"?"text-slate-500":"font-bold text-rose-700"}>{x.status==="CANCELLED"?"SIMULAÇÃO CANCELADA":"NÃO FISCAL — PAGAMENTO NÃO REALIZADO"}</p>
+     </div>
+     <div className="flex flex-wrap items-center gap-2"><strong>{money(Number(x.totalCents)/100)}</strong>
+      <a className={button} href={"/documents/print?kind=simulation&id="+encodeURIComponent(x.id)+"&paper=80"} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4"/> Imprimir 58/80 mm</a>
+      <a className={button} href={"/documents/print?kind=simulation&id="+encodeURIComponent(x.id)+"&paper=A4"} target="_blank" rel="noopener noreferrer">A4 / PDF / WhatsApp</a>
+      {x.status==="SIMULATED"&&hasPermission("sales.cancel")&&<button className={button} disabled={saving} onClick={()=>void cancelTraining(x)}>Cancelar teste</button>}
+     </div>
+    </div>)}</div>}
+   </section>
   :<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="text-sm font-black text-slate-900">Histórico de vendas persistidas</h2><p className="text-xs text-slate-500">Nenhuma autorização fiscal é presumida. Status refletido diretamente no Neon.</p></div>
    {history.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhuma venda cadastrada nesta filial.</div>:<div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr>{["Venda","Data","Cliente","Vendedor","Total","Status","Detalhes"].map(x=><th key={x} className="px-4 py-3">{x}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{history.map(s=><tr key={s.id}><td className="px-4 py-3 font-mono font-bold text-violet-700">{s.saleNumber}</td><td className="px-4 py-3">{dateText(s.createdAtUtc)}</td><td className="px-4 py-3">{s.customerName}</td><td className="px-4 py-3">{s.sellerName}</td><td className="px-4 py-3 font-bold">{money(s.totalAmount)}</td><td className="px-4 py-3"><span className="rounded-lg bg-slate-100 px-2 py-1">{statusSale[s.status]||"Desconhecido"}</span></td><td className="px-4 py-3"><button className={button} onClick={()=>setSelectedSale(s)}>Visualizar</button></td></tr>)}</tbody></table></div>}
   </section>}
