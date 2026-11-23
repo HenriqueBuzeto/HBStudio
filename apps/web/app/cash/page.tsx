@@ -1,237 +1,106 @@
 "use client";
 
-import React, { useState } from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
-import { 
-  DollarSign, 
-  ArrowDownRight, 
-  ArrowUpRight, 
-  Lock, 
-  Coins, 
-  Receipt,
-  FolderOpen
-} from "lucide-react";
+import {useAuth} from "@/lib/auth";
+import {Wallet,RefreshCw,LockKeyhole,AlertTriangle,CheckCircle2,Plus,History} from "lucide-react";
 
-interface CashMovement {
-  id: string;
-  time: string;
-  type: string;
-  amount: number;
-  doc: string;
-  reason: string;
-}
+type CashRegister={id:string;code:string;name:string;status:number};
+type Shift={id:string;registerId:string;registerName:string;operatorId:string;status:number;openingFloat:number;recordedBalance:number;recordedCashIn:number;recordedCashOut:number;movementNet:number;movementCount:number;openedAtUtc:string;closedAtUtc:string|null;reconciliationMismatch:boolean};
+type Overview={registers:CashRegister[];shifts:Shift[];canOpen:boolean;note:string};
+const money=(n:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);
+const date=(d:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"}).format(new Date(d));
 
-export default function CashPage() {
-  const [movements, setMovements] = useState<CashMovement[]>([]);
-  const [cashBalance, setCashBalance] = useState<number>(0.00);
-  const [initialFloat, setInitialFloat] = useState<number>(0.00);
-  const [cashIn, setCashIn] = useState<number>(0.00);
-  const [electronicSales, setElectronicSales] = useState<number>(0.00);
-  const [isShiftOpen, setIsShiftOpen] = useState(false);
-  const [showOpenModal, setShowOpenModal] = useState(false);
-  const [floatInput, setFloatInput] = useState("");
-
-  const handleOpenShift = (e: React.FormEvent) => {
-    e.preventDefault();
-    window.alert("Abertura de caixa indisponível até a integração transacional com Neon.");
-  };
-
-  return (
-    <RootShellLayout>
-      <div className="space-y-6">
-        {/* Header estilo HBVisionX */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                Frente de Loja
-              </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isShiftOpen ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
-                {isShiftOpen ? "Turno Aberto" : "Caixa Fechado"}
-              </span>
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
-              Caixa & Gestão de Turnos
-            </h1>
-            <p className="text-xs text-slate-500">
-              Módulo de caixa aguardando integração transacional com Neon. Dados operacionais indisponíveis.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!isShiftOpen ? (
-              <button
-                disabled title="Aguardando integração do Caixa com Neon"
-                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                Abrir Caixa (Turno 01)
-              </button>
-            ) : (
-              <>
-                <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors shadow-xs">
-                  <ArrowDownRight className="w-3.5 h-3.5 text-rose-500" />
-                  Sangria
-                </button>
-                <button className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors shadow-xs">
-                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                  Suprimento
-                </button>
-                <button
-                  onClick={() => setIsShiftOpen(false)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-                >
-                  <Lock className="w-3.5 h-3.5" />
-                  Fechar Turno
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Indicadores Topo estilo HBVisionX */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5 text-purple-600" />
-              Disponibilidade em Caixa
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Saldo Físico (Dinheiro Gaveta)
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cashBalance)}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Conferência física</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Fundo de Troco Inicial
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(initialFloat)}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">{isShiftOpen ? "Turno em andamento" : "Aguardando abertura"}</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-purple-600"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Entradas em Dinheiro
-              </span>
-              <div className="text-lg font-extrabold text-purple-700">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cashIn)}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Vendas PDV e serviços</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                PIX & Cartões (Registrados)
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(electronicSales)}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Conciliação eletrônica</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabela de Movimentações */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-purple-600" />
-              Lançamentos do Turno Atual
-            </h3>
-            <span className="text-xs text-slate-500">Operador: Henrique Barreto</span>
-          </div>
-
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
-              <tr>
-                <th className="py-3 px-4">Hora</th>
-                <th className="py-3 px-4">Tipo</th>
-                <th className="py-3 px-4">Valor</th>
-                <th className="py-3 px-4">Documento / Venda</th>
-                <th className="py-3 px-4">Justificativa / Motivo</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {movements.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 text-slate-500">{m.time}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
-                      {m.type}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(m.amount)}
-                  </td>
-                  <td className="py-3 px-4 font-mono text-slate-600">{m.doc}</td>
-                  <td className="py-3 px-4 text-slate-500">{m.reason}</td>
-                </tr>
-              ))}
-              {movements.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-16 text-center text-slate-400">
-                    <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-700">Nenhum movimento no turno</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Abra o caixa e lance as primeiras vendas ou suprimentos do balcão.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Modal de Abertura de Caixa */}
-        {showOpenModal && (
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-xl space-y-4">
-              <h3 className="text-sm font-extrabold text-slate-900">Abertura de Caixa (Turno 01)</h3>
-              <form onSubmit={handleOpenShift} className="space-y-3 text-xs">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Fundo de Troco Inicial (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={floatInput}
-                    onChange={(e) => setFloatInput(e.target.value)}
-                    placeholder="Ex: 200,00"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowOpenModal(false)}
-                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
-                  >
-                    Confirmar Abertura
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
-    </RootShellLayout>
-  );
+export default function CashPage(){
+ const {hasPermission,isLoading:authLoading}=useAuth();
+ const canView=hasPermission("cash.shift.view"),canOpen=hasPermission("cash.open");
+ const [data,setData]=useState<Overview|null>(null);
+ const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
+ const [error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [registerId,setRegisterId]=useState(""),[openingFloat,setOpeningFloat]=useState("0.00"),[showOpen,setShowOpen]=useState(false);
+ const requestKey=useRef("");
+ const load=useCallback(async()=>{
+  setLoading(true);setError("");
+  try{
+   const response=await fetch("/api/cash/overview",{cache:"no-store"});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||"Não foi possível consultar os caixas.");
+   setData(result);
+  }catch(e){setError(e instanceof Error?e.message:"Falha de conexão com Neon.");setData(null);}
+  finally{setLoading(false);}
+ },[]);
+ useEffect(()=>{if(!authLoading&&canView)void load();},[authLoading,canView,load]);
+ const openShift=async(e:React.FormEvent)=>{
+  e.preventDefault();if(saving)return;
+  const amount=Number(openingFloat);
+  if(!registerId||!Number.isFinite(amount)||amount<0||Math.abs(amount*100-Math.round(amount*100))>0.000001){setError("Selecione um caixa e informe o fundo em reais e centavos.");return;}
+  if(!requestKey.current)requestKey.current=crypto.randomUUID();
+  setSaving(true);setError("");setNotice("");
+  try{
+   const response=await fetch("/api/cash/overview",{method:"POST",headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({registerId,openingFloat:amount,requestKey:requestKey.current})});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(result.error||"Abertura de caixa não concluída.");
+   setNotice("Caixa aberto com registro auditável no Neon.");
+   setShowOpen(false);requestKey.current="";setOpeningFloat("0.00");setRegisterId("");
+   await load();
+  }catch(e){setError(e instanceof Error?e.message:"Falha ao abrir o caixa. A solicitação pode ser reenviada com segurança.");}
+  finally{setSaving(false);}
+ };
+ if(!authLoading&&!canView)return <RootShellLayout><div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-sm text-amber-900" role="alert">Sem permissão para visualizar os turnos de caixa.</div></RootShellLayout>;
+ const open=data?.shifts.filter(s=>s.status===1)||[];
+ const eligible=data?.registers.filter(r=>r.status===1&&!open.some(s=>s.registerId===r.id))||[];
+ const mismatch=data?.shifts.filter(s=>s.reconciliationMismatch)||[];
+ return <RootShellLayout>
+  <div className="space-y-5">
+   <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div><span className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Frente de Loja • Operação Real</span>
+     <h1 className="mt-2 text-xl font-extrabold text-slate-900">Caixa & Gestão de Turnos</h1>
+     <p className="mt-1 text-xs text-slate-500">Turnos e movimentações consultados diretamente no Neon; fechamento e conciliação permanecem protegidos até homologação.</p></div>
+    <div className="flex gap-2">
+     <button type="button" onClick={()=>void load()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50"><RefreshCw className="h-4 w-4"/>Atualizar</button>
+     <button type="button" onClick={()=>{requestKey.current="";setError("");setShowOpen(true);}} disabled={!canOpen||!data||eligible.length===0}
+      className="flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4"/>Abrir turno</button>
+    </div>
+   </header>
+   {error&&<div role="alert" className="flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
+   {notice&&<div role="status" className="flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 className="h-5 w-5 shrink-0"/>{notice}</div>}
+   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5"><Wallet className="h-5 w-5 text-violet-700"/><div className="mt-2 text-2xl font-black text-slate-900">{data?open.length:"—"}</div><p className="text-xs text-slate-500">Turnos abertos</p></div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5"><History className="h-5 w-5 text-violet-700"/><div className="mt-2 text-2xl font-black text-slate-900">{data?data.registers.length:"—"}</div><p className="text-xs text-slate-500">Caixas cadastrados na filial</p></div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5"><AlertTriangle className="h-5 w-5 text-amber-600"/><div className="mt-2 text-2xl font-black text-slate-900">{data?mismatch.length:"—"}</div><p className="text-xs text-slate-500">Turnos com diferença entre saldo e movimentos</p></div>
+   </div>
+   <div className="rounded-2xl border border-slate-200 bg-white p-5">
+    <h2 className="font-extrabold text-slate-900">Histórico de turnos reais</h2>
+    <p className="mt-1 text-xs text-slate-500">O saldo registrado não substitui a conferência física de numerário.</p>
+    {!data?<p className="mt-5 text-sm text-slate-500">{loading?"Consultando o banco...":"Dados indisponíveis."}</p>:
+     data.shifts.length===0?<p className="mt-5 text-sm text-slate-500">Não há turnos nesta filial.</p>:
+     <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[700px] text-left text-xs">
+      <thead className="bg-slate-50 font-bold text-slate-600"><tr><th className="p-3">Caixa</th><th className="p-3">Abertura</th><th className="p-3">Estado</th><th className="p-3 text-right">Fundo inicial</th><th className="p-3 text-right">Saldo registrado</th><th className="p-3 text-right">Movimentos</th><th className="p-3">Integridade</th></tr></thead>
+      <tbody className="divide-y divide-slate-100">{data.shifts.map(s=><tr key={s.id}><td className="p-3 font-bold">{s.registerName}</td><td className="p-3">{date(s.openedAtUtc)}</td>
+       <td className="p-3">{s.status===1?"Aberto":s.status===5?"Encerrado":`Estado ${s.status}`}</td>
+       <td className="p-3 text-right">{money(s.openingFloat)}</td><td className="p-3 text-right font-bold">{money(s.recordedBalance)}</td>
+       <td className="p-3 text-right">{s.movementCount}</td><td className={s.reconciliationMismatch?"p-3 font-bold text-rose-700":"p-3 text-emerald-700"}>{s.reconciliationMismatch?"Divergência — revisar":"Soma consistente"}</td></tr>)}</tbody>
+     </table></div>}
+   </div>
+   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800"><LockKeyhole className="mr-2 inline h-4 w-4"/>Sangrias, suprimentos, fechamento cego e liquidação de vendas seguem bloqueados até aprovação do gate financeiro e fiscal. Esta tela não cria pagamentos.</div>
+  </div>
+  {showOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-3" role="dialog" aria-modal="true" aria-label="Abrir turno de caixa">
+   <form onSubmit={e=>void openShift(e)} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+    <h2 className="text-lg font-extrabold">Abrir turno no Neon</h2>
+    <p className="text-xs text-slate-500">Um caixa só poderá possuir um turno aberto. O fundo inicial será registrado em movimento auditável.</p>
+    {error&&<div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-semibold text-rose-800">{error}</div>}
+    <label className="block text-xs font-bold">Caixa disponível
+      <select required value={registerId} onChange={e=>setRegisterId(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm">
+       <option value="">Selecione um caixa</option>{eligible.map(r=><option key={r.id} value={r.id}>{r.code} • {r.name}</option>)}
+      </select>
+    </label>
+    <label className="block text-xs font-bold">Fundo inicial (R$)
+      <input required type="number" min="0" max="1000000" step="0.01" value={openingFloat} onChange={e=>setOpeningFloat(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm"/>
+    </label>
+    <div className="flex justify-end gap-2"><button type="button" disabled={saving} onClick={()=>{setShowOpen(false);setError("");requestKey.current="";}} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold">Cancelar</button>
+     <button type="submit" disabled={saving||!registerId} className="rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving?"Registrando...":"Abrir e auditar"}</button></div>
+   </form>
+  </div>}
+ </RootShellLayout>;
 }
