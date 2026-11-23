@@ -1,6 +1,6 @@
 -- Isolated, immutable simulation-only sales. Never post stock/finance/fiscal.
 -- This table must NOT be included in commercial sales totals or tax revenue.
-CREATE TABLE IF NOT EXISTS pos_training_sales (
+CREATE TABLE IF NOT EXISTS pos_training_checkout_records (
  "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  "TenantId" uuid NOT NULL REFERENCES tenants("Id") ON DELETE RESTRICT,
  "BranchId" uuid NOT NULL REFERENCES branches("Id") ON DELETE RESTRICT,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS pos_training_sales (
  CHECK (("Status"='SIMULATED' AND "VoidedAtUtc" IS NULL AND "VoidedByUserId" IS NULL)
   OR ("Status"='VOIDED' AND "VoidedAtUtc" IS NOT NULL AND "VoidedByUserId" IS NOT NULL AND length(trim(COALESCE("VoidReason",'')))>3))
 );
-CREATE INDEX IF NOT EXISTS "IX_pos_training_sales_scope"
- ON pos_training_sales ("TenantId","BranchId","CreatedAtUtc" DESC);
-COMMENT ON TABLE pos_training_sales IS
+CREATE INDEX IF NOT EXISTS "IX_pos_training_checkout_records_scope"
+ ON pos_training_checkout_records ("TenantId","BranchId","CreatedAtUtc" DESC);
+COMMENT ON TABLE pos_training_checkout_records IS
  'SIMULATION ONLY. No legal/commercial sale, no bank receipt, no payment intent, no fiscal document, no warehouse/Kardex or financial ledger posting.';
