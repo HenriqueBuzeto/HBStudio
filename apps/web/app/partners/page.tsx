@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCpf} from "@/lib/br-format";
 import {
   Users,
   Building2,
@@ -146,7 +147,7 @@ export default function PartnersPage() {
                 <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3.5 px-4">
                     <div className="font-extrabold text-slate-900">{p.name}</div>
-                    <div className="text-[10px] font-mono text-slate-400">{p.document}</div>
+                    <div className="text-[10px] font-mono text-slate-400">{formatCpf(p.document)}</div>
                   </td>
                   <td className="py-3.5 px-4 text-slate-600 font-medium">{p.role}</td>
                   <td className="py-3.5 px-4 font-extrabold text-purple-700 text-sm">
@@ -205,7 +206,7 @@ export default function PartnersPage() {
                   <input
                     type="text"
                     value={doc}
-                    onChange={(e) => setDoc(e.target.value)}
+                    onChange={(e) => setDoc(formatCpf(e.target.value))}
                     placeholder="000.000.000-00"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                   />
