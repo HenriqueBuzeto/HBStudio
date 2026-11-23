@@ -907,6 +907,20 @@ export default function RepairsPage() {
                   </div>
                 </div>
 
+                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                  <a href={"/documents/print?kind=service&id="+encodeURIComponent(selectedOrder.id)+"&paper=80"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-800">
+                    Imprimir OS • 58/80 mm
+                  </a>
+                  <a href={"/documents/print?kind=service&id="+encodeURIComponent(selectedOrder.id)+"&paper=A4"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                    OS A4 / PDF / WhatsApp
+                  </a>
+                  <a href={"/documents/print?kind=contract&id="+encodeURIComponent(selectedOrder.id)+"&paper=A4"}
+                    target="_blank" rel="noopener noreferrer" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800">
+                    Minuta de contrato A4
+                  </a>
+                </div>
                 {/* Botões do Rodapé */}
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <button
