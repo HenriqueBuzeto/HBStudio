@@ -107,11 +107,12 @@ export async function POST(request: NextRequest) {
     const model=required(body.model,"Modelo",160);
     const defect=required(body.reportedDefect,"Defeito relatado",2000);
     const items=validateItems(body.items||[]);
+    const requestKey=uuid(body.requestKey,"Chave de idempotência");
     const rows=await ctx.db.query(
-      'SELECT * FROM repair_enterprise_create($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::text,$14::text,$15::text,$16::jsonb)',
+      'SELECT * FROM repair_enterprise_create($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::text,$14::text,$15::text,$16::jsonb,$17::uuid)',
       [ctx.tenantId,ctx.branchId,ctx.userId,ctx.email,cid,customerId,customerName,equipmentType,
         brand,model,optional(body.color,100),optional(body.serialNumber,120),
-        optional(body.equipmentDetails,2000),defect,optional(body.physicalConditionNotes,2000),JSON.stringify(items)]
+        optional(body.equipmentDetails,2000),defect,optional(body.physicalConditionNotes,2000),JSON.stringify(items),requestKey]
     );
     return NextResponse.json({id:rows[0].id,orderNumber:rows[0].orderNumber,
       message:"Ordem de serviço criada e auditada no Neon."},{status:201,headers:headers(cid)});
