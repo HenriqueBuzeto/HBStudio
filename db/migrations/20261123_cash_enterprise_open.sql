@@ -70,7 +70,7 @@ BEGIN
      "CreatedByUserId","CorrelationId","IdempotencyKey","CreatedAtUtc"
    ) VALUES (
      gen_random_uuid(),p_tenant,p_branch,p_register,v_shift,1,1,p_float,
-     'CashShift',v_shift::text,'OPEN-'||v_shift::text,'Fundo inicial',
+     'OPENING',v_shift::text,'OPEN-'||v_shift::text,'Fundo inicial',
      p_actor,p_correlation,'opening:'||p_request::text,now()
    );
  END IF;
