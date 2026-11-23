@@ -17,6 +17,8 @@ type Seller={id:string;name:string;jobTitle:string|null};
 type Repair={id:string;orderNumber:string;defect:string;finalPrice:number;customerId:string;status:number};
 type Quote={id:string;number:string;status:number;customerId:string|null;customer:string|null;sellerId:string;seller:string|null;validUntil:string;paymentTerms:string;discount:number;shipping:number;createdAt:string;subtotal:number;total:number;items:Array<{sku:string;description:string;quantity:number;price:number}>};
 type Sale={id:string;saleNumber:string;status:number;paymentStatus:number;fulfillmentStatus:number;customerName:string;sellerName:string;subtotal:number;discountTotal:number;chargesTotal:number;totalAmount:number;createdAtUtc:string;items:Array<{skuCode:string;description:string;quantity:number;unitPrice:number}>;payments:Array<{method:number;amount:number;installments:number;status:number;reference:string|null}>;fiscalDocuments:Array<{status:number;accessKey:string;protocol:string|null;sefazStatus:number|null}>};
+type TrainingSale={id:string;number:string;status:"SIMULATED"|"VOIDED";createdAt:string;totalCents:string;
+ paymentMethod:string;installments:number;customer:string|null;seller:string|null};
 type Cart={product:Product;quantity:number};
 type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
 type Readiness={checks:Array<{code:string;ready:boolean;label:string;module:string}>;checkoutEnabled:boolean;checkoutBlocker:string;fiscalIssuanceReady:boolean;fiscalBlocker:string};
@@ -54,9 +56,12 @@ export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
  const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
- const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
+ const [tab,setTab]=useState<"pos"|"quotes"|"history"|"training">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
+ const [trainingSales,setTrainingSales]=useState<TrainingSale[]>([]),[trainingMode,setTrainingMode]=useState(false);
+ const [trainingLastUrl,setTrainingLastUrl]=useState("");
+ const trainingRequestKey=useRef<string|null>(null);
  const [readiness,setReadiness]=useState<Readiness|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [customerId,setCustomerId]=useState(""),[sellerId,setSellerId]=useState(""),[cpf,setCpf]=useState("");
@@ -79,8 +84,8 @@ export default function SalesPage(){
   if(!permitted){setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
+   const [a,q,s,r,t]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null),api<{sales:TrainingSale[]}>("/api/sales/training").catch(()=>({sales:[]}))]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);setTrainingSales(t.sales);
    setSellerId(old=>a.sellers.some(x=>x.id===old)?old:(a.sellers.find(x=>x.id===user?.id)?.id||""));
   }catch(e){setError(e instanceof Error?e.message:"Falha ao consultar o Neon.");}
   finally{setLoading(false);}
@@ -112,12 +117,13 @@ export default function SalesPage(){
  useEffect(()=>{
   const handler=(event:KeyboardEvent)=>{
    if(event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
-    event.preventDefault();void toggleDocumentMode();
+    event.preventDefault();setTrainingMode(v=>!v);setError("");
    }
   };
   window.addEventListener("keydown",handler);
   return ()=>window.removeEventListener("keydown",handler);
- },[toggleDocumentMode]);
+ },[]);
+
  useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
   const customer=aux.customers.find(x=>x.id===customerId);
  const match=useMemo(()=>{
@@ -172,6 +178,44 @@ export default function SalesPage(){
   if(matched)addProduct(matched);
   else setError("Código não encontrado no catálogo da sua empresa. Selecione um resultado da busca.");
  };
+ const saveTraining=async()=>{
+  if(!trainingMode||!permitted||!items.length||!sellerId||totalCents<=0||
+    !isDiscountValid||saving||(discountCents>0&&!aux.capabilities.discountOverride))return;
+  const prefs=getBrowserPrintSettings();
+  const printTab=prefs.autoPrintSale?window.open("about:blank","_blank"):null;
+  const key=trainingRequestKey.current||crypto.randomUUID();
+  trainingRequestKey.current=key;
+  setSaving(true);setError("");setNotice("");setTrainingLastUrl("");
+  try{
+   const saved=await api<{id:string;number:string}>("/api/sales/training","POST",{
+    requestKey:key,customerId:customerId||null,sellerId,
+    items:items.map(i=>({skuId:i.product.id,quantity:i.quantity})),
+    paymentMethod:method==="Cash"?"CASH":method==="Pix"?"PIX":method==="CreditCard"?"CREDIT":"DEBIT",
+    installments:method==="CreditCard"?installments:1,discountCents
+   });
+   trainingRequestKey.current=null;
+   const url=buildPrintUrl("training-sale",saved.id,prefs.paper,prefs.autoPrintSale);
+   setTrainingLastUrl(url);
+   setNotice("SIMULAÇÃO "+saved.number+" salva. Não existe venda real, recebimento, baixa de estoque ou nota.");
+   if(printTab&&!printTab.closed)try{printTab.location.replace(new URL(url,window.location.origin).href);}catch{}
+   setItems([]);setDiscountInput("");setTab("training");
+   const refreshed=await api<{sales:TrainingSale[]}>("/api/sales/training");setTrainingSales(refreshed.sales);
+  }catch(e){if(printTab&&!printTab.closed)printTab.close();setError(e instanceof Error?e.message:"Falha ao registrar simulação.");}
+  finally{setSaving(false);}
+ };
+ const voidTraining=async(id:string)=>{
+  if(!hasPermission("sales.cancel")){setError("Permissão sales.cancel necessária.");return;}
+  const reason=window.prompt("Motivo do cancelamento da simulação:");
+  if(reason===null)return;
+  try{
+   const res=await fetch("/api/sales/training/"+encodeURIComponent(id),{method:"PATCH",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({reason})});
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok)throw new Error(data.error||"Falha ao cancelar.");
+   const refreshed=await api<{sales:TrainingSale[]}>("/api/sales/training");
+   setTrainingSales(refreshed.sales);setNotice("Simulação cancelada. Nenhum estorno financeiro foi gerado.");
+  }catch(e){setError(e instanceof Error?e.message:"Falha ao cancelar.");}
+ };
  const saveQuote=async()=>{
   if(!canQuote||saving)return;
   const prefs=getBrowserPrintSettings();
@@ -218,6 +262,7 @@ export default function SalesPage(){
     <button className={tab==="pos"?primary:button} onClick={()=>setTab("pos")}><ShoppingCart className="h-4 w-4"/> Frente de caixa</button>
     <button className={tab==="quotes"?primary:button} onClick={()=>setTab("quotes")}><FileText className="h-4 w-4"/> Orçamentos ({quotes.length})</button>
     <button className={tab==="history"?primary:button} onClick={()=>setTab("history")}><Receipt className="h-4 w-4"/> Vendas ({history.length})</button>
+     <button className={tab==="training"?primary:button} onClick={()=>setTab("training")}><ClipboardList className="h-4 w-4"/> Simulações ({trainingSales.length})</button>
    </div>
   </header>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
@@ -301,7 +346,7 @@ export default function SalesPage(){
      <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
      <button type="button" disabled={checkingDocumentMode} onClick={()=>void toggleDocumentMode()}
       className={"rounded-lg px-3 py-1.5 font-extrabold disabled:opacity-50 "+(documentMode==="INTERNAL"?"bg-red-700 text-white":"bg-slate-800 text-white")}>
-      {checkingDocumentMode?"Verificando...":"Ctrl + F1 • Alternar"}
+      {checkingDocumentMode?"Verificando...":"Consultar dispensa legal"}
      </button>
     </div>
     <p className="mt-2">{documentMode==="INTERNAL"?
@@ -312,7 +357,7 @@ export default function SalesPage(){
      Cliente solicitou documento fiscal
     </label>
     {documentModeError&&<div role="alert" className="mt-2 rounded-lg bg-amber-100 p-2 font-semibold text-amber-900">{documentModeError}</div>}
-    <p className="mt-2 text-[10px]">Atalho disponível na janela do PDV; algumas combinações podem ser interceptadas pelo navegador. Também é possível usar o botão.</p>
+    <p className="mt-2 text-[10px]">Ctrl + F1 alterna apenas treinamento; o modo fiscal real depende de elegibilidade própria.</p>
    </div>
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
      {readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
