@@ -12,7 +12,7 @@ function respondError(e:unknown,cid:string) {
     return NextResponse.json({code:"REPAIR_CONFLICT",error:"OS alterada por outro usuário. Recarregue antes de tentar novamente."},{status:409,headers:responseHeaders(cid)});
   if(message.includes("REPAIR_NOT_FOUND"))
     return NextResponse.json({code:"REPAIR_NOT_FOUND",error:"OS não encontrada nesta filial."},{status:404,headers:responseHeaders(cid)});
-  if(/REPAIR_INVALID_|REPAIR_DELIVERED_/.test(message))
+  if(/REPAIR_(INVALID_|DELIVERED_|FINALIZED_|DELIVERY_)/.test(message))
     return NextResponse.json({code:"REPAIR_VALIDATION_ERROR",error:"Transição de status ou itens não permitidos para esta OS."},{status:422,headers:responseHeaders(cid)});
   console.error("[Repairs]["+cid+"] update error:",e instanceof Error?e.name:"unknown");
   return NextResponse.json({code:"REPAIR_UPDATE_UNAVAILABLE",error:"Falha ao atualizar ordem de serviço."},{status:503,headers:responseHeaders(cid)});
@@ -29,10 +29,12 @@ export async function PUT(request:NextRequest,{params}:{params:Promise<{id:strin
       throw new FleetError(422,"VALIDATION_ERROR","Dados inválidos.");
     const changingItems=Object.prototype.hasOwnProperty.call(body,"items");
     const changingStatus=Object.prototype.hasOwnProperty.call(body,"status");
-    const permission=changingItems?"repairs.quote":changingStatus?"repairs.execute":"repairs.diagnose";
+    const newStatus=changingStatus ? Number(body.status) : null;
+    const statusPermission=newStatus===12?"repairs.deliver":newStatus===10?"repairs.quality":"repairs.execute";
+    const permission=changingItems?"repairs.quote":changingStatus?statusPermission:"repairs.diagnose";
     const ctx=await authorizeFleet(request,permission);
-    if(changingItems&&changingStatus&&!ctx.permissions.has("repairs.execute"))
-      throw new FleetError(403,"FORBIDDEN","Permissão repairs.execute necessária.");
+    if(changingItems&&changingStatus&&!ctx.permissions.has(statusPermission))
+      throw new FleetError(403,"FORBIDDEN","Permissão "+statusPermission+" necessária.");
     const expectedStatus=Number(body.expectedStatus);
     if(!Number.isInteger(expectedStatus))
       throw new FleetError(422,"VALIDATION_ERROR","Status atual obrigatório.");
@@ -65,10 +67,11 @@ export async function PUT(request:NextRequest,{params}:{params:Promise<{id:strin
       return v.trim()||null;
     };
     const rows=await ctx.db.query(
-      'SELECT * FROM repair_enterprise_update($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::int,$8::timestamptz,$9::int,$10::text,$11::text,$12::text,$13::jsonb)',
+      'SELECT * FROM repair_enterprise_update($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::int,$8::timestamptz,$9::int,$10::text,$11::text,$12::text,$13::jsonb,$14::text,$15::text)',
       [ctx.tenantId,ctx.branchId,ctx.userId,ctx.email,cid,id,expectedStatus,expectedUpdated,
         status,optionalText(body.reportedDefect,2000),optionalText(body.diagnosticNotes,2000),
-        optionalText(body.resolutionNotes,2000),items===null?null:JSON.stringify(items)]
+        optionalText(body.resolutionNotes,2000),items===null?null:JSON.stringify(items),
+        optionalText(body.deliveredToPersonName,180),optionalText(body.deliveryNotes,1000)]
     );
     const result=rows[0];
     return NextResponse.json({message:"OS atualizada e registrada no histórico.",
