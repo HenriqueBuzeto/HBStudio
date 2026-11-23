@@ -59,7 +59,7 @@ export default function DocumentPrintPage(){
   if(params.get("auto")!=="1")return;
   const prefs=getBrowserPrintSettings();
   const authorizedPreference=
-    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService);
+    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService)||(kind==="training-sale"&&prefs.autoPrintSale);
   if(!authorizedPreference)return;
   attemptedAutoPrint.current=true;
   const onceKey=`hbstudio:autoprint:v1:${kind}:${id}`;
