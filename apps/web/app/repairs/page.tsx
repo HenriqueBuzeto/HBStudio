@@ -486,7 +486,7 @@ export default function RepairsPage() {
         {/* MODAL 1: Nova Ordem de Serviço */}
         {showCreateModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white w-full max-w-2xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95">
+            <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl overflow-y-auto max-h-[calc(100dvh-1rem)] my-2 sm:my-8 animate-in fade-in zoom-in-95">
               <div className="p-6 bg-gradient-to-r from-purple-700 to-indigo-700 text-white flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-black tracking-tight">Criar Nova Ordem de Serviço (OS)</h3>
@@ -502,7 +502,8 @@ export default function RepairsPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateSubmit} className="p-6 space-y-5">
+              <form onSubmit={handleCreateSubmit} className="p-3 sm:p-6 space-y-5">
+                {errorMessage && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-900">{errorMessage}</div>}
                 {/* 1. Cliente */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-extrabold text-slate-700">
@@ -690,9 +691,10 @@ export default function RepairsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-extrabold rounded-xl shadow-md hover:from-violet-500 hover:to-purple-500 cursor-pointer"
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-extrabold rounded-xl shadow-md hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 cursor-pointer"
                   >
-                    Gerar Ordem de Serviço
+                    {saving ? "Salvando OS..." : "Gerar Ordem de Serviço"}
                   </button>
                 </div>
               </form>
@@ -703,7 +705,7 @@ export default function RepairsPage() {
         {/* MODAL 2: Visualizar e Editar Ordem de Serviço (Adicionar/Remover Peças e Alterar Status) */}
         {selectedOrder && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white w-full max-w-3xl rounded-3xl border border-slate-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95">
+            <div className="bg-white w-full max-w-3xl rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xl overflow-y-auto max-h-[calc(100dvh-1rem)] my-2 sm:my-8 animate-in fade-in zoom-in-95">
               {/* Header com Número da OS e Status */}
               <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
                 <div>
@@ -902,7 +904,7 @@ export default function RepairsPage() {
                     }}
                     className="px-5 py-2.5 bg-slate-900 text-white text-xs font-extrabold rounded-xl hover:bg-black cursor-pointer"
                   >
-                    Salvar Alterações da OS
+                    Fechar detalhes da OS
                   </button>
                 </div>
               </div>
