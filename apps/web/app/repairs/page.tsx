@@ -43,6 +43,9 @@ export default function RepairsPage() {
   const [saving, setSaving] = useState(false);
   const createRequestKey = useRef<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deliveryRequest, setDeliveryRequest] = useState<string | null>(null);
+  const [deliveryRecipient, setDeliveryRecipient] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
@@ -130,7 +133,13 @@ export default function RepairsPage() {
     setBrand("");setModel("");setColor("");setSerialNumber("");setEquipmentDetails("");
     setReportedDefect("");setInitialItems([]);
   };
-  const handleMoveStatus = async (orderId:string,newStatus:number) => {
+  const handleMoveStatus = async (orderId:string,newStatus:number,delivery?:{recipient:string;notes:string}) => {
+    if(newStatus===12 && !delivery) {
+      setErrorMessage(null);setDeliveryRequest(orderId);return;
+    }
+    if(newStatus===12 && (!delivery?.recipient.trim() || delivery.recipient.trim().length<2)) {
+      setErrorMessage("Informe o nome de quem está retirando o equipamento.");return;
+    }
     const current=orders.find(o=>o.id===orderId);
     if(!current || saving) return;
     try {
@@ -138,9 +147,11 @@ export default function RepairsPage() {
       await readApi(await fetch(`/api/repairs/orders/${encodeURIComponent(orderId)}`,{
         method:"PUT",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({status:newStatus,expectedStatus:current.status,
-          expectedUpdatedAtUtc:current.updatedAtUtc||null})
+          expectedUpdatedAtUtc:current.updatedAtUtc||null,
+          deliveredToPersonName:delivery?.recipient||null,deliveryNotes:delivery?.notes||null})
       }));
       setSuccessMessage("Status da OS atualizado e auditado.");
+      if(newStatus===12) {setDeliveryRequest(null);setDeliveryRecipient("");setDeliveryNotes("");}
       await loadOrders();
       setSelectedOrder((prev:any)=>prev?.id===orderId?{...prev,status:newStatus}:prev);
     } catch(err) {
@@ -912,6 +923,33 @@ export default function RepairsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        {deliveryRequest && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 p-3" role="dialog" aria-modal="true" aria-label="Confirmar entrega da OS">
+            <form onSubmit={(e)=>{e.preventDefault();void handleMoveStatus(deliveryRequest,12,{recipient:deliveryRecipient,notes:deliveryNotes});}}
+              className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+              <h3 className="text-base font-black text-slate-900">Confirmar entrega do equipamento</h3>
+              <p className="text-xs text-slate-600">A entrega encerra o fluxo normal da OS. Informe quem recebeu o equipamento para manter a rastreabilidade.</p>
+              {errorMessage && <div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-bold text-rose-800">{errorMessage}</div>}
+              <label className="block text-xs font-bold text-slate-700">Nome de quem retirou
+                <input value={deliveryRecipient} onChange={(e)=>setDeliveryRecipient(e.target.value)}
+                  required minLength={2} maxLength={180}
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" placeholder="Nome completo do responsável"/>
+              </label>
+              <label className="block text-xs font-bold text-slate-700">Observações de entrega
+                <textarea value={deliveryNotes} onChange={(e)=>setDeliveryNotes(e.target.value)}
+                  maxLength={1000} rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
+              </label>
+              <div className="flex justify-end gap-2">
+                <button type="button" disabled={saving} onClick={()=>{setDeliveryRequest(null);setErrorMessage(null);}}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {saving?"Registrando...":"Confirmar entrega"}
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>
