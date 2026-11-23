@@ -9,10 +9,10 @@ export async function GET(request:NextRequest,context:Context){
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try{
   const {kind,id}=await context.params;
-  if(!["quote","service","contract","sale"].includes(kind))
+  if(!["quote","training","service","contract","sale"].includes(kind))
    throw new FleetError(404,"DOCUMENT_NOT_FOUND","Tipo de documento não encontrado.");
   uuid(id,"Documento");
-  const permission=kind==="quote"?"sales.pos.use":kind==="sale"?"sales.pos.use":"repairs.view";
+  const permission=kind==="quote"||kind==="training"||kind==="sale"?"sales.pos.use":"repairs.view";
   const ctx=await authorizeFleet(request,permission);
   if(kind==="sale")
    throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED",
@@ -38,7 +38,7 @@ export async function GET(request:NextRequest,context:Context){
    branch:String(issuer.branchName),cnpj:issuer.cnpj||null,
    address:[issuer.street,issuer.streetNumber,issuer.city,issuer.state].filter(Boolean).join(", ")
   };
-  if(kind==="quote"){
+  if(kind==="quote"||kind==="training"){
    const rows=await ctx.db.query(
     `SELECT q."QuoteNumber" AS number,q."CreatedAtUtc" AS "createdAt",
        q."ValidUntilUtc" AS "validUntil",q."Status" AS status,
@@ -60,7 +60,7 @@ export async function GET(request:NextRequest,context:Context){
     [ctx.tenantId,id]
    );
    const subtotal=items.reduce((n:number,i:any)=>n+Number(i.quantity)*Number(i.price)-Number(i.discount),0);
-   return NextResponse.json({kind,documentType:"QUOTE",number:rows[0].number,
+   return NextResponse.json({kind,documentType:kind==="training"?"TRAINING_PREVIEW":"QUOTE",number:rows[0].number,
     issuedAt:rows[0].createdAt,organization,
     customer:rows[0].customer||"Consumidor não identificado",
     items:items.map((i:any)=>({sku:i.sku,description:i.description,quantity:Number(i.quantity),
@@ -70,7 +70,7 @@ export async function GET(request:NextRequest,context:Context){
     paymentTerms:rows[0].paymentTerms,
     validUntil:rows[0].validUntil,
     notes:rows[0].notes,
-    disclaimer:"ORÇAMENTO COMERCIAL. NÃO É CUPOM FISCAL. NÃO COMPROVA PAGAMENTO OU RESERVA DE ESTOQUE."},
+    disclaimer:kind==="training"?"SIMULAÇÃO DE IMPRESSÃO. NÃO É VENDA, NÃO COMPROVA PAGAMENTO, NENHUM ESTOQUE OU CAIXA FOI MOVIMENTADO.":"ORÇAMENTO COMERCIAL. NÃO É CUPOM FISCAL. NÃO COMPROVA PAGAMENTO OU RESERVA DE ESTOQUE."},
     {headers:headers(cid)});
   }
   const rows=await ctx.db.query(
