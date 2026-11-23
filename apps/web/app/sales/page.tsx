@@ -56,6 +56,10 @@ export default function SalesPage(){
  const [method,setMethod]=useState<Method>("Pix"),[installments,setInstallments]=useState(1),[cashReceived,setCashReceived]=useState("");
  const [selectedQuote,setSelectedQuote]=useState<Quote|null>(null),[selectedSale,setSelectedSale]=useState<Sale|null>(null);
  const [repairId,setRepairId]=useState("");
+ const [documentMode,setDocumentMode]=useState<"FISCAL"|"INTERNAL">("FISCAL");
+ const [documentModeError,setDocumentModeError]=useState("");
+ const [checkingDocumentMode,setCheckingDocumentMode]=useState(false);
+ const [fiscalRequested,setFiscalRequested]=useState(false);
  const searchRef=useRef<HTMLInputElement|null>(null);
  const load=useCallback(async()=>{
   if(!permitted){setLoading(false);return;}
@@ -68,7 +72,40 @@ export default function SalesPage(){
   finally{setLoading(false);}
  },[permitted,user?.id]);
  useEffect(()=>{if(!authLoading)void load();},[authLoading,load]);
- const customer=aux.customers.find(x=>x.id===customerId);
+ const toggleDocumentMode=useCallback(async()=>{
+  if(checkingDocumentMode)return;
+  if(documentMode==="INTERNAL"){
+   setDocumentMode("FISCAL");setDocumentModeError("");return;
+  }
+  setCheckingDocumentMode(true);setDocumentModeError("");
+  try{
+   const response=await fetch("/api/sales/document-eligibility?"+
+    new URLSearchParams({customerId,operationType:"LOCAL_GOODS",fiscalRequested:String(fiscalRequested)}),
+    {cache:"no-store"});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Política fiscal indisponível.");
+   if(!data.eligible){
+    setDocumentMode("FISCAL");
+    setDocumentModeError(data.explanation||"A operação não está autorizada a utilizar comprovante interno.");
+    return;
+   }
+   setDocumentMode("INTERNAL");
+  }catch(e){
+   setDocumentMode("FISCAL");
+   setDocumentModeError(e instanceof Error?e.message:"Não foi possível validar a situação fiscal.");
+  }finally{setCheckingDocumentMode(false);}
+ },[checkingDocumentMode,documentMode,customerId,fiscalRequested]);
+ useEffect(()=>{
+  const handler=(event:KeyboardEvent)=>{
+   if(event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
+    event.preventDefault();void toggleDocumentMode();
+   }
+  };
+  window.addEventListener("keydown",handler);
+  return ()=>window.removeEventListener("keydown",handler);
+ },[toggleDocumentMode]);
+ useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
+  const customer=aux.customers.find(x=>x.id===customerId);
  const match=useMemo(()=>{
   const s=query.trim().toLocaleLowerCase("pt-BR");
   if(s.length<2)return [];
@@ -175,7 +212,25 @@ export default function SalesPage(){
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
-     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
+     <div className={"rounded-xl border-2 p-3 text-xs "+(documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+     <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
+     <button type="button" disabled={checkingDocumentMode} onClick={()=>void toggleDocumentMode()}
+      className={"rounded-lg px-3 py-1.5 font-extrabold disabled:opacity-50 "+(documentMode==="INTERNAL"?"bg-red-700 text-white":"bg-slate-800 text-white")}>
+      {checkingDocumentMode?"Verificando...":"Ctrl + F1 • Alternar"}
+     </button>
+    </div>
+    <p className="mt-2">{documentMode==="INTERNAL"?
+      "Pré-avaliação autorizada por política fiscal vigente da filial. Esta seleção não finaliza a venda nem dispensa a validação fiscal obrigatória no servidor.":
+      "Modo padrão: operação destinada ao fluxo de documento fiscal quando a emissão estiver homologada."}</p>
+    <label className="mt-2 flex items-center gap-2 font-semibold">
+     <input type="checkbox" checked={fiscalRequested} onChange={e=>setFiscalRequested(e.target.checked)}/>
+     Cliente solicitou documento fiscal
+    </label>
+    {documentModeError&&<div role="alert" className="mt-2 rounded-lg bg-amber-100 p-2 font-semibold text-amber-900">{documentModeError}</div>}
+    <p className="mt-2 text-[10px]">Atalho disponível na janela do PDV; algumas combinações podem ser interceptadas pelo navegador. Também é possível usar o botão.</p>
+   </div>
+   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
      {readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
        <strong className="block text-slate-800">Pré-requisitos verificados nesta filial</strong>
        <ul className="mt-2 space-y-1.5">
