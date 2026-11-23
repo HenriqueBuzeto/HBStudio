@@ -74,6 +74,7 @@ export default function SalesPage(){
  const [printRetryUrl,setPrintRetryUrl]=useState("");
  const [repairId,setRepairId]=useState("");
  const [documentMode,setDocumentMode]=useState<"FISCAL"|"INTERNAL">("FISCAL");
+ const [trainingMode,setTrainingMode]=useState(false);
  const [documentModeError,setDocumentModeError]=useState("");
  const [checkingDocumentMode,setCheckingDocumentMode]=useState(false);
  const [fiscalRequested,setFiscalRequested]=useState(false);
@@ -115,12 +116,12 @@ export default function SalesPage(){
  useEffect(()=>{
   const handler=(event:KeyboardEvent)=>{
    if(event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
-    event.preventDefault();void toggleDocumentMode();
+    event.preventDefault();setTrainingMode(current=>!current);
    }
   };
   window.addEventListener("keydown",handler);
   return ()=>window.removeEventListener("keydown",handler);
- },[toggleDocumentMode]);
+ },[]);
  useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
   const customer=aux.customers.find(x=>x.id===customerId);
  const match=useMemo(()=>{
@@ -340,21 +341,24 @@ export default function SalesPage(){
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
-     <div className={"rounded-xl border-2 p-3 text-xs "+(documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+     <div className={"rounded-xl border-2 p-3 text-xs "+(trainingMode||documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
     <div className="flex flex-wrap items-center justify-between gap-2">
-     <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
-     <button type="button" disabled={checkingDocumentMode} onClick={()=>void toggleDocumentMode()}
+     <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{trainingMode?"TREINAMENTO — SIMULAÇÃO NÃO FISCAL":documentMode==="INTERNAL"?"COMPROVANTE INTERNO — DISPENSA SOB ANÁLISE":"MODO FISCAL"}</div>
+     <button type="button" disabled={checkingDocumentMode} onClick={()=>setTrainingMode(v=>!v)}
       className={"rounded-lg px-3 py-1.5 font-extrabold disabled:opacity-50 "+(documentMode==="INTERNAL"?"bg-red-700 text-white":"bg-slate-800 text-white")}>
-      {checkingDocumentMode?"Verificando...":"Ctrl + F1 • Alternar"}
+      {"Ctrl + F1 • "+(trainingMode?"Desativar treino":"Ativar treino")}
      </button>
     </div>
-    <p className="mt-2">{documentMode==="INTERNAL"?
-      "Pré-avaliação autorizada por política fiscal vigente da filial. Esta seleção não finaliza a venda nem dispensa a validação fiscal obrigatória no servidor.":
+    <p className="mt-2">{trainingMode?"Neste modo, o sistema apenas simula uma operação e imprime um cupom marcado SIMULAÇÃO, sem movimentar valores reais e sem transmissão SEFAZ.":documentMode==="INTERNAL"?
+      "Pré-avaliação de dispensa fiscal para uma operação real. Nunca constitui permissão universal de não emitir nota.":
       "Modo padrão: operação destinada ao fluxo de documento fiscal quando a emissão estiver homologada."}</p>
     <label className="mt-2 flex items-center gap-2 font-semibold">
      <input type="checkbox" checked={fiscalRequested} onChange={e=>setFiscalRequested(e.target.checked)}/>
      Cliente solicitou documento fiscal
     </label>
+    <button type="button" onClick={()=>void toggleDocumentMode()} disabled={checkingDocumentMode} className="block text-xs font-bold underline">
+      {checkingDocumentMode?"Validando enquadramento...":"Verificar dispensa fiscal legal para venda real"}
+    </button>
     {documentModeError&&<div role="alert" className="mt-2 rounded-lg bg-amber-100 p-2 font-semibold text-amber-900">{documentModeError}</div>}
     <p className="mt-2 text-[10px]">Atalho disponível na janela do PDV; algumas combinações podem ser interceptadas pelo navegador. Também é possível usar o botão.</p>
    </div>
