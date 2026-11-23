@@ -8,6 +8,7 @@
 - Página de configuração local de papel e impressão de teste para computador.
 - Ações de impressão adicionadas às telas existentes de orçamento e assistência técnica.
 - Bloqueio de recibo de venda ainda não liquidada: não imprimir pagamento ou autorização SEFAZ fictícios.
+- Simulação de cupom por orçamento persistido, com indicação SIMULAÇÃO e sem criar venda, baixa de estoque ou pagamento real.
 
 ## Padrão de qualidade para impressora
 A versão atual usa impressão nativa de Chrome/Edge. É preciso instalar o driver compatível no Windows/macOS, configurar a bobina correta e validar modelos reais. Larguras úteis aproximadas: 48 mm na bobina 58 e 72 mm na bobina 80; variam por fabricante. Cabeçalho/rodapé do navegador precisam estar desativados.
@@ -17,7 +18,7 @@ Para impressão sem janela, a etapa futura é integrar conector local como QZ Tr
 Para gerar o PDF automaticamente como arquivo no servidor, é necessário backend de geração, fontes em pt-BR, armazenamento privado e controle de acesso. Para WhatsApp com PDF em anexo, é necessária a API oficial Meta Business, upload privado, consentimento, templates aprovados, webhooks, fila e idempotência.
 
 ## Regra financeira/fiscal
-Modo de treinamento: operação em QA isolada, sem contaminar banco, estoque, receita, caixa ou contabilidade de produção, e recibo sempre identificado como SIMULAÇÃO.
+Prévia de treinamento implementada: não é operação de venda; reutiliza orçamento real somente para testar a impressão, sem gravar venda, estoque, receita, caixa ou contabilidade. Um ambiente QA separado continuará necessário para homologar transações de treinamento completas.
 
 Venda interna real: continua uma venda e deve atualizar faturamento, estoque, caixa, financeiro e histórico; a dispensa da nota fiscal exige análise legal, elegibilidade por estabelecimento/cliente/operação e revalidação na transação. Pagamento em dinheiro NÃO dispensa nota por si só.
 
