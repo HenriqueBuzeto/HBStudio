@@ -3,6 +3,7 @@
 import {useEffect,useRef,useState} from "react";
 import {getBrowserPrintSettings,saveBrowserPrintSettings} from "@/lib/browser-print";
 import RootShellLayout from "@/components/RootShellLayout";
+import {formatCnpj} from "@/lib/br-format";
 import {Printer,FileDown,MessageCircle,RefreshCw,AlertTriangle,FileText,ShieldAlert} from "lucide-react";
 
 type Paper="58"|"80"|"A4";
@@ -158,7 +159,7 @@ export default function DocumentPrintPage(){
     <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"80mm":"58mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"anywhere"}}>
      <div className="border-b-2 border-slate-900 pb-3 text-center">
       <h2 className="font-black uppercase">{document.organization.name}</h2>
-      {document.organization.cnpj&&<p>CNPJ: {document.organization.cnpj}</p>}
+      {document.organization.cnpj&&<p>CNPJ: {formatCnpj(document.organization.cnpj)}</p>}
       <p>{document.organization.branch}</p>
       {document.organization.address&&<p>{document.organization.address}</p>}
      </div>
