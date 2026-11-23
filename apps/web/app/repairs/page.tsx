@@ -40,6 +40,9 @@ const KANBAN_STAGES = [
 export default function RepairsPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
@@ -55,142 +58,111 @@ export default function RepairsPage() {
   // Form de Criação de OS
   const [createCustomerName, setCreateCustomerName] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [equipmentType, setEquipmentType] = useState("Computador Gamer");
-  const [brand, setBrand] = useState("Custom / Desktop");
-  const [model, setModel] = useState("PC Gamer");
-  const [color, setColor] = useState("Branco");
+  const [equipmentType, setEquipmentType] = useState("Computador");
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [color, setColor] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
-  const [equipmentDetails, setEquipmentDetails] = useState("PC Gamer Branco Ryzen 7, 32GB RAM, RTX");
-  const [reportedDefect, setReportedDefect] = useState("Limpeza avançada, troca de pasta térmica e formatação.");
-  const [initialItems, setInitialItems] = useState<Array<{ itemType: number; description: string; quantity: number; unitPrice: number; productSkuId?: string }>>([
-    { itemType: 1, description: "Limpeza Avançada & Troca de Pasta Térmica", quantity: 1, unitPrice: 150.00 }
-  ]);
+  const [equipmentDetails, setEquipmentDetails] = useState("");
+  const [reportedDefect, setReportedDefect] = useState("");
+  const [initialItems, setInitialItems] = useState<Array<{ itemType: number; description: string; quantity: number; unitPrice: number; productSkuId?: string }>>([]);
 
-  // Carregar ordens de serviço do banco Neon
+  // Erros de API nunca devem ser interpretados como listas vazias.
+  const readApi = async (response: Response) => {
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `Falha na operação (HTTP ${response.status})`);
+    return body;
+  };
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/repairs/orders");
-      if (res.ok) {
-        const data = await res.json();
-        setOrders(data.orders || []);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar ordens de serviço:", err);
-    } finally {
-      setLoading(false);
-    }
+      const data = await readApi(await fetch("/api/repairs/orders", { cache: "no-store" }));
+      setOrders(data.orders || []);
+    } catch(err) {
+      setErrorMessage(err instanceof Error ? err.message : "Falha ao consultar OS no Neon.");
+    } finally { setLoading(false); }
   };
-
-  // Carregar dados auxiliares
   const loadAuxData = async () => {
     try {
-      const res = await fetch("/api/repairs/auxiliary");
-      if (res.ok) {
-        const data = await res.json();
-        setAuxCustomers(data.customers || []);
-        setAuxProducts(data.products || []);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar auxiliares:", err);
+      const data = await readApi(await fetch("/api/repairs/auxiliary", { cache: "no-store" }));
+      setAuxCustomers(data.customers || []);
+      setAuxProducts(data.products || []);
+    } catch(err) {
+      setErrorMessage(err instanceof Error ? err.message : "Falha ao consultar dados auxiliares.");
     }
   };
-
   useEffect(() => {
-    loadOrders();
-    loadAuxData();
-    // No modo TV ou operacional, faz polling leve a cada 30 segundos
-    const interval = setInterval(loadOrders, 30000);
+    void loadOrders();
+    void loadAuxData();
+    const interval = setInterval(() => { void loadOrders(); }, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  // Adicionar item no formulário de criação
   const handleAddInitialItem = (type: number) => {
-    if (type === 1) {
-      setInitialItems([...initialItems, { itemType: 1, description: "Serviço Técnico", quantity: 1, unitPrice: 100 }]);
-    } else {
-      setInitialItems([...initialItems, { itemType: 2, description: "Peça / Componente", quantity: 1, unitPrice: 50 }]);
-    }
+    setInitialItems(previous => [...previous, {itemType:type,description:"",quantity:1,unitPrice:0}]);
   };
-
-  // Criar nova OS
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reportedDefect) return;
-
+  const handleCreateSubmit = async (event:React.FormEvent) => {
+    event.preventDefault();
+    if(saving) return;
+    if (!reportedDefect.trim() || (!selectedCustomerId && !createCustomerName.trim())) {
+      setErrorMessage("Informe o cliente e o defeito relatado.");
+      return;
+    }
     try {
-      const res = await fetch("/api/repairs/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: selectedCustomerId || undefined,
-          customerName: createCustomerName || "Cliente Balcão",
-          equipmentType,
-          brand,
-          model,
-          color,
-          serialNumber: serialNumber || "S/N",
-          equipmentDetails,
-          reportedDefect,
-          items: initialItems,
-        }),
-      });
-
-      if (res.ok) {
-        setShowCreateModal(false);
-        resetCreateForm();
-        loadOrders();
-      }
-    } catch (err) {
-      console.error("Erro ao cadastrar OS:", err);
-    }
+      setSaving(true); setErrorMessage(null);setSuccessMessage(null);
+      const data = await readApi(await fetch("/api/repairs/orders",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({customerId:selectedCustomerId||undefined,customerName:createCustomerName.trim()||undefined,
+          equipmentType,brand,model,color,serialNumber,equipmentDetails,reportedDefect,items:initialItems})
+      }));
+      setShowCreateModal(false);
+      resetCreateForm();
+      setSuccessMessage(`OS ${data.orderNumber} cadastrada no Neon.`);
+      await loadOrders();
+    } catch(err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao cadastrar OS.");
+    } finally {setSaving(false);}
   };
-
   const resetCreateForm = () => {
-    setCreateCustomerName("");
-    setSelectedCustomerId("");
-    setEquipmentType("Computador Gamer");
-    setEquipmentDetails("PC Gamer Branco Ryzen 7");
-    setReportedDefect("Limpeza avançada, troca de pasta térmica");
-    setInitialItems([{ itemType: 1, description: "Limpeza Avançada & Troca de Pasta Térmica", quantity: 1, unitPrice: 150.00 }]);
+    setCreateCustomerName("");setSelectedCustomerId("");setEquipmentType("Computador");
+    setBrand("");setModel("");setColor("");setSerialNumber("");setEquipmentDetails("");
+    setReportedDefect("");setInitialItems([]);
   };
-
-  // Mover status no Kanban
-  const handleMoveStatus = async (orderId: string, newStatus: number) => {
+  const handleMoveStatus = async (orderId:string,newStatus:number) => {
+    const current=orders.find(o=>o.id===orderId);
+    if(!current || saving) return;
     try {
-      const res = await fetch(`/api/repairs/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (res.ok) {
-        loadOrders();
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder({ ...selectedOrder, status: newStatus });
-        }
-      }
-    } catch (err) {
-      console.error("Erro ao mover status:", err);
-    }
+      setSaving(true);setErrorMessage(null);setSuccessMessage(null);
+      await readApi(await fetch(`/api/repairs/orders/${encodeURIComponent(orderId)}`,{
+        method:"PUT",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({status:newStatus,expectedStatus:current.status,
+          expectedUpdatedAtUtc:current.updatedAtUtc||null})
+      }));
+      setSuccessMessage("Status da OS atualizado e auditado.");
+      await loadOrders();
+      setSelectedOrder((prev:any)=>prev?.id===orderId?{...prev,status:newStatus}:prev);
+    } catch(err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao atualizar status.");
+      await loadOrders();
+    } finally {setSaving(false);}
   };
-
-  // Salvar itens editados na OS (adicionar/remover peças ou serviços)
-  const handleSaveOrderItems = async (orderId: string, updatedItems: any[]) => {
+  const handleSaveOrderItems = async (orderId:string,updatedItems:any[]) => {
+    const current=orders.find(o=>o.id===orderId);
+    if(!current || saving) return;
     try {
-      const res = await fetch(`/api/repairs/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: updatedItems }),
-      });
-      if (res.ok) {
-        loadOrders();
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder({ ...selectedOrder, items: updatedItems });
-        }
-      }
-    } catch (err) {
-      console.error("Erro ao atualizar itens:", err);
-    }
+      setSaving(true);setErrorMessage(null);setSuccessMessage(null);
+      await readApi(await fetch(`/api/repairs/orders/${encodeURIComponent(orderId)}`,{
+        method:"PUT",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({items:updatedItems.map(i=>({itemType:i.itemType,
+          description:i.description,quantity:i.quantity,unitPrice:i.unitPrice,productSkuId:i.productSkuId||null})),
+          expectedStatus:current.status,expectedUpdatedAtUtc:current.updatedAtUtc||null})
+      }));
+      setSuccessMessage("Itens e totais da OS atualizados com sucesso.");
+      await loadOrders();
+      setSelectedOrder((prev:any)=>prev?.id===orderId?{...prev,items:updatedItems}:prev);
+    } catch(err) {
+      setErrorMessage(err instanceof Error?err.message:"Erro ao salvar itens.");
+      await loadOrders();
+    } finally {setSaving(false);}
   };
 
   // Filtragem de ordens
@@ -322,6 +294,8 @@ export default function RepairsPage() {
   return (
     <RootShellLayout>
       <div className="space-y-6">
+        {errorMessage && <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-900">{errorMessage}<button type="button" onClick={()=>setErrorMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>}
+        {successMessage && <div role="status" className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">{successMessage}<button type="button" onClick={()=>setSuccessMessage(null)} className="ml-3 font-bold underline">Fechar</button></div>
         {/* Header Oficial do Módulo HBVisionX */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex-1">
@@ -356,7 +330,7 @@ export default function RepairsPage() {
             </button>
 
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => {setErrorMessage(null);setShowCreateModal(true);}}
               className="h-10 px-5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
@@ -484,6 +458,7 @@ export default function RepairsPage() {
                           value={order.status}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => handleMoveStatus(order.id, Number(e.target.value))}
+                          disabled={saving}
                           className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md px-1.5 py-1 text-slate-700 cursor-pointer"
                         >
                           <option value={1}>Triagem / Não Iniciado</option>
@@ -772,6 +747,7 @@ export default function RepairsPage() {
                         key={step.s}
                         type="button"
                         onClick={() => handleMoveStatus(selectedOrder.id, step.s)}
+                        disabled={saving}
                         className={`p-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                           selectedOrder.status === step.s
                             ? "bg-purple-600 text-white border-purple-600 shadow-sm"
