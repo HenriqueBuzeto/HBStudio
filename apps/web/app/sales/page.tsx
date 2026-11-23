@@ -258,7 +258,11 @@ export default function SalesPage(){
     <p className="text-xs text-slate-500">Cliente: {selectedQuote.customer||"Consumidor não identificado"} • Vendedor: {selectedQuote.seller||"—"} • Validade: {dateText(selectedQuote.validUntil)}</p>
     <div className="divide-y divide-slate-100">{selectedQuote.items.map((i,idx)=><div key={idx} className="flex justify-between py-3 text-xs"><span>{i.quantity}x {i.description} <small className="text-slate-400">{i.sku}</small></span><strong>{money(i.quantity*i.price)}</strong></div>)}</div>
     <div className="rounded-xl bg-slate-50 p-4"><div className="flex justify-between text-xs"><span>Desconto</span><span>{money(selectedQuote.discount)}</span></div><div className="mt-2 flex justify-between text-lg font-black"><span>Total do orçamento</span><span>{money(selectedQuote.total)}</span></div><p className="mt-2 text-xs text-slate-500">Condição pretendida: {selectedQuote.paymentTerms}</p></div>
-   <button className={button+" no-print w-full"} type="button" onClick={()=>window.print()}><Printer className="h-4 w-4"/> Imprimir orçamento</button>
+   <div className="no-print flex flex-wrap gap-2">
+    <a className={button} href={"/documents/print?kind=quote&id="+encodeURIComponent(selectedQuote.id)+"&paper=80"} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4"/> Bobina 80/58 mm</a>
+    <a className={button} href={"/documents/print?kind=quote&id="+encodeURIComponent(selectedQuote.id)+"&paper=A4"} target="_blank" rel="noopener noreferrer"><FileText className="h-4 w-4"/> A4 / PDF / WhatsApp</a>
+    <a className={button} href={"/documents/print?kind=training&id="+encodeURIComponent(selectedQuote.id)+"&paper=80"} target="_blank" rel="noopener noreferrer"><Printer className="h-4 w-4"/> Teste de cupom (SIMULAÇÃO)</a>
+   </div>
    </div>
   </Modal>}
   {selectedSale&&<Modal title={"Venda "+selectedSale.saleNumber} onClose={()=>setSelectedSale(null)}>
