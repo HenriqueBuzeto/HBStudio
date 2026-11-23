@@ -54,6 +54,7 @@ export default function RepairsPage() {
   const [deliveryRequest, setDeliveryRequest] = useState<string | null>(null);
   const [deliveryRecipient, setDeliveryRecipient] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [itemDraft,setItemDraft]=useState<{orderId:string;itemType:1|2;description:string;quantity:string;unitPrice:string}|null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
@@ -170,7 +171,7 @@ export default function RepairsPage() {
   };
   const handleSaveOrderItems = async (orderId:string,updatedItems:any[]) => {
     const current=orders.find(o=>o.id===orderId);
-    if(!current || saving) return;
+    if(!current || saving) return false;
     try {
       setSaving(true);setErrorMessage(null);setSuccessMessage(null);
       await readApi(await fetch(`/api/repairs/orders/${encodeURIComponent(orderId)}`,{
@@ -182,9 +183,11 @@ export default function RepairsPage() {
       setSuccessMessage("Itens e totais da OS atualizados com sucesso.");
       await loadOrders();
       setSelectedOrder((prev:any)=>prev?.id===orderId?{...prev,items:updatedItems}:prev);
+      return true;
     } catch(err) {
       setErrorMessage(err instanceof Error?err.message:"Erro ao salvar itens.");
       await loadOrders();
+      return false;
     } finally {setSaving(false);}
   };
 
@@ -818,26 +821,16 @@ export default function RepairsPage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          const updated = [
-                            ...(selectedOrder.items || []),
-                            { itemType: 1, description: "Serviço Adicional", quantity: 1, unitPrice: 80.00 }
-                          ];
-                          handleSaveOrderItems(selectedOrder.id, updated);
-                        }}
+                        onClick={() => {setErrorMessage(null);setItemDraft({orderId:selectedOrder.id,itemType:1,description:"",quantity:"1",unitPrice:""});}}
+                        disabled={saving||!canQuote||[10,11,12].includes(selectedOrder.status)}
                         className="text-xs font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         + Adicionar Serviço
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const updated = [
-                            ...(selectedOrder.items || []),
-                            { itemType: 2, description: "Peça / Pasta Térmica Nova", quantity: 1, unitPrice: 45.00 }
-                          ];
-                          handleSaveOrderItems(selectedOrder.id, updated);
-                        }}
+                        onClick={() => {setErrorMessage(null);setItemDraft({orderId:selectedOrder.id,itemType:2,description:"",quantity:"1",unitPrice:""});}}
+                        disabled={saving||!canQuote||[10,11,12].includes(selectedOrder.status)}
                         className="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl cursor-pointer"
                       >
                         + Adicionar Peça
@@ -882,6 +875,7 @@ export default function RepairsPage() {
                                   handleSaveOrderItems(selectedOrder.id, updated);
                                 }}
                                 className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                                disabled={saving||!canQuote||[10,11,12].includes(selectedOrder.status)}
                                 title="Remover este item da OS"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -959,6 +953,48 @@ export default function RepairsPage() {
                   className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold">Cancelar</button>
                 <button type="submit" disabled={saving} className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
                   {saving?"Registrando...":"Confirmar entrega"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        {itemDraft && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/70 p-3" role="dialog" aria-modal="true" aria-label="Adicionar item à OS">
+            <form onSubmit={async(e)=>{
+              e.preventDefault();
+              if(!selectedOrder||selectedOrder.id!==itemDraft.orderId)return;
+              const quantity=Number(itemDraft.quantity),unitPrice=Number(itemDraft.unitPrice);
+              if(!itemDraft.description.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitPrice)||unitPrice<0||!Number.isInteger(unitPrice*100)){
+                setErrorMessage("Informe descrição, quantidade e preço válido em centavos.");return;
+              }
+              const ok=await handleSaveOrderItems(itemDraft.orderId,[...(selectedOrder.items||[]),{
+                itemType:itemDraft.itemType,description:itemDraft.description.trim(),quantity,unitPrice
+              }]);
+              if(ok)setItemDraft(null);
+            }} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+              <h3 className="text-base font-black text-slate-900">Adicionar {itemDraft.itemType===1?"serviço":"peça"} à OS</h3>
+              {errorMessage && <div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-bold text-rose-800">{errorMessage}</div>}
+              <label className="block text-xs font-bold text-slate-700">Descrição
+                <input required maxLength={400} value={itemDraft.description} onChange={e=>setItemDraft({...itemDraft,description:e.target.value})}
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-xs font-bold text-slate-700">Quantidade
+                  <input required type="number" min="0.001" step="0.001" max="10000" value={itemDraft.quantity}
+                    onChange={e=>setItemDraft({...itemDraft,quantity:e.target.value})}
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
+                </label>
+                <label className="block text-xs font-bold text-slate-700">Preço unitário (R$)
+                  <input required type="number" min="0" step="0.01" max="100000000" value={itemDraft.unitPrice}
+                    onChange={e=>setItemDraft({...itemDraft,unitPrice:e.target.value})}
+                    className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
+                </label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" disabled={saving} onClick={()=>{setItemDraft(null);setErrorMessage(null);}}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold">Cancelar</button>
+                <button type="submit" disabled={saving} className="rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {saving?"Salvando...":"Adicionar à OS"}
                 </button>
               </div>
             </form>
