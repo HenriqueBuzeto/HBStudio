@@ -70,20 +70,18 @@ export default function DocumentPrintPage(){
    return;
   }
   // window.print requests a print dialog or kiosk job; it does not prove paper was printed.
-  let cancelled=false;
   const launch=async()=>{
    try{
-    await document.fonts?.ready;
+    await window.document.fonts?.ready;
     await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
-    if(cancelled)return;
+    if(!window.location.pathname.endsWith("/documents/print"))return;
     setAutoMessage("Impressão solicitada ao navegador. Confirme o papel na impressora.");
     window.print();
    }catch{
-    if(!cancelled)setAutoMessage("A impressão automática foi bloqueada. Clique em Imprimir.");
+    setAutoMessage("A impressão automática foi bloqueada. Clique em Imprimir.");
    }
   };
   void launch();
-  return ()=>{cancelled=true;};
  },[document,kind,id]);
 
  const isContract=kind==="contract";
