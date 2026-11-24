@@ -76,6 +76,7 @@ export async function POST(request:NextRequest){
    throw new FleetError(422,"INVALID_REFERENCE","Vendedor, cliente ou SKU não disponível nesta empresa.");
   const snapshot=items.map(item=>{
    const sku=skus.find((s:any)=>s.id===item.skuId);
+   if(!sku)throw new FleetError(422,"SKU_NOT_FOUND","SKU não encontrado para simulação.");
    const unitCents=Math.round(Number(sku.price)*100);
    if(!Number.isSafeInteger(unitCents)||unitCents<=0)
     throw new FleetError(422,"PRICE_INVALID","SKU sem preço válido.");
