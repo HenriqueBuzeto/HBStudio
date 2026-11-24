@@ -18,6 +18,7 @@ type Document={
 };
 const money=(value:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(value);
 const date=(value:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"}).format(new Date(value));
+const quantity=(v:number)=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:3}).format(v);
 const paperOptions:{code:Paper;name:string}[]=[
  {code:"80",name:"Bobina 80 mm"},{code:"58",name:"Bobina 58 mm"},{code:"A4",name:"Folha A4"}
 ];
@@ -114,11 +115,11 @@ export default function DocumentPrintPage(){
     #hb-printed-document,#hb-printed-document * {visibility:visible!important;}
     #hb-printed-document {position:absolute!important;left:0!important;top:0!important;
       border:0!important;box-shadow:none!important;margin:0!important;
-      padding:${effectivePaper==="A4"?"0":"3mm 2mm"}!important;
-      width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"72mm":"48mm"}!important;
+      padding:${effectivePaper==="A4"?"0":"2mm 1.5mm 4mm"}!important;
+      box-sizing:border-box!important;width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm"}!important;
       max-width:none!important;min-height:auto!important;background:#fff!important;
-      color:#000!important;overflow:visible!important;print-color-adjust:exact;}
-    .hb-print-actions {display:none!important;}
+      color:#000!important;overflow:visible!important;overflow-wrap:break-word!important;word-break:normal!important;print-color-adjust:exact;}
+    .hb-receipt-row{display:flex!important;align-items:baseline!important;justify-content:space-between!important;gap:2mm!important;max-width:100%!important;}\n    .hb-receipt-row>:first-child{min-width:0!important;}\n    .hb-receipt-row>:last-child{white-space:nowrap!important;flex-shrink:0!important;text-align:right!important;}\n    .hb-receipt-item{break-inside:avoid!important;page-break-inside:avoid!important;}\n    .hb-print-actions {display:none!important;}
     #hb-printed-document table {width:100%;border-collapse:collapse;}
     #hb-printed-document tr {break-inside:avoid;}
     #hb-printed-document {font-size:${effectivePaper==="58"?"9px":effectivePaper==="80"?"11px":"12px"}!important;}
@@ -156,7 +157,7 @@ export default function DocumentPrintPage(){
      {reference&&<p role="status" className="text-xs font-semibold text-emerald-700">{reference}</p>}
      {autoMessage&&<p role="status" className="text-xs font-semibold text-amber-800">{autoMessage}</p>}
     </div>
-    <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"80mm":"58mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"anywhere"}}>
+    <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{boxSizing:"border-box",width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"break-word",wordBreak:"normal"}}>
      <div className="border-b-2 border-slate-900 pb-3 text-center">
       <h2 className="font-black uppercase">{document.organization.name}</h2>
       {document.organization.cnpj&&<p>CNPJ: {formatCnpj(document.organization.cnpj)}</p>}
@@ -179,19 +180,21 @@ export default function DocumentPrintPage(){
       {document.detail.diagnostic&&<p><strong>Diagnóstico:</strong> {document.detail.diagnostic}</p>}
       {document.detail.resolution&&<p><strong>Serviço realizado:</strong> {document.detail.resolution}</p>}
      </div>}
-     <table className="w-full border-collapse text-left" style={{tableLayout:"fixed"}}>
-      <thead><tr className="border-b border-slate-600"><th className="py-2" style={{width:"56%"}}>Descrição</th><th className="text-center">Qtd.</th><th className="text-right">Total</th></tr></thead>
-      <tbody>{document.items.map((item,i)=><tr key={i} className="border-b border-dotted border-slate-300 align-top">
-       <td className="py-2">{item.description}{item.sku&&<span className="block text-[0.85em]">{item.sku}</span>}</td>
-       <td className="py-2 text-center">{item.quantity}</td>
-       <td className="py-2 text-right">{money(item.quantity*item.unitPrice-item.discount)}</td>
-      </tr>)}</tbody>
-     </table>
-     <div className="mt-4 space-y-1 border-t border-dashed border-slate-600 pt-2 text-right">
-      <p>Subtotal: {money(document.totals.subtotal)}</p>
-      {document.totals.discount>0&&<p>Descontos: − {money(document.totals.discount)}</p>}
-      {document.totals.shipping>0&&<p>Frete: {money(document.totals.shipping)}</p>}
-      <p className="mt-2 border-t border-slate-600 pt-2 text-[1.15em] font-black">TOTAL: {money(document.totals.total)}</p>
+     <section aria-label="Itens" className="border-t border-slate-800 pt-2">
+      <div className="hb-receipt-row border-b border-slate-600 pb-1 font-bold"><span>ITENS / DESCRIÇÃO</span><span>VALOR</span></div>
+      {document.items.map((item,i)=><div key={i} className="hb-receipt-item border-b border-dotted border-slate-400 py-2">
+       <p className="font-semibold">{String(i+1).padStart(2,"0")} · {item.description}</p>
+       {item.sku&&<p className="text-[0.85em]">Cód.: {item.sku}</p>}
+       <div className="hb-receipt-row mt-1"><span>{quantity(item.quantity)} × {money(item.unitPrice)}</span><strong>{money(item.quantity*item.unitPrice-item.discount)}</strong></div>
+       {item.discount>0&&<div className="hb-receipt-row"><span>Desconto do item</span><span>− {money(item.discount)}</span></div>}
+      </div>)}
+     </section>
+     <div className="mt-3 space-y-1 border-t border-dashed border-slate-600 pt-2">
+      <div className="hb-receipt-row"><span>Itens</span><span>{quantity(document.items.reduce((n,i)=>n+i.quantity,0))}</span></div>
+      <div className="hb-receipt-row"><span>Subtotal</span><span>{money(document.totals.subtotal)}</span></div>
+      {document.totals.discount>0&&<div className="hb-receipt-row"><span>Desconto</span><span>− {money(document.totals.discount)}</span></div>}
+      {document.totals.shipping>0&&<div className="hb-receipt-row"><span>Frete</span><span>{money(document.totals.shipping)}</span></div>}
+      <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>TOTAL</span><span>{money(document.totals.total)}</span></div>
      </div>
      {document.notes&&<p className="mt-4"><strong>Observações:</strong> {document.notes}</p>}
      {isContract&&<div className="mt-8 space-y-5 text-sm">
@@ -202,7 +205,7 @@ export default function DocumentPrintPage(){
        <div className="border-t border-slate-900 pt-2">Responsável pelo atendimento</div>
       </div>
      </div>}
-     <div className="mt-6 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
+     <div className="mt-4 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
      <p className="mt-3 text-center text-[0.9em]">Documento gerado a partir de registros internos do HB Studio.</p>
     </article>
     <div className="hb-print-actions rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
