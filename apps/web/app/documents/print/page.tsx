@@ -108,6 +108,9 @@ export default function DocumentPrintPage(){
  };
  return <RootShellLayout>
   <style>{`
+   .hb-receipt-row{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;}
+   .hb-receipt-row>:first-child{min-width:0;}
+   .hb-receipt-row>:last-child{white-space:nowrap;flex-shrink:0;text-align:right;}
    @media print {
     @page {size: ${effectivePaper==="A4"?"A4":"auto"};margin:${effectivePaper==="A4"?"12mm":"0"};}
     html,body {margin:0!important;padding:0!important;background:#fff!important;color:#000!important;}
@@ -126,7 +129,7 @@ export default function DocumentPrintPage(){
     .hb-print-actions {display:none!important;}
     #hb-printed-document table {width:100%;border-collapse:collapse;}
     #hb-printed-document tr {break-inside:avoid;}
-    #hb-printed-document {font-size:${effectivePaper==="58"?"9px":effectivePaper==="80"?"11px":"12px"}!important;}
+    #hb-printed-document {font-family:Arial,Helvetica,sans-serif!important;font-size:${effectivePaper==="58"?"10px":effectivePaper==="80"?"12px":"12px"}!important;line-height:1.35!important;}
    }
   `}</style>
   <div className="mx-auto max-w-5xl space-y-4 pb-12">
@@ -142,7 +145,7 @@ export default function DocumentPrintPage(){
    {loading&&<div className="rounded-xl border bg-white p-6 text-sm">Consultando documento no Neon...</div>}
    {error&&<div role="alert" className="hb-print-actions flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
    {document&&<>
-    {(kind==="training"||kind==="training-sale")&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: gera apenas uma prévia imprimível do orçamento. Não registra venda, pagamento, movimentação de estoque ou valor em caixa.</div>}
+    {(kind==="training"||kind==="training-sale")&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: documento de simulação, sem venda comercial, pagamento, movimentação de estoque ou valor em caixa.</div>}
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
@@ -165,6 +168,7 @@ export default function DocumentPrintPage(){
      <div className="border-b-2 border-slate-900 pb-3 text-center">
       <h2 className="font-black uppercase">{document.organization.name}</h2>
       {document.organization.cnpj&&<p>CNPJ: {formatCnpj(document.organization.cnpj)}</p>}
+      {document.organization.legalName!==document.organization.name&&<p>{document.organization.legalName}</p>}
       <p>{document.organization.branch}</p>
       {document.organization.address&&<p>{document.organization.address}</p>}
      </div>
@@ -200,7 +204,7 @@ export default function DocumentPrintPage(){
       {document.totals.shipping>0&&<div className="hb-receipt-row"><span>Frete</span><span>{money(document.totals.shipping)}</span></div>}
       <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>TOTAL</span><span>{money(document.totals.total)}</span></div>
      </div>
-     {document.notes&&<p className="mt-4"><strong>Observações:</strong> {document.notes}</p>}
+     {document.notes&&<p className="mt-4"><strong>{kind==="training-sale"?"Condição simulada:":"Observações:"}</strong> {document.notes}</p>}
      {isContract&&<div className="mt-8 space-y-5 text-sm">
       <p>Este termo acompanha a ordem de serviço identificada e descreve os itens orçados e a condição informada no atendimento. Não substitui termos comerciais específicos nem constitui aceite automático.</p>
       <p>Garantias legais e adicionais serão verificadas de acordo com a operação e a legislação aplicável. Qualquer autorização técnica e serviço adicional depende de concordância registrada.</p>
@@ -209,7 +213,7 @@ export default function DocumentPrintPage(){
        <div className="border-t border-slate-900 pt-2">Responsável pelo atendimento</div>
       </div>
      </div>}
-     <div className="mt-4 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
+     <div className="hb-receipt-item mt-4 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
      <p className="mt-3 text-center text-[0.9em]">Documento gerado a partir de registros internos do HB Studio.</p>
     </article>
     <div className="hb-print-actions rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
