@@ -119,7 +119,11 @@ export default function DocumentPrintPage(){
       box-sizing:border-box!important;width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm"}!important;
       max-width:none!important;min-height:auto!important;background:#fff!important;
       color:#000!important;overflow:visible!important;overflow-wrap:break-word!important;word-break:normal!important;print-color-adjust:exact;}
-    .hb-receipt-row{display:flex!important;align-items:baseline!important;justify-content:space-between!important;gap:2mm!important;max-width:100%!important;}\n    .hb-receipt-row>:first-child{min-width:0!important;}\n    .hb-receipt-row>:last-child{white-space:nowrap!important;flex-shrink:0!important;text-align:right!important;}\n    .hb-receipt-item{break-inside:avoid!important;page-break-inside:avoid!important;}\n    .hb-print-actions {display:none!important;}
+    .hb-receipt-row{display:flex!important;align-items:baseline!important;justify-content:space-between!important;gap:2mm!important;max-width:100%!important;}
+    .hb-receipt-row>:first-child{min-width:0!important;}
+    .hb-receipt-row>:last-child{white-space:nowrap!important;flex-shrink:0!important;text-align:right!important;}
+    .hb-receipt-item{break-inside:avoid!important;page-break-inside:avoid!important;}
+    .hb-print-actions {display:none!important;}
     #hb-printed-document table {width:100%;border-collapse:collapse;}
     #hb-printed-document tr {break-inside:avoid;}
     #hb-printed-document {font-size:${effectivePaper==="58"?"9px":effectivePaper==="80"?"11px":"12px"}!important;}
