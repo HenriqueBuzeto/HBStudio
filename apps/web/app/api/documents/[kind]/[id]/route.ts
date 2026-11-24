@@ -21,10 +21,18 @@ export async function GET(request:NextRequest,context:Context){
        t."TotalCents"::text AS total,t."SubtotalCents"::text AS subtotal,
        t."DiscountCents"::text AS discount,t."ItemsSnapshot" AS items,
        t."Status" AS status,p."Name" AS customer,
-       b."Name" AS branchName,ten."Name" AS tenantName
+       b."Name" AS branchName,ten."Name" AS tenantName,
+       e."CorporateName" AS "corporateName",e."TradeName" AS "tradeName",
+       e."Cnpj" AS cnpj,e."Street" AS street,e."Number" AS "streetNumber",
+       e."CityName" AS city,e."State" AS state
       FROM pos_training_checkout_records t
       JOIN branches b ON b."Id"=t."BranchId" AND b."TenantId"=t."TenantId"
       JOIN tenants ten ON ten."Id"=t."TenantId"
+      LEFT JOIN LATERAL (
+        SELECT "CorporateName","TradeName","Cnpj","Street","Number","CityName","State"
+        FROM fiscal_establishments WHERE "TenantId"=t."TenantId" AND "BranchId"=t."BranchId"
+        ORDER BY "CreatedAtUtc" DESC LIMIT 1
+      ) e ON true
       LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
       WHERE t."Id"=$3::uuid AND t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid`,
       [ctx.tenantId,ctx.branchId,id]
@@ -32,8 +40,12 @@ export async function GET(request:NextRequest,context:Context){
     if(!train)throw new FleetError(404,"DOCUMENT_NOT_FOUND","Simulação não encontrada nesta filial.");
     const items=Array.isArray(train.items)?train.items:[];
     return NextResponse.json({kind,documentType:"TRAINING_SALE",number:train.number,
-      issuedAt:train.createdAt,organization:{name:train.tenantName,legalName:train.tenantName,
-       branch:train.branchName,cnpj:null,address:""},
+      issuedAt:train.createdAt,organization:{
+       name:train.tradeName||train.corporateName||train.tenantName,
+       legalName:train.corporateName||train.tenantName,
+       branch:train.branchName,cnpj:train.cnpj||null,
+       address:[train.street,train.streetNumber,train.city,train.state].filter(Boolean).join(", ")
+      },
       customer:train.customer||"Consumidor não identificado",
       items:items.map((i:any)=>({sku:i.skuCode,description:i.description,
        quantity:i.quantity,unitPrice:i.unitCents/100,discount:0})),
