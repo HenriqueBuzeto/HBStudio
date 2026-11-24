@@ -31,3 +31,49 @@ CREATE INDEX IF NOT EXISTS "IX_pos_training_checkout_records_scope"
  ON pos_training_checkout_records ("TenantId","BranchId","CreatedAtUtc" DESC);
 COMMENT ON TABLE pos_training_checkout_records IS
  'SIMULATION ONLY. No legal/commercial sale, no bank receipt, no payment intent, no fiscal document, no warehouse/Kardex or financial ledger posting.';
+
+-- Composite tenant ownership prevents connecting training records to a
+-- customer, seller or branch in another company even from direct SQL.
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_training_branch_tenant_id"
+ ON branches ("TenantId","Id");
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_training_user_tenant_id"
+ ON users ("TenantId","Id");
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_training_party_tenant_id"
+ ON parties ("TenantId","Id");
+ALTER TABLE pos_training_checkout_records
+ ADD CONSTRAINT "FK_training_branch_tenant"
+ FOREIGN KEY ("TenantId","BranchId") REFERENCES branches("TenantId","Id") ON DELETE RESTRICT;
+ALTER TABLE pos_training_checkout_records
+ ADD CONSTRAINT "FK_training_creator_tenant"
+ FOREIGN KEY ("TenantId","CreatedByUserId") REFERENCES users("TenantId","Id") ON DELETE RESTRICT;
+ALTER TABLE pos_training_checkout_records
+ ADD CONSTRAINT "FK_training_seller_tenant"
+ FOREIGN KEY ("TenantId","SellerUserId") REFERENCES users("TenantId","Id") ON DELETE RESTRICT;
+ALTER TABLE pos_training_checkout_records
+ ADD CONSTRAINT "FK_training_customer_tenant"
+ FOREIGN KEY ("TenantId","CustomerPartyId") REFERENCES parties("TenantId","Id") ON DELETE RESTRICT;
+ALTER TABLE pos_training_checkout_records
+ ADD CONSTRAINT "FK_training_void_actor_tenant"
+ FOREIGN KEY ("TenantId","VoidedByUserId") REFERENCES users("TenantId","Id") ON DELETE RESTRICT;
+
+-- No one may rewrite or delete historic simulated prices/parties/amounts.
+-- The only legal mutation is SIMULATED -> VOIDED with timestamp and reason.
+CREATE OR REPLACE FUNCTION pos_training_checkout_immutable()
+RETURNS trigger LANGUAGE plpgsql AS $training_guard$
+BEGIN
+ IF TG_OP='DELETE' THEN
+  RAISE EXCEPTION 'TRAINING_DELETE_FORBIDDEN' USING ERRCODE='23514';
+ END IF;
+ IF OLD."Status"<>'SIMULATED' OR NEW."Status"<>'VOIDED'
+   OR NEW."VoidedAtUtc" IS NULL OR NEW."VoidedByUserId" IS NULL
+   OR length(trim(COALESCE(NEW."VoidReason",'')))<4
+   OR (to_jsonb(OLD)-'Status'-'VoidedAtUtc'-'VoidedByUserId'-'VoidReason')
+    IS DISTINCT FROM
+      (to_jsonb(NEW)-'Status'-'VoidedAtUtc'-'VoidedByUserId'-'VoidReason')
+ THEN RAISE EXCEPTION 'TRAINING_SNAPSHOT_IMMUTABLE' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $training_guard$;
+CREATE TRIGGER "TR_training_checkout_immutable"
+ BEFORE UPDATE OR DELETE ON pos_training_checkout_records
+ FOR EACH ROW EXECUTE FUNCTION pos_training_checkout_immutable();
