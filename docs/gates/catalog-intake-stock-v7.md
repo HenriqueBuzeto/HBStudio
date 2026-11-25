@@ -1,0 +1,7 @@
+# Catalog and manufacturing inventory intake v7
+- Single catalog intake form for normal goods, raw materials, spare parts, services and manufactured goods. Typed brand/category names can be reused or created atomically; standard serial workflow remains separate.
+- Optional opening physical balance is one per SKU/warehouse, explicitly confirmed, with one Kardex movement; not a supplier receipt, account payable or invoice. Existing stock is never overwritten. Filaments use kg in canonical stock and g per spool. First entry creates physical spool IDs and initial cost. Current diameter is 1.75 mm per existing spool engine.
+- Warehouse creation without inventory is separately supported.
+- Factory stock order uses a catalog SKU of kind 5, real destination warehouse, no customer and no approved sale price. It reserves/consumes materials through existing production functions and adds finished goods only on final quality approval. Output movement type 11. Accounting capitalizes material costs if canonical accounts are configured; otherwise records PENDING_CONFIGURATION. Managerial costs remain separate. No external fiscal activity.
+- QA cash checkout can sell finished stock (same-type cart; no mixed standard/manufactured cart) and cannot bill a stock production order as a custom OS. Production commercial gate remains unchanged. Actual payment and fiscal workflows remain outside scope.
+- Tests: catalog intake, warehouse, stock production/sale and existing workflow/checkout suites exercised in Neon QA; build and browser validation required before promotion.

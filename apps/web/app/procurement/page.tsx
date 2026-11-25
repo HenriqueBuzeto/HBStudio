@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import CatalogIntakeForm from "@/components/CatalogIntakeForm";
+import {useAuth} from "@/lib/auth";
 import {formatCpfCnpj} from "@/lib/br-format";
 import {
   ShoppingCart,
@@ -151,6 +153,7 @@ export interface SkuOption {
 export type ElectronicCategory = "smartphone" | "computador_gamer" | "videogame" | "notebook" | "outro";
 
 export default function ProcurementPage() {
+  const {hasPermission}=useAuth();const [intakeOpen,setIntakeOpen]=useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "receipts" | "used_devices">("orders");
   const [searchTerm, setSearchTerm] = useState("");
   const [canViewCost, setCanViewCost] = useState(true);
@@ -491,7 +494,8 @@ export default function ProcurementPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {hasPermission("catalog.products.manage")&&<button type="button" onClick={()=>setIntakeOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar produto</button>}
             <button
               onClick={() => setCanViewCost(!canViewCost)}
               className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${canViewCost
@@ -887,6 +891,7 @@ export default function ProcurementPage() {
           </div>
         )}
 
+        {intakeOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Cadastro de produto" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Cadastro de produto</h2><CatalogIntakeForm onClose={()=>setIntakeOpen(false)} onDone={async()=>{await loadData();setIntakeOpen(false);}}/></section></div>}
         {/* Modal: Novo Pedido de Compra */}
         {isOrderModalOpen && (
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">

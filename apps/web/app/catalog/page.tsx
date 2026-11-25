@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {useAuth} from "@/lib/auth";
 import RootShellLayout from "@/components/RootShellLayout";
+import CatalogIntakeForm from "@/components/CatalogIntakeForm";
 import { 
   Boxes, 
   Smartphone, 
@@ -105,6 +106,7 @@ export default function CatalogPage() {
 
   // Modais
   const [isCreateModelOpen, setIsCreateModelOpen] = useState(false);
+  const [isIntakeOpen,setIsIntakeOpen]=useState(false);
   const [isCreateSkuOpen, setIsCreateSkuOpen] = useState(false);
   const [isUpdatePriceOpen, setIsUpdatePriceOpen] = useState(false);
   const [isRegisterUnitOpen, setIsRegisterUnitOpen] = useState(false);
@@ -528,12 +530,12 @@ export default function CatalogPage() {
               Registrar Unidade (IMEI)
             </button>
             <button
-              onClick={() => setIsCreateModelOpen(true)}
+              onClick={() => setIsIntakeOpen(true)}
               disabled={!canManage}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              Novo Modelo
+              Novo produto
             </button>
           </div>
         </div>
@@ -595,7 +597,7 @@ export default function CatalogPage() {
                 <p className="font-bold text-slate-700 text-sm">{search.trim() ? "Nenhum modelo encontrado na busca" : "Nenhum modelo cadastrado no catálogo"}</p>
                 <p className="text-xs text-slate-400 mt-1">{search.trim()?"Experimente outro nome ou SKU.":"Cadastre novos modelos de smartphones, acessórios ou peças de reposição."}</p>
                 <button
-                  onClick={() => setIsCreateModelOpen(true)}
+                  onClick={() => setIsIntakeOpen(true)}
                   className="mt-4 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
                 >
                   Cadastrar Primeiro Modelo
@@ -834,6 +836,7 @@ export default function CatalogPage() {
             </div>
           </div>
         )}
+        {isIntakeOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Cadastro de produto" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Cadastro de produto</h2><CatalogIntakeForm onClose={()=>setIsIntakeOpen(false)} onDone={async()=>{await loadCatalogData();setIsIntakeOpen(false);}}/></section></div>}
         {/* Modal: Novo Modelo */}
         {isCreateModelOpen && (
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
