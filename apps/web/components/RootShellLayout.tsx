@@ -42,6 +42,7 @@ interface NavSection {
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
+    anyPermissions?: string[];
   }[];
 }
 
@@ -51,6 +52,7 @@ const navSections: NavSection[] = [
     items: [
       { name: "Visão Geral", href: "/", icon: LayoutDashboard },
       { name: "PDV Balcão", href: "/sales", icon: ShoppingCart, badge: "PDV" },
+      { name: "Impressoras & Documentos", href: "/documents/printers", icon: Printer, anyPermissions: ["sales.pos.use","repairs.view"] },
     ],
   },
   {
@@ -79,6 +81,8 @@ const navSections: NavSection[] = [
     items: [
       { name: "Caixa & Turnos", href: "/cash", icon: CircleDollarSign },
       { name: "Financeiro & DRE", href: "/financial", icon: TrendingUp },
+      { name: "Crédito / Débito & Pix", href: "/financial/acquirers", icon: Receipt,
+        anyPermissions: ["finance.reports.view","finance.banks.manage"] },
       { name: "Sócios & Capital", href: "/partners", icon: Building2 },
       { name: "Usuários & Senhas", href: "/users", icon: UserCheck, badge: "Master" },
     ],
@@ -92,7 +96,7 @@ export default function RootShellLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -170,6 +174,7 @@ export default function RootShellLayout({
               </h3>
               <div className="space-y-1 pt-1">
                 {section.items.map((item) => {
+                  if(item.anyPermissions?.length && !item.anyPermissions.some(key=>hasPermission(key)))return null;
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
                   return (

@@ -9,11 +9,62 @@ export async function GET(request:NextRequest,context:Context){
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try{
   const {kind,id}=await context.params;
-  if(!["quote","training","service","contract","sale"].includes(kind))
+  if(!["quote","training","training-sale","service","contract","sale"].includes(kind))
    throw new FleetError(404,"DOCUMENT_NOT_FOUND","Tipo de documento não encontrado.");
   uuid(id,"Documento");
-  const permission=kind==="quote"||kind==="training"||kind==="sale"?"sales.pos.use":"repairs.view";
+  const permission=kind==="quote"||kind==="training"||kind==="training-sale"||kind==="sale"?"sales.pos.use":"repairs.view";
   const ctx=await authorizeFleet(request,permission);
+  if(kind==="training-sale"){
+    const [train]=await ctx.db.query(
+      `SELECT t."Number" AS number,t."CreatedAtUtc" AS "createdAt",
+       t."PaymentMethod" AS method,t."Installments" AS installments,
+       t."TotalCents"::text AS total,t."SubtotalCents"::text AS subtotal,
+       t."DiscountCents"::text AS discount,t."ItemsSnapshot" AS items,
+       t."Status" AS status,p."Name" AS customer,
+       t."VoidedAtUtc" AS "voidedAt",t."VoidReason" AS "voidReason",
+       creator."FullName" AS "operator",seller."FullName" AS seller,voider."FullName" AS "voidedBy",
+       t."VoidedByUserId"::text AS "voidedById",
+       event."Id"::text AS "voidEventId",
+       b."Name" AS branchName,ten."Name" AS tenantName,
+       e."CorporateName" AS "corporateName",e."TradeName" AS "tradeName",
+       e."Cnpj" AS cnpj,e."Street" AS street,e."Number" AS "streetNumber",
+       e."CityName" AS city,e."State" AS state
+      FROM pos_training_checkout_records t
+      JOIN branches b ON b."Id"=t."BranchId" AND b."TenantId"=t."TenantId"
+      JOIN tenants ten ON ten."Id"=t."TenantId"
+      LEFT JOIN LATERAL (
+        SELECT "CorporateName","TradeName","Cnpj","Street","Number","CityName","State"
+        FROM fiscal_establishments WHERE "TenantId"=t."TenantId" AND "BranchId"=t."BranchId"
+        ORDER BY "CreatedAtUtc" DESC LIMIT 1
+      ) e ON true
+      LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
+      JOIN users creator ON creator."Id"=t."CreatedByUserId" AND creator."TenantId"=t."TenantId"
+      JOIN users seller ON seller."Id"=t."SellerUserId" AND seller."TenantId"=t."TenantId"
+      LEFT JOIN users voider ON voider."Id"=t."VoidedByUserId" AND voider."TenantId"=t."TenantId"
+      LEFT JOIN LATERAL (SELECT a."Id" FROM audit_events a WHERE a."TenantId"=t."TenantId" AND a."BranchId"=t."BranchId" AND a."EntityType"='PosTrainingSale' AND a."EntityId"=t."Id"::text AND a."Action"='Voided' ORDER BY a."CreatedAtUtc" DESC LIMIT 1) event ON true
+      WHERE t."Id"=$3::uuid AND t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid`,
+      [ctx.tenantId,ctx.branchId,id]
+    );
+    if(!train)throw new FleetError(404,"DOCUMENT_NOT_FOUND","Simulação não encontrada nesta filial.");
+    const items=Array.isArray(train.items)?train.items:[];
+    return NextResponse.json({kind,documentType:"TRAINING_SALE",number:train.number,
+      issuedAt:train.createdAt,organization:{
+       name:[train.tradeName,train.corporateName,train.tenantName].find(v=>typeof v==="string"&&v.trim())||"Empresa não identificada",
+       legalName:[train.corporateName,train.tenantName].find(v=>typeof v==="string"&&v.trim())||"",
+       branch:train.branchName||"Filial não identificada",cnpj:train.cnpj||null,
+       address:[train.street,train.streetNumber,train.city,train.state].filter(Boolean).join(", ")
+      },
+      customer:train.customer||"Consumidor não identificado",
+      items:items.map((i:any)=>({sku:i.skuCode,description:i.description,
+       quantity:i.quantity,unitPrice:i.unitCents/100,discount:0})),
+      totals:{subtotal:Number(train.subtotal)/100,discount:Number(train.discount)/100,
+       shipping:0,total:Number(train.total)/100},
+      training:{status:train.status,operator:train.operator,seller:train.seller,
+       paymentMethod:train.method,installments:Number(train.installments),
+       cancellation:train.status==="VOIDED"?{at:train.voidedAt,by:train.voidedBy||train.voidedById,reason:train.voidReason,eventId:train.voidEventId}:null},
+      disclaimer:"SIMULAÇÃO / TREINAMENTO — NÃO É DOCUMENTO FISCAL, NÃO É COMPROVANTE DE PAGAMENTO. NENHUM ESTOQUE, CAIXA, RECEITA OU FINANCEIRO FOI MOVIMENTADO."},
+      {headers:headers(cid)});
+  }
   if(kind==="sale")
    throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED",
     "Comprovantes de venda ficam bloqueados até a confirmação transacional e fiscal do checkout. Não é permitido imprimir pagamento ainda não confirmado.");

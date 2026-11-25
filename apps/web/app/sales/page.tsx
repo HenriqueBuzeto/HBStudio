@@ -17,6 +17,8 @@ type Seller={id:string;name:string;jobTitle:string|null};
 type Repair={id:string;orderNumber:string;defect:string;finalPrice:number;customerId:string;status:number};
 type Quote={id:string;number:string;status:number;customerId:string|null;customer:string|null;sellerId:string;seller:string|null;validUntil:string;paymentTerms:string;discount:number;shipping:number;createdAt:string;subtotal:number;total:number;items:Array<{sku:string;description:string;quantity:number;price:number}>};
 type Sale={id:string;saleNumber:string;status:number;paymentStatus:number;fulfillmentStatus:number;customerName:string;sellerName:string;subtotal:number;discountTotal:number;chargesTotal:number;totalAmount:number;createdAtUtc:string;items:Array<{skuCode:string;description:string;quantity:number;unitPrice:number}>;payments:Array<{method:number;amount:number;installments:number;status:number;reference:string|null}>;fiscalDocuments:Array<{status:number;accessKey:string;protocol:string|null;sefazStatus:number|null}>};
+type TrainingSale={id:string;number:string;status:"SIMULATED"|"VOIDED";createdAt:string;totalCents:string;
+ paymentMethod:string;installments:number;customer:string|null;seller:string|null};
 type Cart={product:Product;quantity:number};
 type Auxiliary={customers:Customer[];sellers:Seller[];products:Product[];repairs:Repair[];cashShift:null|{id:string;register:string;openedAt:string};fiscalReady:boolean;capabilities:{saveQuote:boolean;discountOverride:boolean;cancel:boolean;fiscalIssue:boolean;checkout:boolean}};
 type Readiness={checks:Array<{code:string;ready:boolean;label:string;module:string}>;checkoutEnabled:boolean;checkoutBlocker:string;fiscalIssuanceReady:boolean;fiscalBlocker:string};
@@ -54,9 +56,12 @@ export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
  const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
- const [tab,setTab]=useState<"pos"|"quotes"|"history">("pos");
+ const [tab,setTab]=useState<"pos"|"quotes"|"history"|"training">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
+ const [trainingSales,setTrainingSales]=useState<TrainingSale[]>([]),[trainingMode,setTrainingMode]=useState(false);
+ const [trainingLastUrl,setTrainingLastUrl]=useState("");
+ const trainingRequestKey=useRef<string|null>(null);
  const [readiness,setReadiness]=useState<Readiness|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [customerId,setCustomerId]=useState(""),[sellerId,setSellerId]=useState(""),[cpf,setCpf]=useState("");
@@ -79,8 +84,8 @@ export default function SalesPage(){
   if(!permitted){setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const [a,q,s,r]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null)]);
-   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);
+   const [a,q,s,r,t]=await Promise.all([api<Auxiliary>("/api/sales/auxiliary"),api<{quotes:Quote[]}>("/api/sales/quotes"),api<{sales:Sale[]}>("/api/sales"),api<Readiness>("/api/sales/readiness").catch(()=>null),api<{sales:TrainingSale[]}>("/api/sales/training").catch(()=>({sales:[]}))]);
+   setAux(a);setQuotes(q.quotes);setHistory(s.sales);setReadiness(r);setTrainingSales(t.sales);
    setSellerId(old=>a.sellers.some(x=>x.id===old)?old:(a.sellers.find(x=>x.id===user?.id)?.id||""));
   }catch(e){setError(e instanceof Error?e.message:"Falha ao consultar o Neon.");}
   finally{setLoading(false);}
@@ -112,12 +117,13 @@ export default function SalesPage(){
  useEffect(()=>{
   const handler=(event:KeyboardEvent)=>{
    if(event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
-    event.preventDefault();void toggleDocumentMode();
+    event.preventDefault();setTrainingMode(v=>!v);setError("");
    }
   };
   window.addEventListener("keydown",handler);
   return ()=>window.removeEventListener("keydown",handler);
- },[toggleDocumentMode]);
+ },[]);
+
  useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
   const customer=aux.customers.find(x=>x.id===customerId);
  const match=useMemo(()=>{
@@ -172,6 +178,44 @@ export default function SalesPage(){
   if(matched)addProduct(matched);
   else setError("Código não encontrado no catálogo da sua empresa. Selecione um resultado da busca.");
  };
+ const saveTraining=async()=>{
+  if(!trainingMode||!permitted||!items.length||!sellerId||totalCents<=0||
+    !isDiscountValid||saving||(discountCents>0&&!aux.capabilities.discountOverride))return;
+  const prefs=getBrowserPrintSettings();
+  const printTab=prefs.autoPrintSale?window.open("about:blank","_blank"):null;
+  const key=trainingRequestKey.current||crypto.randomUUID();
+  trainingRequestKey.current=key;
+  setSaving(true);setError("");setNotice("");setTrainingLastUrl("");
+  try{
+   const saved=await api<{id:string;number:string}>("/api/sales/training","POST",{
+    requestKey:key,customerId:customerId||null,sellerId,
+    items:items.map(i=>({skuId:i.product.id,quantity:i.quantity})),
+    paymentMethod:method==="Cash"?"CASH":method==="Pix"?"PIX":method==="CreditCard"?"CREDIT":"DEBIT",
+    installments:method==="CreditCard"?installments:1,discountCents
+   });
+   trainingRequestKey.current=null;
+   const url=buildPrintUrl("training-sale",saved.id,prefs.paper,prefs.autoPrintSale);
+   setTrainingLastUrl(url);
+   setNotice("SIMULAÇÃO "+saved.number+" salva. Não existe venda real, recebimento, baixa de estoque ou nota.");
+   if(printTab&&!printTab.closed)try{printTab.location.replace(new URL(url,window.location.origin).href);}catch{}
+   setItems([]);setDiscountInput("");setTab("training");
+   const refreshed=await api<{sales:TrainingSale[]}>("/api/sales/training");setTrainingSales(refreshed.sales);
+  }catch(e){if(printTab&&!printTab.closed)printTab.close();setError(e instanceof Error?e.message:"Falha ao registrar simulação.");}
+  finally{setSaving(false);}
+ };
+ const voidTraining=async(id:string)=>{
+  if(!hasPermission("sales.cancel")){setError("Permissão sales.cancel necessária.");return;}
+  const reason=window.prompt("Motivo do cancelamento da simulação:");
+  if(reason===null)return;
+  try{
+   const res=await fetch("/api/sales/training/"+encodeURIComponent(id),{method:"PATCH",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({reason})});
+   const data=await res.json().catch(()=>({}));
+   if(!res.ok)throw new Error(data.error||"Falha ao cancelar.");
+   const refreshed=await api<{sales:TrainingSale[]}>("/api/sales/training");
+   setTrainingSales(refreshed.sales);setNotice("Simulação cancelada. Nenhum estorno financeiro foi gerado.");
+  }catch(e){setError(e instanceof Error?e.message:"Falha ao cancelar.");}
+ };
  const saveQuote=async()=>{
   if(!canQuote||saving)return;
   const prefs=getBrowserPrintSettings();
@@ -218,6 +262,7 @@ export default function SalesPage(){
     <button className={tab==="pos"?primary:button} onClick={()=>setTab("pos")}><ShoppingCart className="h-4 w-4"/> Frente de caixa</button>
     <button className={tab==="quotes"?primary:button} onClick={()=>setTab("quotes")}><FileText className="h-4 w-4"/> Orçamentos ({quotes.length})</button>
     <button className={tab==="history"?primary:button} onClick={()=>setTab("history")}><Receipt className="h-4 w-4"/> Vendas ({history.length})</button>
+     <button className={tab==="training"?primary:button} onClick={()=>setTab("training")}><ClipboardList className="h-4 w-4"/> Simulações ({trainingSales.length})</button>
    </div>
   </header>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
@@ -296,12 +341,22 @@ export default function SalesPage(){
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
+     <div className={"rounded-xl border-2 p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+       <strong>{trainingMode?"TREINAMENTO ATIVO — NÃO É VENDA REAL":"TREINAMENTO DESATIVADO"}</strong>
+       <button type="button" onClick={()=>setTrainingMode(v=>!v)}
+        className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Ctrl + F1 • {trainingMode?"Desativar":"Ativar simulação"}</button>
+      </div>
+      <p className="mt-2">{trainingMode?
+       "Simulação para qualquer cliente e operador com acesso ao PDV. Não movimenta estoque, caixa, receita, contabilidade ou SEFAZ.":
+       "Para operações reais, continuam necessárias liquidação homologada e regras fiscais aplicáveis."}</p>
+     </div>
      <div className={"rounded-xl border-2 p-3 text-xs "+(documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
     <div className="flex flex-wrap items-center justify-between gap-2">
      <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
      <button type="button" disabled={checkingDocumentMode} onClick={()=>void toggleDocumentMode()}
       className={"rounded-lg px-3 py-1.5 font-extrabold disabled:opacity-50 "+(documentMode==="INTERNAL"?"bg-red-700 text-white":"bg-slate-800 text-white")}>
-      {checkingDocumentMode?"Verificando...":"Ctrl + F1 • Alternar"}
+      {checkingDocumentMode?"Verificando...":"Consultar dispensa legal"}
      </button>
     </div>
     <p className="mt-2">{documentMode==="INTERNAL"?
@@ -312,7 +367,7 @@ export default function SalesPage(){
      Cliente solicitou documento fiscal
     </label>
     {documentModeError&&<div role="alert" className="mt-2 rounded-lg bg-amber-100 p-2 font-semibold text-amber-900">{documentModeError}</div>}
-    <p className="mt-2 text-[10px]">Atalho disponível na janela do PDV; algumas combinações podem ser interceptadas pelo navegador. Também é possível usar o botão.</p>
+    <p className="mt-2 text-[10px]">Ctrl + F1 alterna apenas treinamento; o modo fiscal real depende de elegibilidade própria.</p>
    </div>
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800"><div className="flex items-center gap-2 font-black"><ShieldAlert className="h-4 w-4"/> Finalização protegida</div><p className="mt-1">Venda, baixa de estoque, cobrança e emissão de NFC-e exigem confirmação transacional e fiscal real. Não serão simuladas. {aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno de caixa aberto para este operador."}</p><a href="/cash" className="mt-2 inline-flex rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100">Consultar ou abrir turno no Caixa</a></div>
      {readiness&&<div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
@@ -326,13 +381,40 @@ export default function SalesPage(){
        <p className="mt-3 text-amber-800">{readiness.checkoutBlocker}</p>
        <p className="mt-1 text-slate-600">{readiness.fiscalBlocker}</p>
       </div>}
-      <button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>
+      {trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
+        disabled={saving||!items.length||!sellerId||totalCents<=0||!isDiscountValid||
+         (discountCents>0&&!aux.capabilities.discountOverride)}
+        onClick={()=>void saveTraining()}>
+        <Receipt className="mr-2 inline h-4 w-4"/>{saving?"Salvando...":"Registrar venda SIMULADA — sem financeiro / fiscal"}
+       </button>}
+       {!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
     </section>
    </div>
   </div>
   :tab==="quotes"?<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-sm font-black text-slate-900">Orçamentos registrados no Neon</h2><p className="text-xs text-slate-500">Propostas comerciais não são venda nem comprovante de pagamento.</p></div><button className={primary} onClick={()=>setTab("pos")}><Plus className="h-4 w-4"/> Novo orçamento</button></div>
    {quotes.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhum orçamento encontrado para esta filial.</div>:<div className="divide-y divide-slate-100">{quotes.map(q=><div key={q.id} className="flex flex-wrap items-center justify-between gap-4 p-4"><div><strong className="font-mono text-xs text-violet-700">{q.number}</strong><p className="mt-1 text-xs text-slate-600">{q.customer||"Consumidor não identificado"} • Vendedor: {q.seller||"—"}</p><p className="text-[10px] text-slate-400">Criado em {dateText(q.createdAt)} • Válido até {dateText(q.validUntil)}</p></div><div className="flex items-center gap-3"><strong className="text-base text-slate-900">{money(q.total)}</strong><button className={button} onClick={()=>setSelectedQuote(q)}><ClipboardList className="h-4 w-4"/> Detalhes</button></div></div>)}</div>}
   </section>
+  :tab==="training"?<section className="rounded-2xl border-2 border-rose-200 bg-white shadow-sm">
+      <div className="border-b border-rose-200 bg-rose-50 p-5">
+       <h2 className="font-black text-rose-900">Vendas simuladas — treinamento</h2>
+       <p className="mt-1 text-xs text-rose-800">Valores aqui não compõem vendas reais, faturamento, caixa, estoques ou relatórios financeiros oficiais.</p>
+      </div>
+      {trainingLastUrl&&<a href={trainingLastUrl} target="_blank" rel="noopener noreferrer"
+        className="m-4 inline-block rounded-xl bg-rose-700 px-4 py-2 text-xs font-bold text-white">Imprimir última simulação</a>}
+      {trainingSales.length===0?<p className="p-8 text-sm text-slate-500">Nenhuma simulação registrada nesta filial.</p>:
+       <div className="overflow-x-auto"><table className="w-full text-left text-xs">
+        <thead className="bg-slate-50"><tr>{["Número","Data","Cliente","Vendedor","Total simulado","Status","Ações"].map(x=><th key={x} className="px-3 py-3">{x}</th>)}</tr></thead>
+        <tbody>{trainingSales.map(t=><tr key={t.id} className="border-t">
+         <td className="px-3 py-3 font-mono text-[10px]">{t.number}</td><td className="px-3 py-3">{dateText(t.createdAt)}</td>
+         <td className="px-3 py-3">{t.customer||"Não identificado"}</td><td className="px-3 py-3">{t.seller}</td>
+         <td className="px-3 py-3 font-bold">{money(Number(t.totalCents)/100)}</td>
+         <td className="px-3 py-3">{t.status==="VOIDED"?"Cancelada":"Simulação"}</td>
+         <td className="px-3 py-3"><div className="flex gap-2">
+          <a href={buildPrintUrl("training-sale",t.id,"80")} target="_blank" rel="noopener noreferrer" className={button}>Imprimir</a>
+          {t.status==="SIMULATED"&&hasPermission("sales.cancel")&&<button type="button" className={button} onClick={()=>void voidTraining(t.id)}>Cancelar</button>}
+         </div></td>
+        </tr>)}</tbody></table></div>}
+     </section>
   :<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="text-sm font-black text-slate-900">Histórico de vendas persistidas</h2><p className="text-xs text-slate-500">Nenhuma autorização fiscal é presumida. Status refletido diretamente no Neon.</p></div>
    {history.length===0?<div className="p-12 text-center text-xs text-slate-500">Nenhuma venda cadastrada nesta filial.</div>:<div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr>{["Venda","Data","Cliente","Vendedor","Total","Status","Detalhes"].map(x=><th key={x} className="px-4 py-3">{x}</th>)}</tr></thead><tbody className="divide-y divide-slate-100">{history.map(s=><tr key={s.id}><td className="px-4 py-3 font-mono font-bold text-violet-700">{s.saleNumber}</td><td className="px-4 py-3">{dateText(s.createdAtUtc)}</td><td className="px-4 py-3">{s.customerName}</td><td className="px-4 py-3">{s.sellerName}</td><td className="px-4 py-3 font-bold">{money(s.totalAmount)}</td><td className="px-4 py-3"><span className="rounded-lg bg-slate-100 px-2 py-1">{statusSale[s.status]||"Desconhecido"}</span></td><td className="px-4 py-3"><button className={button} onClick={()=>setSelectedSale(s)}>Visualizar</button></td></tr>)}</tbody></table></div>}
   </section>}
