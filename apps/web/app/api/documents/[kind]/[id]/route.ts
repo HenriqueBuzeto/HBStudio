@@ -21,6 +21,10 @@ export async function GET(request:NextRequest,context:Context){
        t."TotalCents"::text AS total,t."SubtotalCents"::text AS subtotal,
        t."DiscountCents"::text AS discount,t."ItemsSnapshot" AS items,
        t."Status" AS status,p."Name" AS customer,
+       t."VoidedAtUtc" AS "voidedAt",t."VoidReason" AS "voidReason",
+       creator."FullName" AS "operator",seller."FullName" AS seller,voider."FullName" AS "voidedBy",
+       t."VoidedByUserId"::text AS "voidedById",
+       event."Id"::text AS "voidEventId",
        b."Name" AS branchName,ten."Name" AS tenantName,
        e."CorporateName" AS "corporateName",e."TradeName" AS "tradeName",
        e."Cnpj" AS cnpj,e."Street" AS street,e."Number" AS "streetNumber",
@@ -34,6 +38,10 @@ export async function GET(request:NextRequest,context:Context){
         ORDER BY "CreatedAtUtc" DESC LIMIT 1
       ) e ON true
       LEFT JOIN parties p ON p."Id"=t."CustomerPartyId" AND p."TenantId"=t."TenantId"
+      JOIN users creator ON creator."Id"=t."CreatedByUserId" AND creator."TenantId"=t."TenantId"
+      JOIN users seller ON seller."Id"=t."SellerUserId" AND seller."TenantId"=t."TenantId"
+      LEFT JOIN users voider ON voider."Id"=t."VoidedByUserId" AND voider."TenantId"=t."TenantId"
+      LEFT JOIN LATERAL (SELECT a."Id" FROM audit_events a WHERE a."TenantId"=t."TenantId" AND a."BranchId"=t."BranchId" AND a."EntityType"='PosTrainingSale' AND a."EntityId"=t."Id"::text AND a."Action"='Voided' ORDER BY a."CreatedAtUtc" DESC LIMIT 1) event ON true
       WHERE t."Id"=$3::uuid AND t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid`,
       [ctx.tenantId,ctx.branchId,id]
     );
@@ -41,9 +49,9 @@ export async function GET(request:NextRequest,context:Context){
     const items=Array.isArray(train.items)?train.items:[];
     return NextResponse.json({kind,documentType:"TRAINING_SALE",number:train.number,
       issuedAt:train.createdAt,organization:{
-       name:train.tradeName||train.corporateName||train.tenantName,
-       legalName:train.corporateName||train.tenantName,
-       branch:train.branchName,cnpj:train.cnpj||null,
+       name:[train.tradeName,train.corporateName,train.tenantName].find(v=>typeof v==="string"&&v.trim())||"Empresa não identificada",
+       legalName:[train.corporateName,train.tenantName].find(v=>typeof v==="string"&&v.trim())||"",
+       branch:train.branchName||"Filial não identificada",cnpj:train.cnpj||null,
        address:[train.street,train.streetNumber,train.city,train.state].filter(Boolean).join(", ")
       },
       customer:train.customer||"Consumidor não identificado",
@@ -51,7 +59,9 @@ export async function GET(request:NextRequest,context:Context){
        quantity:i.quantity,unitPrice:i.unitCents/100,discount:0})),
       totals:{subtotal:Number(train.subtotal)/100,discount:Number(train.discount)/100,
        shipping:0,total:Number(train.total)/100},
-      notes:"FORMA SIMULADA: "+train.method+" • "+train.installments+"x • "+train.status,
+      training:{status:train.status,operator:train.operator,seller:train.seller,
+       paymentMethod:train.method,installments:Number(train.installments),
+       cancellation:train.status==="VOIDED"?{at:train.voidedAt,by:train.voidedBy||train.voidedById,reason:train.voidReason,eventId:train.voidEventId}:null},
       disclaimer:"SIMULAÇÃO / TREINAMENTO — NÃO É DOCUMENTO FISCAL, NÃO É COMPROVANTE DE PAGAMENTO. NENHUM ESTOQUE, CAIXA, RECEITA OU FINANCEIRO FOI MOVIMENTADO."},
       {headers:headers(cid)});
   }
