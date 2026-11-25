@@ -4,7 +4,6 @@ import {inflateRawSync} from "node:zlib";
 import {authorizeFleet,FleetError,guardOrigin,uuid} from "@/lib/fleet-session";
 import {parseFile} from "@/lib/factory-slicer.mjs";
 
-export const runtime="nodejs";
 const headers={"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"};
 const fail=(e:unknown)=>{if(e instanceof FleetError)return NextResponse.json({error:e.message,code:e.code},{status:e.status,headers});const code=(e as {code?:string})?.code;if(["22023","22P02","23502"].includes(code||""))return NextResponse.json({error:"Arquivo ou dados inválidos."},{status:422,headers});if(["23514","23505","23503"].includes(code||""))return NextResponse.json({error:"Revisão duplicada, limite de armazenamento ou conflito."},{status:409,headers});console.error("[FactoryFiles]",e instanceof Error?e.name:"Unknown");return NextResponse.json({error:"Biblioteca indisponível."},{status:503,headers});};
 export async function GET(req:NextRequest){

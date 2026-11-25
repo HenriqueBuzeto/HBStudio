@@ -12,6 +12,7 @@ type Document={
  organization:{name:string;legalName:string;branch:string;cnpj:string|null;address:string};
  customer:string;items:Array<{sku?:string;description:string;quantity:number;unitPrice:number;discount:number;category?:string}>;
  totals:{subtotal:number;discount:number;shipping:number;total:number};
+ sale?:{state:"REGISTERED"|"DELIVERED"|"CANCELLED";operator:string;orderNumber:string|null;tendered:number;change:number;cancellation:{at:string;by:string;reason:string}|null};
  training?:{status:string;operator:string;seller:string;paymentMethod:string;installments:number;cancellation:{at:string;by:string;reason:string;eventId:string|null}|null};
  validUntil?:string;paymentTerms?:string|null;notes?:string|null;disclaimer:string;
  detail?:{equipment:string;defect:string;condition:string|null;diagnostic:string|null;
@@ -91,15 +92,16 @@ export default function DocumentPrintPage(){
  const isContract=kind==="contract";
  const effectivePaper=isContract?"A4":paper;
  const training=document?.training;
- const cancelled=training?.status==="VOIDED";
+ const sale=document?.sale;
+ const cancelled=training?.status==="VOIDED"||sale?.state==="CANCELLED";
  const statusLabel=training?.status==="VOIDED"?"CANCELADA":training?.status==="SIMULATED"?"SIMULAÇÃO REGISTRADA":"STATUS NÃO CONFIRMADO";
  const title=kind==="sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"COMPROVANTE DE VENDA INTERNA"):kind==="training-sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"VENDA SIMULADA — TREINAMENTO"):kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
  const shareText=document?
   [title+` ${document.number}`,`Cliente: ${document.customer}`,
     training?`Situação: ${statusLabel}`:"",
     `${cancelled?"Valor original":"Total informado"}: ${money(document.totals.total)}`,
-    training?.cancellation?`Cancelamento: ${date(training.cancellation.at)}`:"",
-    training?"Sem pagamento real. Documento de treinamento.":"",
+    training?.cancellation?`Cancelamento: ${date(training.cancellation.at)}`:sale?.cancellation?`Cancelamento: ${date(sale.cancellation.at)}`:"",
+    training?"Sem pagamento real. Documento de treinamento.":sale?"Comprovante interno de homologação. Não válido para operações comerciais.":"",
     kind==="quote"&&document.validUntil?`Validade: ${date(document.validUntil)}`:"",
     "Documento interno. Não é nota ou cupom fiscal. O PDF pode ser anexado manualmente, após salvar pelo navegador."
    ].filter(Boolean).join("\n"):"";
