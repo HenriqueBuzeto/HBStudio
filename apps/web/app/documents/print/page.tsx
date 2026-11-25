@@ -12,12 +12,14 @@ type Document={
  organization:{name:string;legalName:string;branch:string;cnpj:string|null;address:string};
  customer:string;items:Array<{sku?:string;description:string;quantity:number;unitPrice:number;discount:number;category?:string}>;
  totals:{subtotal:number;discount:number;shipping:number;total:number};
+ training?:{status:string;operator:string;seller:string;paymentMethod:string;installments:number;cancellation:{at:string;by:string;reason:string;eventId:string|null}|null};
  validUntil?:string;paymentTerms?:string|null;notes?:string|null;disclaimer:string;
  detail?:{equipment:string;defect:string;condition:string|null;diagnostic:string|null;
  resolution:string|null;legalWarrantyDays:number;additionalWarrantyDays:number};
 };
 const money=(value:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(value);
 const date=(value:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"}).format(new Date(value));
+const paymentLabel=(method:string)=>({CASH:"Dinheiro",PIX:"Pix",CREDIT:"Cartão de crédito",DEBIT:"Cartão de débito"} as Record<string,string>)[method]||"Não informado";
 const quantity=(v:number)=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:3}).format(v);
 const paperOptions:{code:Paper;name:string}[]=[
  {code:"80",name:"Bobina 80 mm"},{code:"58",name:"Bobina 58 mm"},{code:"A4",name:"Folha A4"}
@@ -88,10 +90,16 @@ export default function DocumentPrintPage(){
 
  const isContract=kind==="contract";
  const effectivePaper=isContract?"A4":paper;
- const title=kind==="training-sale"?"VENDA SIMULADA — TREINAMENTO":kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
+ const training=document?.training;
+ const cancelled=training?.status==="VOIDED";
+ const statusLabel=training?.status==="VOIDED"?"CANCELADA":training?.status==="SIMULATED"?"SIMULAÇÃO REGISTRADA":"STATUS NÃO CONFIRMADO";
+ const title=kind==="training-sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"VENDA SIMULADA — TREINAMENTO"):kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
  const shareText=document?
   [title+` ${document.number}`,`Cliente: ${document.customer}`,
-    `Total informado: ${money(document.totals.total)}`,
+    training?`Situação: ${statusLabel}`:"",
+    `${cancelled?"Valor original simulado":"Total informado"}: ${money(document.totals.total)}`,
+    training?.cancellation?`Cancelamento: ${date(training.cancellation.at)}`:"",
+    training?"Sem pagamento real. Documento de treinamento.":"",
     kind==="quote"&&document.validUntil?`Validade: ${date(document.validUntil)}`:"",
     "Documento interno. Não é nota ou cupom fiscal. O PDF pode ser anexado manualmente, após salvar pelo navegador."
    ].filter(Boolean).join("\n"):"";
@@ -166,7 +174,7 @@ export default function DocumentPrintPage(){
     </div>
     <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{boxSizing:"border-box",width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"break-word",wordBreak:"normal"}}>
      <div className="border-b-2 border-slate-900 pb-3 text-center">
-      <h2 className="font-black uppercase">{document.organization.name}</h2>
+      <h2 className="font-black uppercase text-[1.25em]">{document.organization.name||"Empresa não identificada"}</h2>
       {document.organization.cnpj&&<p>CNPJ: {formatCnpj(document.organization.cnpj)}</p>}
       {document.organization.legalName!==document.organization.name&&<p>{document.organization.legalName}</p>}
       <p>{document.organization.branch}</p>
@@ -175,12 +183,15 @@ export default function DocumentPrintPage(){
      <div className="mt-4 border-b border-dashed border-slate-600 pb-3 text-center">
       <h3 className="font-black">{title}</h3>
       <p>Nº {document.number}</p>
-      <p>{date(document.issuedAt)}</p>
+      <p>Registro: {date(document.issuedAt)}</p>
+      {training&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center text-[1.2em]">{statusLabel}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}
      </div>
      <div className="my-3 space-y-1"><p><strong>Cliente:</strong> {document.customer}</p>
+      {training&&<><p><strong>Operador:</strong> {training.operator||"Não informado"}</p><p><strong>Vendedor:</strong> {training.seller||"Não informado"}</p></>}
       {document.validUntil&&<p><strong>Válido até:</strong> {date(document.validUntil)}</p>}
       {document.paymentTerms&&<p><strong>Condição prevista:</strong> {document.paymentTerms}</p>}
      </div>
+     {training?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(training.cancellation.at)}</p><p><strong>Responsável:</strong> {training.cancellation.by||"Não informado"}</p><p><strong>Motivo:</strong> {training.cancellation.reason||"Não informado"}</p>{training.cancellation.eventId&&<p className="text-[0.85em]"><strong>Registro de auditoria interno:</strong> {training.cancellation.eventId}</p>}</section>}
      {document.detail&&<div className="my-3 border-t border-dashed border-slate-500 pt-2">
       <p><strong>Aparelho:</strong> {document.detail.equipment}</p>
       <p><strong>Defeito relatado:</strong> {document.detail.defect}</p>
@@ -202,8 +213,9 @@ export default function DocumentPrintPage(){
       <div className="hb-receipt-row"><span>Subtotal</span><span>{money(document.totals.subtotal)}</span></div>
       {document.totals.discount>0&&<div className="hb-receipt-row"><span>Desconto</span><span>− {money(document.totals.discount)}</span></div>}
       {document.totals.shipping>0&&<div className="hb-receipt-row"><span>Frete</span><span>{money(document.totals.shipping)}</span></div>}
-      <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>TOTAL</span><span>{money(document.totals.total)}</span></div>
+      <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>{cancelled?"TOTAL ORIGINAL":"TOTAL"}</span><span>{money(document.totals.total)}</span></div>
      </div>
+     {training&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO SIMULADO{cancelled?" — CANCELADO":""}</h4><p><strong>Forma:</strong> {paymentLabel(training.paymentMethod)}</p><p><strong>Parcelas:</strong> {training.installments}x</p><div className="hb-receipt-row"><span>Recebimento real</span><strong>{money(0)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno real</span><strong>{money(0)}</strong></div>}<p className="text-[0.85em]">Autorização fiscal e bancária: não aplicável à simulação.</p></section>}
      {document.notes&&<p className="mt-4"><strong>{kind==="training-sale"?"Condição simulada:":"Observações:"}</strong> {document.notes}</p>}
      {isContract&&<div className="mt-8 space-y-5 text-sm">
       <p>Este termo acompanha a ordem de serviço identificada e descreve os itens orçados e a condição informada no atendimento. Não substitui termos comerciais específicos nem constitui aceite automático.</p>
