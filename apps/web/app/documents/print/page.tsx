@@ -8,7 +8,7 @@ import {Printer,FileDown,MessageCircle,RefreshCw,AlertTriangle,FileText,ShieldAl
 
 type Paper="58"|"80"|"A4";
 type Document={
- kind:"quote"|"training"|"training-sale"|"service"|"contract";documentType:string;number:string;issuedAt:string;
+ kind:"quote"|"training"|"training-sale"|"service"|"contract"|"sale";documentType:string;number:string;issuedAt:string;
  organization:{name:string;legalName:string;branch:string;cnpj:string|null;address:string};
  customer:string;items:Array<{sku?:string;description:string;quantity:number;unitPrice:number;discount:number;category?:string}>;
  totals:{subtotal:number;discount:number;shipping:number;total:number};
@@ -41,7 +41,7 @@ export default function DocumentPrintPage(){
   const defaultPaper=getBrowserPrintSettings().paper;
   const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:defaultPaper;
   setPaper(docKind==="contract"?"A4":selected);
-  if(!["quote","training","training-sale","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
+  if(!["quote","training","training-sale","service","contract","sale"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
    setError("Documento ou identificador inválido.");setLoading(false);return;
   }
   const controller=new AbortController();
@@ -62,7 +62,7 @@ export default function DocumentPrintPage(){
   if(params.get("auto")!=="1")return;
   const prefs=getBrowserPrintSettings();
   const authorizedPreference=
-    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService)||(kind==="training-sale"&&prefs.autoPrintSale);
+    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService)||((kind==="training-sale"||kind==="sale")&&prefs.autoPrintSale);
   if(!authorizedPreference)return;
   attemptedAutoPrint.current=true;
   const onceKey=`hbstudio:autoprint:v1:${kind}:${id}`;
@@ -93,11 +93,11 @@ export default function DocumentPrintPage(){
  const training=document?.training;
  const cancelled=training?.status==="VOIDED";
  const statusLabel=training?.status==="VOIDED"?"CANCELADA":training?.status==="SIMULATED"?"SIMULAÇÃO REGISTRADA":"STATUS NÃO CONFIRMADO";
- const title=kind==="training-sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"VENDA SIMULADA — TREINAMENTO"):kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
+ const title=kind==="sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"COMPROVANTE DE VENDA INTERNA"):kind==="training-sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"VENDA SIMULADA — TREINAMENTO"):kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
  const shareText=document?
   [title+` ${document.number}`,`Cliente: ${document.customer}`,
     training?`Situação: ${statusLabel}`:"",
-    `${cancelled?"Valor original simulado":"Total informado"}: ${money(document.totals.total)}`,
+    `${cancelled?"Valor original":"Total informado"}: ${money(document.totals.total)}`,
     training?.cancellation?`Cancelamento: ${date(training.cancellation.at)}`:"",
     training?"Sem pagamento real. Documento de treinamento.":"",
     kind==="quote"&&document.validUntil?`Validade: ${date(document.validUntil)}`:"",
@@ -184,14 +184,14 @@ export default function DocumentPrintPage(){
       <h3 className="font-black">{title}</h3>
       <p>Nº {document.number}</p>
       <p>Registro: {date(document.issuedAt)}</p>
-      {training&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center text-[1.2em]">{statusLabel}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}
+      {sale&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center">{sale.state==="CANCELLED"?"CANCELADA":sale.state==="DELIVERED"?"ENTREGUE":"VENDA REGISTRADA"}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}{training&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center text-[1.2em]">{statusLabel}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}
      </div>
      <div className="my-3 space-y-1"><p><strong>Cliente:</strong> {document.customer}</p>
-      {training&&<><p><strong>Operador:</strong> {training.operator||"Não informado"}</p><p><strong>Vendedor:</strong> {training.seller||"Não informado"}</p></>}
+      {sale&&<><p><strong>Operador:</strong> {sale.operator}</p>{sale.orderNumber&&<p><strong>OS:</strong> {sale.orderNumber}</p>}</>}{training&&<><p><strong>Operador:</strong> {training.operator||"Não informado"}</p><p><strong>Vendedor:</strong> {training.seller||"Não informado"}</p></>}
       {document.validUntil&&<p><strong>Válido até:</strong> {date(document.validUntil)}</p>}
       {document.paymentTerms&&<p><strong>Condição prevista:</strong> {document.paymentTerms}</p>}
      </div>
-     {training?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(training.cancellation.at)}</p><p><strong>Responsável:</strong> {training.cancellation.by||"Não informado"}</p><p><strong>Motivo:</strong> {training.cancellation.reason||"Não informado"}</p>{training.cancellation.eventId&&<p className="text-[0.85em]"><strong>Registro de auditoria interno:</strong> {training.cancellation.eventId}</p>}</section>}
+     {sale?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(sale.cancellation.at)}</p><p><strong>Responsável:</strong> {sale.cancellation.by}</p><p><strong>Motivo:</strong> {sale.cancellation.reason}</p></section>}{training?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(training.cancellation.at)}</p><p><strong>Responsável:</strong> {training.cancellation.by||"Não informado"}</p><p><strong>Motivo:</strong> {training.cancellation.reason||"Não informado"}</p>{training.cancellation.eventId&&<p className="text-[0.85em]"><strong>Registro de auditoria interno:</strong> {training.cancellation.eventId}</p>}</section>}
      {document.detail&&<div className="my-3 border-t border-dashed border-slate-500 pt-2">
       <p><strong>Aparelho:</strong> {document.detail.equipment}</p>
       <p><strong>Defeito relatado:</strong> {document.detail.defect}</p>
@@ -215,7 +215,7 @@ export default function DocumentPrintPage(){
       {document.totals.shipping>0&&<div className="hb-receipt-row"><span>Frete</span><span>{money(document.totals.shipping)}</span></div>}
       <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>{cancelled?"TOTAL ORIGINAL":"TOTAL"}</span><span>{money(document.totals.total)}</span></div>
      </div>
-     {training&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO SIMULADO{cancelled?" — CANCELADO":""}</h4><p><strong>Forma:</strong> {paymentLabel(training.paymentMethod)}</p><p><strong>Parcelas:</strong> {training.installments}x</p><div className="hb-receipt-row"><span>Recebimento real</span><strong>{money(0)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno real</span><strong>{money(0)}</strong></div>}<p className="text-[0.85em]">Autorização fiscal e bancária: não aplicável à simulação.</p></section>}
+     {sale&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO — DINHEIRO</h4><div className="hb-receipt-row"><span>Valor recebido</span><strong>{money(sale.tendered)}</strong></div><div className="hb-receipt-row"><span>Troco</span><strong>{money(sale.change)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno registrado</span><strong>{money(document.totals.total)}</strong></div>}</section>}{training&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO SIMULADO{cancelled?" — CANCELADO":""}</h4><p><strong>Forma:</strong> {paymentLabel(training.paymentMethod)}</p><p><strong>Parcelas:</strong> {training.installments}x</p><div className="hb-receipt-row"><span>Recebimento real</span><strong>{money(0)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno real</span><strong>{money(0)}</strong></div>}<p className="text-[0.85em]">Autorização fiscal e bancária: não aplicável à simulação.</p></section>}
      {document.notes&&<p className="mt-4"><strong>{kind==="training-sale"?"Condição simulada:":"Observações:"}</strong> {document.notes}</p>}
      {isContract&&<div className="mt-8 space-y-5 text-sm">
       <p>Este termo acompanha a ordem de serviço identificada e descreve os itens orçados e a condição informada no atendimento. Não substitui termos comerciais específicos nem constitui aceite automático.</p>

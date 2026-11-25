@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { authorizeFleet, FleetError, guardOrigin } from "@/lib/fleet-session";
+import { authorizeFleet, FleetError, guardOrigin, uuid } from "@/lib/fleet-session";
 
 function errorResponse(err:unknown,cid:string){
  if(err instanceof FleetError)return NextResponse.json({code:err.code,error:err.message},{status:err.status,headers:{"X-Correlation-Id":cid}});
@@ -49,6 +49,22 @@ export async function POST(request:NextRequest){
   guardOrigin(request);
   const ctx=await authorizeFleet(request,"sales.create");
   if(!ctx.permissions.has("sales.pos.use"))throw new FleetError(403,"FORBIDDEN","Permissão de PDV necessária.");
+  const raw=await request.text();if(raw.length>100000)throw new FleetError(413,"SIZE_LIMIT","Solicitação muito extensa.");
+  let body:any;try{body=JSON.parse(raw);}catch{throw new FleetError(422,"INVALID_BODY","Dados inválidos.");}
+  if(body&&body.mode==="INTERNAL_QA_CASH"){
+   const key=uuid(body.requestId,"Operação");
+   if(!body.data||typeof body.data!=="object"||Array.isArray(body.data))throw new FleetError(422,"INVALID_BODY","Dados inválidos.");
+   try{
+    const [row]=await ctx.db.query("SELECT public.internal_checkout_cash_v5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb) result",[ctx.tenantId,ctx.branchId,ctx.userId,key,JSON.stringify(body.data)]);
+    return NextResponse.json({result:row.result},{headers:{"X-Correlation-Id":cid,"Cache-Control":"no-store"}});
+   }catch(e){
+    const code=(e as {code?:string})?.code;
+    if(code==="42501")throw new FleetError(403,"CHECKOUT_QA_ONLY","Operação restrita à homologação interna.");
+    if(["22023","22P02","22003"].includes(code||""))throw new FleetError(422,"INVALID_CHECKOUT","Revise os dados e confirme o recebimento.");
+    if(["23514","23505","23503","40001","40P01"].includes(code||""))throw new FleetError(409,"CHECKOUT_CONFLICT","Confira turno, preço, estoque e configuração financeira antes de repetir.");
+    throw e;
+   }
+  }
   return NextResponse.json({
    code:"CHECKOUT_NOT_HOMOLOGATED",
    error:"A finalização ainda requer integração transacional de estoque, caixa e confirmação de pagamentos. Nenhuma venda, baixa ou NFC-e foi gerada. Você pode salvar um orçamento real.",

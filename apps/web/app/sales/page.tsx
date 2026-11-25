@@ -2,6 +2,7 @@
 
 import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import InternalCheckoutPanel from "./InternalCheckoutPanel";
 import {useAuth} from "@/lib/auth";
 import {distributeInstallments} from "@/lib/pos-installments";
 import {formatCpfCnpj} from "@/lib/br-format";
@@ -61,6 +62,7 @@ export default function SalesPage(){
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
  const [trainingSales,setTrainingSales]=useState<TrainingSale[]>([]),[trainingMode,setTrainingMode]=useState(false);
  const [trainingLastUrl,setTrainingLastUrl]=useState("");
+ const [qaCheckout,setQaCheckout]=useState(false);
  const trainingRequestKey=useRef<string|null>(null);
  const [readiness,setReadiness]=useState<Readiness|null>(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -116,13 +118,13 @@ export default function SalesPage(){
  },[checkingDocumentMode,documentMode,customerId,fiscalRequested]);
  useEffect(()=>{
   const handler=(event:KeyboardEvent)=>{
-   if(event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
+   if(!qaCheckout&&event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
     event.preventDefault();setTrainingMode(v=>!v);setError("");
    }
   };
   window.addEventListener("keydown",handler);
   return ()=>window.removeEventListener("keydown",handler);
- },[]);
+ },[qaCheckout]);
 
  useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
   const customer=aux.customers.find(x=>x.id===customerId);
@@ -262,7 +264,7 @@ export default function SalesPage(){
     <button className={tab==="pos"?primary:button} onClick={()=>setTab("pos")}><ShoppingCart className="h-4 w-4"/> Frente de caixa</button>
     <button className={tab==="quotes"?primary:button} onClick={()=>setTab("quotes")}><FileText className="h-4 w-4"/> Orçamentos ({quotes.length})</button>
     <button className={tab==="history"?primary:button} onClick={()=>setTab("history")}><Receipt className="h-4 w-4"/> Vendas ({history.length})</button>
-     <button className={tab==="training"?primary:button} onClick={()=>setTab("training")}><ClipboardList className="h-4 w-4"/> Simulações ({trainingSales.length})</button>
+     <button className={tab==="training"?primary:button} onClick={()=>setTab("training")}><ClipboardList className="h-4 w-4"/> Histórico de treinamento ({trainingSales.length})</button>
    </div>
   </header>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
@@ -272,7 +274,7 @@ export default function SalesPage(){
   </div>}
   {!authLoading&&!permitted?<div className="rounded-xl bg-white p-12 text-center text-sm text-slate-500">Acesso negado. Permissão <strong>sales.pos.use</strong> necessária.</div>
   :loading?<div className="rounded-xl bg-white p-16 text-center text-sm text-slate-500"><RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin"/>Consultando o Neon...</div>
-  :tab==="pos"?<div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+  :tab==="pos"?<div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12"><div className="lg:col-span-12"><InternalCheckoutPanel onAvailability={setQaCheckout} onChange={()=>{void api<{sales:Sale[]}>("/api/sales").then(x=>setHistory(x.sales)).catch(()=>{});}}/></div>
    <div className="space-y-4 lg:col-span-7">
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-xs font-black text-slate-900"><ScanBarcode className="h-4 w-4 text-violet-600"/> Buscar produto, SKU ou código de barras</h2><span className={pill}>{aux.products.length} SKUs reais</span></div>
@@ -341,7 +343,7 @@ export default function SalesPage(){
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
      <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
-     <div className={"rounded-xl border-2 p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+     {!qaCheckout&&<>     <div className={"rounded-xl border-2 p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
        <strong>{trainingMode?"TREINAMENTO ATIVO — NÃO É VENDA REAL":"TREINAMENTO DESATIVADO"}</strong>
        <button type="button" onClick={()=>setTrainingMode(v=>!v)}
@@ -351,6 +353,7 @@ export default function SalesPage(){
        "Simulação para qualquer cliente e operador com acesso ao PDV. Não movimenta estoque, caixa, receita, contabilidade ou SEFAZ.":
        "Para operações reais, continuam necessárias liquidação homologada e regras fiscais aplicáveis."}</p>
      </div>
+</>}
      <div className={"rounded-xl border-2 p-3 text-xs "+(documentMode==="INTERNAL"?"border-red-600 bg-red-50 text-red-900":"border-slate-200 bg-slate-50 text-slate-800")}>
     <div className="flex flex-wrap items-center justify-between gap-2">
      <div className="flex items-center gap-2 font-black"><Receipt className="h-4 w-4"/>{documentMode==="INTERNAL"?"COMPROVANTE INTERNO — NÃO FISCAL":"MODO FISCAL"}</div>
@@ -381,13 +384,13 @@ export default function SalesPage(){
        <p className="mt-3 text-amber-800">{readiness.checkoutBlocker}</p>
        <p className="mt-1 text-slate-600">{readiness.fiscalBlocker}</p>
       </div>}
-      {trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
+      {!qaCheckout&&trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
         disabled={saving||!items.length||!sellerId||totalCents<=0||!isDiscountValid||
          (discountCents>0&&!aux.capabilities.discountOverride)}
         onClick={()=>void saveTraining()}>
         <Receipt className="mr-2 inline h-4 w-4"/>{saving?"Salvando...":"Registrar venda SIMULADA — sem financeiro / fiscal"}
        </button>}
-       {!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
+       {!qaCheckout&&!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
     </section>
    </div>
   </div>

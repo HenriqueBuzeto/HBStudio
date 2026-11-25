@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {deflateRawSync,inflateRawSync} from 'node:zlib';
+import {parseFile,parseGcode,parseSliceInfo,crc32} from '../lib/factory-slicer.mjs';
+const xml="<config><plate><metadata key=\"index\" value=\"1\"/><metadata key=\"prediction\" value=\"3391\"/><metadata key=\"weight\" value=\"35\"/><filament id=\"1\" type=\"PLA\" color=\"#FFFFFF\" used_g=\"20\"/><filament id=\"2\" type=\"PLA\" color=\"#000000\" used_g=\"15\"/></plate><plate><metadata key=\"index\" value=\"2\"/><metadata key=\"prediction\" value=\"60\"/></plate></config>";
+function zip(name,body){const n=Buffer.from(name),raw=Buffer.from(body),z=deflateRawSync(raw),l=Buffer.alloc(30),c=Buffer.alloc(46),e=Buffer.alloc(22);l.writeUInt32LE(0x04034b50);l.writeUInt16LE(8,8);l.writeUInt32LE(crc32(raw),14);l.writeUInt32LE(z.length,18);l.writeUInt32LE(raw.length,22);l.writeUInt16LE(n.length,26);c.writeUInt32LE(0x02014b50);c.writeUInt16LE(8,10);c.writeUInt32LE(crc32(raw),16);c.writeUInt32LE(z.length,20);c.writeUInt32LE(raw.length,24);c.writeUInt16LE(n.length,28);e.writeUInt32LE(0x06054b50);e.writeUInt16LE(1,8);e.writeUInt16LE(1,10);e.writeUInt32LE(c.length+n.length,12);e.writeUInt32LE(l.length+n.length+z.length,16);return Buffer.concat([l,n,z,c,n,e]);}
+const inflate=(x,max)=>inflateRawSync(x,{maxOutputLength:max});
+test('Bambu time and per-slot consumption',()=>{const p=parseGcode('; model printing time: 55m 32s; total estimated time: 56m 31s\n; filament used [g] = 20,15\n; filament_colour = #FFFFFF;#000000\n; total filament used [g] = 35').plates[0];assert.equal(p.seconds,3391);assert.equal(p.preparationSeconds,59);assert.deepEqual(p.filaments.map(x=>x.grams),[20,15]);assert.equal(p.filaments[1].color,'#000000');});
+test('single total is not a color assignment',()=>assert.equal(parseGcode('; total filament used [g] = 14.37').plates[0].filaments.length,0));
+test('divergent totals warn',()=>assert.ok(parseGcode('; filament used [g] = 2,3\n; total filament used [g] = 6').plates[0].warnings.length));
+test('3MF deflated metadata with multiple plates',()=>{const r=parseFile('a.3mf',zip('Metadata/slice_info.config',xml),inflate);assert.equal(r.plates.length,2);assert.equal(r.plates[0].filaments[1].grams,15);assert.equal(r.plates[1].seconds,60);});
+test('no slice metadata is not zero consumption',()=>assert.equal(parseFile('a.3mf',zip('3D/model.model','<model/>'),inflate).plates.length,0));
+test('corruption and oversized XML rejected',()=>{assert.throws(()=>parseFile('a.3mf',Buffer.from('bad'),inflate));assert.throws(()=>parseFile('a.3mf',zip('Metadata/slice_info.config','x'.repeat(262145)),inflate));});
+test('DTD and duplicate slot rejected',()=>{assert.throws(()=>parseSliceInfo('<!DOCTYPE config>'));assert.throws(()=>parseSliceInfo('<config><plate><filament id="1" used_g="1"/><filament id="1" used_g="2"/></plate></config>'));});

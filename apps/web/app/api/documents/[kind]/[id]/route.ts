@@ -65,9 +65,7 @@ export async function GET(request:NextRequest,context:Context){
       disclaimer:"SIMULAÇÃO / TREINAMENTO — NÃO É DOCUMENTO FISCAL, NÃO É COMPROVANTE DE PAGAMENTO. NENHUM ESTOQUE, CAIXA, RECEITA OU FINANCEIRO FOI MOVIMENTADO."},
       {headers:headers(cid)});
   }
-  if(kind==="sale")
-   throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED",
-    "Comprovantes de venda ficam bloqueados até a confirmação transacional e fiscal do checkout. Não é permitido imprimir pagamento ainda não confirmado.");
+
   const [issuer]=await ctx.db.query(
    `SELECT t."Name" AS "tenantName",b."Name" AS "branchName",
       e."CorporateName" AS "corporateName",e."TradeName" AS "tradeName",
@@ -89,6 +87,14 @@ export async function GET(request:NextRequest,context:Context){
    branch:String(issuer.branchName),cnpj:issuer.cnpj||null,
    address:[issuer.street,issuer.streetNumber,issuer.city,issuer.state].filter(Boolean).join(", ")
   };
+  if(kind==="sale"){
+   const [gate]=await ctx.db.query("SELECT public.internal_checkout_qa_enabled_v5() enabled");
+   if(!gate?.enabled)throw new FleetError(409,"SALE_RECEIPT_NOT_HOMOLOGATED","Comprovante comercial indisponível fora da homologação.");
+   const [row]=await ctx.db.query(`SELECT s."SaleNumber" number,s."ConfirmedAtUtc" "issuedAt",s."Status" status,c.state,c.total::float8 total,c.tendered::float8 tendered,c.change_amount::float8 change,p."Name" customer,u."FullName" operator,o."OrderNumber" "orderNumber",c.cancelled_at "cancelledAt",a.payload->>'reason' reason,v."FullName" "cancelledBy" FROM internal_checkout_records_v5 c JOIN sales s ON s."Id"=c.sale_id AND s."TenantId"=c.tenant_id AND s."BranchId"=c.branch_id JOIN users u ON u."Id"=c.actor_id AND u."TenantId"=c.tenant_id LEFT JOIN parties p ON p."Id"=c.customer_id AND p."TenantId"=c.tenant_id LEFT JOIN manufacturing_orders o ON o."Id"=c.order_id AND o."TenantId"=c.tenant_id AND o."BranchId"=c.branch_id LEFT JOIN LATERAL(SELECT x.payload,x.actor_id FROM internal_checkout_actions_v5 x WHERE x.tenant_id=c.tenant_id AND x.branch_id=c.branch_id AND x.sale_id=c.sale_id AND x.action='CANCEL' LIMIT 1) a ON true LEFT JOIN users v ON v."Id"=a.actor_id AND v."TenantId"=c.tenant_id WHERE c.tenant_id=$1::uuid AND c.branch_id=$2::uuid AND c.sale_id=$3::uuid AND s."ConfirmedAtUtc" IS NOT NULL AND ((c.state='CANCELLED' AND s."Status"=6 AND s."PaymentStatus"=7) OR (c.state IN('REGISTERED','DELIVERED') AND s."Status" IN(4,5) AND s."PaymentStatus"=4))`,[ctx.tenantId,ctx.branchId,id]);
+   if(!row)throw new FleetError(404,"DOCUMENT_NOT_FOUND","Venda interna não localizada ou não confirmada.");
+   const items=await ctx.db.query(`SELECT "HistoricalSkuCode" sku,"HistoricalDescription" description,"Quantity"::float8 quantity,"UnitPrice"::float8 "unitPrice","Discount"::float8 discount FROM sale_items WHERE "TenantId"=$1::uuid AND "SaleId"=$2::uuid ORDER BY "CreatedAtUtc","Id"`,[ctx.tenantId,id]);
+   return NextResponse.json({kind,documentType:"INTERNAL_QA_SALE",number:row.number,issuedAt:row.issuedAt,organization,customer:row.customer||"Consumidor não identificado",items,totals:{subtotal:row.total,discount:0,shipping:0,total:row.total},sale:{state:row.state,operator:row.operator,orderNumber:row.orderNumber,tendered:row.tendered,change:row.change,cancellation:row.state==="CANCELLED"?{at:row.cancelledAt,by:row.cancelledBy,reason:row.reason}:null},disclaimer:"COMPROVANTE INTERNO DE HOMOLOGAÇÃO — NÃO É DOCUMENTO FISCAL. NÃO VÁLIDO PARA OPERAÇÕES COMERCIAIS."},{headers:headers(cid)});
+  }
   if(kind==="quote"||kind==="training"){
    const rows=await ctx.db.query(
     `SELECT q."QuoteNumber" AS number,q."CreatedAtUtc" AS "createdAt",

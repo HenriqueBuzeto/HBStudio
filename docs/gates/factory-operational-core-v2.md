@@ -1,0 +1,30 @@
+# Factory 3D operational core — QA / not release-ready
+
+This additive migration reuses canonical Manufacturing3D entities and Inventory balances/reservations/Kardex. It does not create a second stock ledger. PostgreSQL holds the transactions, decimal computations, state validation, idempotency and scoped relations. The API uses existing permission keys and session authorization. The stock receipt and sales engines are separate dependencies. Existing legacy operations remain read-only from the new UI pending reconciliation.
+
+- Filament units: explicitly configure grams per central stock unit (1000 for an SKU stocked in 1kg rolls). Registration maps existing stock, never creates a purchase or duplicate receipt.
+- PostgreSQL stock quantity scale is six decimals after v4. For 1000g/unit the v4 extension supports 0.001g; unrepresentable quantities are rejected rather than rounded.
+- Managed spools initially support 1.75mm FDM filament. Registration snapshots the current central weighted-average stock cost; exact supplier-lot acquisition valuation requires a canonical purchase receipt extension.
+- Successful and failed attempts consume actual grams. The price recorded at order creation is immutable. Material cost and waste are separate; energy and machine rates are taken from the assigned printer at start. No automatic fiscal document, payment, finished-good receipt, accounting journal, or checkout is produced.
+- Legacy .NET service currently reserves one entire SKU unit, has hard-coded power and lacks complete scoped guards. New managed order/attempt/stock guards prevent accidental legacy writes but are not a substitute for adapting the service and EF snapshot. No commercial release until both paths and concurrency are validated.
+- No real telemetry. Slots and print outcome are manually confirmed.
+- Run `db/tests/factory_workflow_v2.sql` on isolated QA only. The test creates a transient tenant, 5 SKUs, 5 rolos and operations, verifies the complete failure/retry/assembly/quality/cancellation flow and rolls back. It is not a manual QA seed.
+- Remaining gates: full TypeScript build, authenticated integration tests, concurrent requests, EF migration and snapshot compatibility, purchase receipt integration, finished-good/WIP accounting, canonical PDV integration, files/BOM/slicer import, permanent QA dataset, deployment targeting QA database.
+
+## Library and purchase traceability extension v3
+
+- Private versioned G-code, 3MF and STL files (2 MiB/file, 50 MiB/tenant initial limit). SHA-256 validated in database. Larger files require private object storage before release.
+- Metadata parser recognizes Bambu/Orca G-code comments and 3MF Metadata/slice_info.config; unknown values remain null. Multi-plate estimates require explicit selection. No machine command is executed. No automatic stock consumption.
+- BOM is immutable per revision; reusable batch plan requires physical spool assignment. Commercial OS link checks project license.
+- Existing approved/posted purchase receipts can be attributed to new physical rolls with receipt item limit, scoped foreign keys, historical cost and no duplicate inventory receipt. Canonical procurement creation/financial posting is not implemented here.
+- Parser fixtures and Node test suite added; HTTP and full build are not yet executed. QA SQL tests for version, BOM and receipt link passed.
+
+## Precision v4
+
+Inventory quantity scale widened from numeric(18,4) to numeric(20,6) on balances, movement, reservation, transfer and count fields. Factory allocations and receipt quantities follow. The six-decimal conversion preserves 0.001g for a 1kg central unit. Canonical EF mapping, migration and snapshot were synchronized for those fields; .NET build and full migration chain remain pending. Managerial lot cost uses the reserved acquisition snapshot; Kardex cost uses the canonical weighted average. Existing v2 test data used matching bases. SQL-owned factory extension tables still need integration review with the EF service. Down migration refuses loss or active factory dependency.
+
+Migration order: existing estimate migration, z01 operational core, z02 library/receipts, z03 precision. The QA-only library seed requires the dedicated QA marker and prior factory-demo-v2 dataset. The sales handoff endpoint lists only completed, unfactured orders scoped to the caller's branch; it explicitly returns checkoutEnabled=false while the canonical checkout remains on hold. No payment, sales, inventory finished-good or journal write is performed by that endpoint.
+
+## QA commercial and procurement extensions v5/v6
+
+The canonical sales tables, payment intents, cash shifts/movements, financial journals and customer profile are written atomically for cash checkout. Scope is explicitly gated by the dedicated Neon QA marker (not created by migrations), canonical permission checks and branch config. Factory OS billed as one manufacturing batch SKU with approved piece count in description; no second raw-material stock issue. Material capitalization is posted at the first billing, not a full WIP accounting solution. Productive material and waste are separated; estimated energy/labor/depreciation remain managerial. Cancellation before delivery requires operator-confirmed cash refund and retained goods, restores ordinary goods and reverses sales journals, preserves consumed factory materials, supports rebilling without duplicate capitalization. Other payment methods, partial payments, mixed factory/goods cart, serialized inventory, returns after delivery, and provider settlement remain disabled. Purchase workflow supports one configured material per order, separate approval, full receipt, weighted-average stock, historical roll cost, AP and balanced journal. No supplier payment is generated. See dedicated QA seed/test SQL. Build, authenticated HTTP, actual concurrent requests, production migration/EF integration and full financial settlement remain gates. Production database is not changed.
