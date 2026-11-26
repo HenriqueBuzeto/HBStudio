@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import CatalogIntakeForm from "@/components/CatalogIntakeForm";
-import PurchaseInsights from "./PurchaseInsights";
+import PurchasePlanningWorkspace from "./PurchasePlanningWorkspace";
 import {useAuth} from "@/lib/auth";
 import {formatCpfCnpj} from "@/lib/br-format";
 import {
@@ -629,7 +629,7 @@ export default function ProcurementPage() {
         </div>
 
         {/* Conteúdo da Aba Ativa */}
-        {activeTab === "suggestions" && <PurchaseInsights showCosts={canViewCost}/>}
+        {activeTab === "suggestions" && <PurchasePlanningWorkspace showCosts={canViewCost}/>}
         {activeTab === "orders" && (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50/50">

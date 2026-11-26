@@ -40,6 +40,8 @@ jobs:
         run: node --experimental-strip-types --test tests/fleet-source.test.mjs
       - name: Purchase insights tests
         run: node --experimental-strip-types --test tests/purchase-insights.test.mjs
+      - name: Purchase planning tests
+        run: node --experimental-strip-types --test tests/purchase-planning.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build
