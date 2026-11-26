@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {REPORTS,canReadReport,buildReportSql,validReportRange} from "../lib/report-definitions.ts";
 import {csvEscape} from "../lib/report-export.ts";
-test("catalog has 49 unique reports and every total references a displayed numeric column",()=>{
- assert.equal(REPORTS.length,49);assert.equal(new Set(REPORTS.map(r=>r.id)).size,49);
+test("catalog has 50 unique reports and every total references a displayed numeric column",()=>{
+ assert.equal(REPORTS.length,50);assert.equal(new Set(REPORTS.map(r=>r.id)).size,50);
  for(const r of REPORTS){assert.ok(r.permissions.length);assert.ok(r.columns.length);assert.equal(new Set(r.columns.map(c=>c.key)).size,r.columns.length);for(const c of r.columns)assert.match(c.key,/^[a-z_]+$/);for(const k of r.totals)assert.ok(r.columns.some(c=>c.key===k&&["qty","money"].includes(c.format)));assert.ok(r.note.length>20);}
 });
 test("report authorization is intersection, not role bypass",()=>{
@@ -36,3 +36,5 @@ test("investment reports preserve company scope and separate real payments from 
  for(const id of ["investment-position","investment-shares","investment-payments","investment-plans"]){const r=REPORTS.find(x=>x.id===id);assert.ok(r.mode.startsWith("company"));assert.equal(canReadReport(r,new Set(["partners.view"])),false);assert.ok(r.sql.includes("s.t"));}
  assert.deepEqual(REPORTS.find(x=>x.id==="investment-plans").totals,[]);
 });
+
+test("sector result is branch-scoped and uses historical responsibility",()=>{const r=REPORTS.find(r=>r.id==="sector-results");assert.equal(canReadReport(r,new Set(["finance.reports.view"])),false);assert.ok(r.sql.includes("x.valid_from<=a"));assert.ok(r.sql.includes("Sem centro de custo"));assert.deepEqual(r.totals,["revenue","expense","result"]);});

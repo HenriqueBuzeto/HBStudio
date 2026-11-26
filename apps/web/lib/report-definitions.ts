@@ -2400,7 +2400,53 @@ export const REPORTS:ReportSpec[]=[
     "order": "\"day\" DESC,name,id,partner_id",
     "sql": "SELECT c.id,l->>'partnerId' partner_id,c.month::text AS \"day\",l->>'name' name,(l->>'baseCents')::numeric/100 base,(l->>'monthlyCents')::numeric/100 monthly,(l->>'amortizeCents')::numeric/100 amortization,(l->>'releaseCents')::numeric/100 released,(l->>'potentialCents')::numeric/100 potential FROM partner_monthly_closings_v10 c CROSS JOIN LATERAL jsonb_array_elements(c.snapshot->'lines') l CROSS JOIN scope s WHERE c.tenant_id=s.t AND c.month>=(s.start_at AT TIME ZONE 'America/Sao_Paulo')::date AND c.month<(s.end_at AT TIME ZONE 'America/Sao_Paulo')::date",
     "totals": []
-  }
+  },
+  {
+  "id": "sector-results",
+  "group": "Financeiro",
+  "title": "Resultado por setor e responsável",
+  "permissions": [
+    "finance.reports.view",
+    "finance.journal.view",
+    "finance.costcenters.manage"
+  ],
+  "mode": "period",
+  "note": "Resultado contábil por centro de custo e responsável vigente na data de competência. Receitas e despesas sem classificação permanecem não atribuídas. Não representa lucro pessoal, nem salários previstos. Somente lançamentos da filial atual.",
+  "columns": [
+    {
+      "key": "sector",
+      "label": "Setor / centro de custo",
+      "format": "text"
+    },
+    {
+      "key": "responsible",
+      "label": "Responsável no período",
+      "format": "text"
+    },
+    {
+      "key": "revenue",
+      "label": "Receitas",
+      "format": "money"
+    },
+    {
+      "key": "expense",
+      "label": "Despesas",
+      "format": "money"
+    },
+    {
+      "key": "result",
+      "label": "Resultado",
+      "format": "money"
+    }
+  ],
+  "order": "result DESC,sector,responsible",
+  "sql": "SELECT coalesce(c.\"Name\",'Sem centro de custo') sector,coalesce(u.\"FullName\",'Sem responsável no período') responsible,sum(CASE WHEN f.\"Type\"=4 THEN CASE l.\"Direction\" WHEN 2 THEN l.\"Amount\" ELSE -l.\"Amount\" END ELSE 0 END) revenue,sum(CASE WHEN f.\"Type\"=5 THEN CASE l.\"Direction\" WHEN 1 THEN l.\"Amount\" ELSE -l.\"Amount\" END ELSE 0 END) expense,sum(CASE l.\"Direction\" WHEN 2 THEN l.\"Amount\" ELSE -l.\"Amount\" END) result FROM financial_journal_entries a JOIN financial_journal_lines l ON l.\"FinancialJournalEntryId\"=a.\"Id\" AND l.\"TenantId\"=a.\"TenantId\" JOIN financial_accounts f ON f.\"Id\"=l.\"FinancialAccountId\" AND f.\"TenantId\"=a.\"TenantId\" LEFT JOIN financial_cost_centers c ON c.\"Id\"=l.\"FinancialCostCenterId\" AND c.\"TenantId\"=a.\"TenantId\" LEFT JOIN LATERAL(SELECT x.user_id FROM sector_responsibilities_v11 x WHERE x.tenant_id=a.\"TenantId\" AND x.center_id=c.\"Id\" AND x.valid_from<=a.\"CompetenceDateUtc\" AND (x.valid_to IS NULL OR a.\"CompetenceDateUtc\"<x.valid_to) ORDER BY x.valid_from DESC LIMIT 1) sr ON true LEFT JOIN users u ON u.\"TenantId\"=a.\"TenantId\" AND u.\"Id\"=sr.user_id CROSS JOIN scope s WHERE a.\"TenantId\"=s.t AND a.\"BranchId\"=s.b AND a.\"CompetenceDateUtc\">=s.start_at AND a.\"CompetenceDateUtc\"<s.end_at AND f.\"Type\" IN(4,5) GROUP BY c.\"Id\",c.\"Name\",u.\"Id\",u.\"FullName\"",
+  "totals": [
+    "revenue",
+    "expense",
+    "result"
+  ]
+}
 ];
 export const REPORT_PERMISSIONS=[...new Set(REPORTS.flatMap(r=>r.permissions))];
 export const SCOPE_SQL=`scope AS (SELECT $1::uuid t,$2::uuid b,($3::date::timestamp AT TIME ZONE 'America/Sao_Paulo') start_at,(($4::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo') end_at)`;
