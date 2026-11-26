@@ -5,6 +5,7 @@ import { readSidebarPosition, saveSidebarPosition, restoreSidebarPosition, sideb
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import NotificationBell from "./NotificationBell";
 import {
   LayoutDashboard,
   Users,
@@ -19,7 +20,6 @@ import {
   X,
   ChevronRight,
   LogOut,
-  Bell,
   Search,
   Sparkles,
   TrendingUp,
@@ -100,6 +100,8 @@ export default function RootShellLayout({
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile,setIsMobile]=useState(false);
+  useEffect(()=>{const media=window.matchMedia("(max-width: 767px)");const update=()=>setIsMobile(media.matches);update();media.addEventListener("change",update);return()=>media.removeEventListener("change",update);},[]);
   const navRef = useRef<HTMLElement>(null);
   const storageKey = user && isAuthenticated ? sidebarStorageKey(user.tenantId, user.id, user.branchId) : null;
   // Pages currently mount their own shell; restore before the new sidebar is painted.
@@ -155,13 +157,14 @@ export default function RootShellLayout({
             <span className="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider">Sistema de Gestão</span>
           </div>
         </div>
+        <div className="flex items-center gap-2">{isMobile&&<NotificationBell mobile/>}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 rounded-lg text-slate-300 hover:bg-[#1e293b]"
           aria-label="Menu"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        </button></div>
       </header>
 
       {/* Sidebar FIXA HB Studio Style */}
@@ -300,14 +303,7 @@ export default function RootShellLayout({
 
           {/* Lado Direito: Notificações, Tema & Perfil com Badge de Cargo */}
           <div className="flex items-center gap-3.5">
-            {/* Botão de Notificação */}
-            <button
-              title="Notificações"
-              className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 relative transition-colors border border-transparent hover:border-slate-200"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-purple-600 absolute top-1.5 right-1.5 ring-2 ring-white" />
-            </button>
+            {!isMobile&&<NotificationBell/>}
 
             <div className="h-6 w-px bg-slate-200"></div>
 

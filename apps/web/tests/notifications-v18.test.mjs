@@ -1,0 +1,6 @@
+import test from "node:test";import assert from "node:assert/strict";import {readFileSync} from "node:fs";
+const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
+const api=read("../app/api/notifications/route.ts"),ui=read("../components/NotificationBell.tsx"),sql=read("../../../db/migrations/20261126_zz_erp_notifications_v18.sql"),shell=read("../components/RootShellLayout.tsx");
+test("notification access uses canonical session and origin protection",()=>{assert.match(api,/authorizeFleet\(req,NOTIFICATION_PERMISSIONS\)/);assert.match(api,/guardOrigin\(req\)/);assert.match(api,/!source.writable/);assert.match(api,/ctx.tenantId,ctx.branchId,ctx.userId/);assert.match(sql,/x\."DefaultBranchId"=b/);assert.match(sql,/rp\."PermissionKey"/);assert.match(sql,/PRIMARY KEY\(tenant_id,branch_id,user_id,notification_key\)/);});
+test("read action only records active authorized notifications",()=>{assert.match(sql,/FROM public.erp_notifications_v18\(t,b,u\) x WHERE x.read_at IS NULL/);assert.match(sql,/ON CONFLICT DO NOTHING/);assert.match(sql,/r.user_id=u/);});
+test("shell and bell use real feed, no permanently lit indicator",()=>{assert.match(shell,/<NotificationBell/);assert.match(ui,/feed.unread>0/);assert.match(ui,/\/api\/notifications/);assert.match(ui,/60000/);assert.match(ui,/ctrl.signal.aborted/);assert.match(ui,/setSnapshot\(null\)/);});
