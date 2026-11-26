@@ -15,7 +15,8 @@ export function analyze(r:Insight,p:Policy){
  else if(r.pending>0){state="hold";reason="Já existe pedido em elaboração ou aguardando aprovação. Revise antes de recomprar.";}
  else if(r.serialized){state=fast||risk?"review":"watch";reason=fast?"Unidade vendida em até sete dias. Avalie recompra por condição, capacidade e custo; não extrapole uma amostra isolada.":"Aparelho serializado: a quantidade exige avaliação da condição e do histórico individual.";}
  else if(!history){state=fast?"review":"insufficient";reason="Histórico insuficiente: mínimo de três vendas distintas em 90 dias e três unidades em 30 dias.";}
- else if(r.profit!==null&&r.profit<0){state="hold";reason="Margem bruta realizada negativa. Revise preço e custo antes da reposição.";}
+ else if(r.profit===null||r.revenue===null||r.revenue<=0){state="review";reason="Rentabilidade não confirmada ou acesso financeiro restrito. Revise custo histórico e preço antes de definir quantidade.";}
+ else if(r.profit<=0){state="hold";reason="Margem bruta realizada não positiva. Revise preço e custo antes da reposição.";}
  else{const target=Math.ceil(demand*(p.lead+p.coverage+p.safety));const reorder=Math.ceil(demand*(p.lead+p.safety));quantity=r.available!+r.incoming<=reorder?Math.max(0,Math.ceil(target-r.available!-r.incoming)):0;state=quantity>0?"buy":"watch";reason=quantity>0?"Estoque disponível e compras aprovadas abaixo do ponto de reposição. Quantidade calculada no cenário informado.":"Posição de estoque e compras aprovadas suficientes no cenário.";}
  return {...r,demand,coverage,margin,fast,risk,quantity,reason,state};
 }
