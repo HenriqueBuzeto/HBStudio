@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import LoyaltyPanel,{useLoyaltySummaries} from "./LoyaltyPanel";
+import {useAuth} from "@/lib/auth";
 import {formatCpfCnpj,formatPhoneBr,formatCep,formatDateBr,onlyDigits,normalizeDocument,normalizePhoneBr,normalizeCep,maskPhoneInput} from "@/lib/br-format";
 import {
   Users,
@@ -156,6 +158,11 @@ export interface Party {
 
 export default function PartiesPage() {
   const [parties, setParties] = useState<Party[]>([]);
+  const {hasPermission}=useAuth();
+  const [loyaltyOpen,setLoyaltyOpen]=useState(false),[loyaltyRefresh,setLoyaltyRefresh]=useState(0);
+  const summaries=useLoyaltySummaries(parties.filter(p=>p.isCustomer).map(p=>p.id),loyaltyRefresh);
+  const loyaltyById=new Map(summaries.map(s=>[s.id,s]));
+  const changedLoyalty=()=>setLoyaltyRefresh(v=>v+1);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -401,7 +408,7 @@ export default function PartiesPage() {
   const filteredParties = parties.filter((p) => {
     if (filterType === "customers" && !p.isCustomer) return false;
     if (filterType === "suppliers" && !p.isSupplier) return false;
-    if (selectedTierFilter !== "all" && p.gamification?.tier !== selectedTierFilter) return false;
+    if (selectedTierFilter !== "all" && loyaltyById.get(p.id)?.tier !== selectedTierFilter) return false;
 
     if (!search.trim()) return true;
     const term = search.toLowerCase();
@@ -471,18 +478,19 @@ export default function PartiesPage() {
                 Gestão 360º de Clientes & Pessoas
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Fidelidade em homologação
+                Clube de fidelidade
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
               Clientes & Fornecedores Enterprise
             </h1>
             <p className="text-xs text-slate-500">
-              Cadastro de clientes e fornecedores com vínculos reais. Pontos, histórico de vendas e resgates aguardam integração completa com o módulo de fidelidade.
+              Cadastro de clientes e fornecedores, pontos de vendas pagas e recompensas vinculados ao Neon.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            {hasPermission("loyalty.view")&&hasPermission("customers.view")&&<button type="button" onClick={()=>setLoyaltyOpen(v=>!v)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-violet-700"><Gift className="w-4 h-4"/> {loyaltyOpen?"Fechar clube":"Clube de fidelidade"}</button>}
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/25"
@@ -493,6 +501,7 @@ export default function PartiesPage() {
           </div>
         </div>
 
+        {loyaltyOpen&&<LoyaltyPanel onChanged={changedLoyalty}/>}
         {/* Barra de Filtros, Categorias e Busca Rápida */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -663,23 +672,7 @@ export default function PartiesPage() {
 
                         {/* Gamificação & Pontos por CPF */}
                         <td className="py-3.5 px-4">
-                          {party.gamification ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${getTierColor(party.gamification.tier || "Bronze")}`}>
-                                  Clube {party.gamification.tier || "Bronze"}
-                                </span>
-                                <span className="text-xs font-extrabold text-purple-700 font-mono">
-                                  {party.gamification.pointsBalance ?? 0} pts
-                                </span>
-                              </div>
-                              <span className="text-[10px] text-slate-400">
-                                Cashback: R$ {(party.gamification.cashbackAvailable || 0).toFixed(2)}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Fidelidade não ativada</span>
-                          )}
+                          {loyaltyById.has(party.id)?<div className="space-y-1"><span className="text-xs font-extrabold text-violet-700">{loyaltyById.get(party.id)!.balance.toLocaleString("pt-BR")} pts</span><p className="text-[10px] text-slate-500">{loyaltyById.get(party.id)!.tier??"Nível não configurado"}</p></div>:<span className="text-xs text-slate-400">{party.isCustomer?"Não confirmado":"Não aplicável"}</span>}
                         </td>
 
                         {/* Aparelhos */}
@@ -791,9 +784,7 @@ export default function PartiesPage() {
                       <h2 className="text-xl font-black text-slate-900 tracking-tight">
                         {fullScreenParty.name}
                       </h2>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getTierColor(fullScreenParty.gamification?.tier || "Bronze")}`}>
-                        Clube {fullScreenParty.gamification?.tier || "Bronze (Pendente)"}
-                      </span>
+                      {loyaltyById.get(fullScreenParty.id)?.tier&&<span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-700">Clube {loyaltyById.get(fullScreenParty.id)?.tier}</span>}
                       <button
                         type="button"
                         onClick={async () => {
@@ -873,10 +864,10 @@ export default function PartiesPage() {
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-purple-700 font-mono">
-                    {fullScreenParty.gamification ? `${fullScreenParty.gamification.pointsBalance ?? 0} pts` : "Não ativado"}
+                    {loyaltyById.has(fullScreenParty.id)?loyaltyById.get(fullScreenParty.id)!.balance.toLocaleString("pt-BR")+" pts":"—"}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Acumulados em compras pelo CPF
+                    Compras pagas vinculadas ao cliente
                   </div>
                 </div>
 
@@ -888,10 +879,10 @@ export default function PartiesPage() {
                   <div className="text-xl font-black text-emerald-600 font-mono">
                     {fullScreenParty.gamification && fullScreenParty.gamification.cashbackAvailable !== undefined
                       ? `R$ ${fullScreenParty.gamification.cashbackAvailable.toFixed(2)}`
-                      : "R$ 0,00"}
+                      : "—"}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    Abatimento direto no PDV
+                    Não habilitado no checkout
                   </div>
                 </div>
 
@@ -903,10 +894,10 @@ export default function PartiesPage() {
                   <div className="text-xl font-black text-slate-900 font-mono">
                     {fullScreenParty.gamification && fullScreenParty.gamification.lifetimeValue !== undefined
                       ? `R$ ${fullScreenParty.gamification.lifetimeValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                      : "R$ 0,00"}
+                      : "—"}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    {fullScreenParty.gamification?.ordersCount ?? 0} pedidos faturados
+                    {fullScreenParty.gamification?.ordersCount ?? "—"} pedidos faturados
                   </div>
                 </div>
 
@@ -916,7 +907,7 @@ export default function PartiesPage() {
                     <Wrench className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-slate-900 font-mono">
-                    {fullScreenParty.gamification?.repairsCount ?? 0} Reparos
+                    {fullScreenParty.gamification?.repairsCount ?? "—"} Reparos
                   </div>
                   <div className="text-[10px] text-slate-400">
                     Assistência técnica concluída
@@ -957,10 +948,7 @@ export default function PartiesPage() {
                     }`}
                 >
                   <Gift className="w-4 h-4 text-amber-500" />
-                  Módulo Gamificação & Resgate de Brindes
-                  <span className="px-2 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800 font-extrabold">
-                    Integração pendente
-                  </span>
+                  Fidelidade & Recompensas
                 </button>
                 <button
                   onClick={() => setActiveTab("history")}
@@ -1151,25 +1139,9 @@ export default function PartiesPage() {
                 {/* ========================================================= */}
                 {/* ABA 2: MÓDULO GAMIFICAÇÃO & RESGATE DE BRINDES            */}
                 {/* ========================================================= */}
-                {activeTab === "gamification" && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-                    <div className="flex items-center gap-3 text-amber-900">
-                      <Gift className="h-5 w-5" />
-                      <h3 className="text-sm font-extrabold">Fidelidade e recompensas em homologação</h3>
-                    </div>
-                    <p className="mt-3 text-xs leading-relaxed text-amber-900">
-                      Esta ficha ainda não está conectada ao extrato real de pontos, à política de cashback
-                      e ao catálogo de recompensas do Neon. Para proteger os dados do cliente, não são
-                      exibidos saldos, níveis, brindes ou resgates simulados.
-                    </p>
-                    <p className="mt-2 text-xs text-amber-800">
-                      A integração será habilitada somente após a conciliação do esquema de fidelidade,
-                      a validação do PDV e os testes de créditos, estornos e resgates.
-                    </p>
-                  </div>
-                )}
+                {activeTab === "gamification" && (fullScreenParty.isCustomer?<LoyaltyPanel key={fullScreenParty.id} partyId={fullScreenParty.id} onChanged={changedLoyalty}/>:<div className="rounded-xl border border-slate-200 bg-white p-5 text-xs text-slate-500">Fidelidade disponível apenas para clientes cadastrados.</div>)}
 
-                                {/* ========================================================= */}
+                {/* ========================================================= */}
                 {/* ABA 3: HISTÓRICO DE VENDAS & OS                           */}
                 {/* ========================================================= */}
                 {activeTab === "history" && (
