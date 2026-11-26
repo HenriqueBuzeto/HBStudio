@@ -5,6 +5,7 @@ import RootShellLayout from "@/components/RootShellLayout";
 import CatalogIntakeForm from "@/components/CatalogIntakeForm";
 import WarehouseCreateForm from "@/components/WarehouseCreateForm";
 import {useAuth} from "@/lib/auth";
+import {formatStockQuantity,formatStockCost,summarizeStock,type StockUnitMetadata} from "@/lib/inventory-units";
 import { 
   Package, 
   Search, 
@@ -19,7 +20,7 @@ import {
   AlertCircle
 } from "lucide-react";
 
-export interface StockBalance {
+export interface StockBalance extends StockUnitMetadata {
   id: string;
   branchId: string;
   warehouseId: string;
@@ -38,7 +39,7 @@ export interface StockBalance {
   version: number;
 }
 
-export interface StockMovement {
+export interface StockMovement extends StockUnitMetadata {
   id: string;
   branchId: string;
   warehouseId: string;
@@ -200,9 +201,9 @@ export default function InventoryPage() {
     }
   };
 
-  const totalOnHand = balances.reduce((acc, curr) => acc + (curr.onHandQuantity || 0), 0);
-  const totalReserved = balances.reduce((acc, curr) => acc + (curr.reservedQuantity || 0), 0);
-  const totalAvailable = balances.reduce((acc, curr) => acc + (curr.availableQuantity || 0), 0);
+  const totalOnHand = summarizeStock(balances,row=>row.onHandQuantity);
+  const totalReserved = summarizeStock(balances,row=>row.reservedQuantity);
+  const totalAvailable = summarizeStock(balances,row=>row.availableQuantity);
   const totalValuation = balances.reduce((acc, curr) => acc + (curr.totalValuedAmount || 0), 0);
 
   const filteredBalances = balances.filter(b => {
@@ -311,14 +312,15 @@ export default function InventoryPage() {
             </span>
           </div>
 
+          <p className="mb-3 text-[11px] text-slate-500">Filamentos em gramas; peças e insumos unitários em unidades. Os totais são separados por medida.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-slate-900"></div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Saldo Físico (On Hand)
+                Saldo físico
               </span>
-              <div className="text-lg font-extrabold text-slate-900">{totalOnHand} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Presente fisicamente na loja</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-slate-900">{totalOnHand.length?totalOnHand.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Quantidades por unidade de medida</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -326,17 +328,17 @@ export default function InventoryPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Reservado para Pedidos
               </span>
-              <div className="text-lg font-extrabold text-amber-700">{totalReserved} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Aguardando faturamento no PDV</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-amber-700">{totalReserved.length?totalReserved.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Reservas de venda e produção</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Disponível para Venda
+                Disponível em estoque
               </span>
-              <div className="text-lg font-extrabold text-emerald-700">{totalAvailable} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Livre para novas vendas</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-emerald-700">{totalAvailable.length?totalAvailable.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Livre para uso ou venda conforme o tipo</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -436,15 +438,13 @@ export default function InventoryPage() {
                       <td className="py-3 px-4">
                         <span className="font-semibold text-slate-700">{item.warehouseName}</span>
                       </td>
-                      <td className="py-3 px-4 font-extrabold text-slate-900">{item.onHandQuantity} un</td>
-                      <td className="py-3 px-4 font-bold text-amber-700">{item.reservedQuantity} un</td>
-                      <td className="py-3 px-4 font-extrabold text-emerald-700">{item.availableQuantity} un</td>
+                      <td className="py-3 px-4 font-extrabold text-slate-900">{formatStockQuantity(item.onHandQuantity,item)}</td>
+                      <td className="py-3 px-4 font-bold text-amber-700">{formatStockQuantity(item.reservedQuantity,item)}</td>
+                      <td className="py-3 px-4 font-extrabold text-emerald-700">{formatStockQuantity(item.availableQuantity,item)}</td>
                       {canViewCost && (
                         <>
                           <td className="py-3 px-4 font-mono font-bold text-slate-700">
-                            {item.averageCost !== undefined
-                              ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.averageCost)
-                              : "—"}
+                            {formatStockCost(item.averageCost,item)}
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-purple-700">
                             {item.totalValuedAmount !== undefined
@@ -516,16 +516,14 @@ export default function InventoryPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 font-extrabold text-slate-900">
-                        {mov.quantity > 0 ? `+${mov.quantity}` : mov.quantity} un
+                        {formatStockQuantity(mov.quantity,mov,true)}
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                        {mov.balanceAfterQuantity} un
+                        {formatStockQuantity(mov.balanceAfterQuantity,mov)}
                       </td>
                       {canViewCost && (
                         <td className="py-3 px-4 font-mono text-slate-700">
-                          {mov.unitCost !== undefined
-                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(mov.unitCost)
-                            : "—"}
+                          {formatStockCost(mov.unitCost,mov)}
                         </td>
                       )}
                       <td className="py-3 px-4">

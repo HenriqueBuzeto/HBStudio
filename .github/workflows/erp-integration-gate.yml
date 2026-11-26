@@ -28,6 +28,8 @@ jobs:
         run: node --test tests/factory-slicer.test.mjs
       - name: Factory Kanban transition tests
         run: node --experimental-strip-types --test tests/factory-kanban.test.mjs
+      - name: Inventory unit presentation tests
+        run: node --experimental-strip-types --test tests/inventory-units.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build
