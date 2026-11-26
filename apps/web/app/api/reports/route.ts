@@ -1,8 +1,9 @@
-import {NextRequest,NextResponse} from "next/server";
+import {NextRequest,NextResponse,connection} from "next/server";
 import crypto from "node:crypto";
 import {authorizeFleet,FleetError} from "@/lib/fleet-session";
 import {REPORTS,REPORT_PERMISSIONS,canReadReport,buildReportSql,validReportRange} from "@/lib/report-definitions";
 export async function GET(req:NextRequest){
+ await connection();
  const cid=crypto.randomUUID(),headers={"Cache-Control":"no-store","X-Correlation-Id":cid};try{
  const ctx=await authorizeFleet(req,REPORT_PERMISSIONS),q=req.nextUrl.searchParams,id=q.get("report");
  const allowed=REPORTS.filter(r=>canReadReport(r,ctx.permissions));
