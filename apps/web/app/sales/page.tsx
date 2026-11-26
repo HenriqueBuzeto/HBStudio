@@ -3,6 +3,7 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import InternalCheckoutPanel from "./InternalCheckoutPanel";
+import CommercialCheckoutPanel from "./CommercialCheckoutPanel";
 import {useAuth} from "@/lib/auth";
 import {distributeInstallments} from "@/lib/pos-installments";
 import {canToggleTraining,isTrainingShortcut} from "@/lib/pos-training-shortcut";
@@ -58,7 +59,7 @@ export default function SalesPage(){
  const {user,isLoading:authLoading,hasPermission}=useAuth();
  const permitted=hasPermission("sales.pos.use");
  const canSeeMerchantFees=hasPermission("sales.cost.view")||hasPermission("finance.reports.view");
- const [tab,setTab]=useState<"pos"|"internal"|"quotes"|"history"|"training">("pos");
+ const [tab,setTab]=useState<"pos"|"commercial"|"internal"|"quotes"|"history"|"training">("pos");
  const [aux,setAux]=useState<Auxiliary>({customers:[],sellers:[],products:[],repairs:[],cashShift:null,fiscalReady:false,capabilities:{saveQuote:false,discountOverride:false,cancel:false,fiscalIssue:false,checkout:false}});
  const [quotes,setQuotes]=useState<Quote[]>([]),[history,setHistory]=useState<Sale[]>([]);
  const [trainingSales,setTrainingSales]=useState<TrainingSale[]>([]),[trainingMode,setTrainingMode]=useState(false);
@@ -268,7 +269,7 @@ export default function SalesPage(){
     <div className="flex flex-wrap items-center gap-2"><a href="/cash" className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"><span className={"h-2 w-2 rounded-full "+(aux.cashShift?"bg-emerald-500":"bg-amber-500")}/>{loading?"Consultando turno":aux.cashShift?"Caixa aberto · "+aux.cashShift.register:"Caixa sem turno"}<ChevronRight className="h-3 w-3"/></a><button className={button} onClick={()=>void load()} disabled={loading||saving}><RefreshCw className={"h-4 w-4 "+(loading?"animate-spin":"")}/> Atualizar</button></div>
    </div>
    <nav aria-label="Áreas do PDV" className="flex flex-wrap items-center gap-1 border-t border-slate-100 bg-slate-50/70 px-4 py-2">
-    {([{id:"pos",label:"Atendimento",icon:ShoppingCart},{id:"internal",label:"Venda interna",icon:Banknote},{id:"quotes",label:"Orçamentos",icon:FileText,count:quotes.length},{id:"history",label:"Vendas",icon:Receipt,count:history.length},{id:"training",label:"Treinamento",icon:ClipboardList,count:trainingSales.length}] as const).filter(t=>t.id!=="internal"||qaCheckout||tab==="internal").map(t=><button key={t.id} type="button" aria-pressed={tab===t.id} onClick={()=>setTab(t.id)} className={"flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 "+(tab===t.id?"bg-violet-700 text-white shadow-sm":"text-slate-600 hover:bg-white hover:text-violet-700")}><t.icon className="h-4 w-4"/>{t.label}{"count" in t&&<span className={"rounded-md px-1.5 py-0.5 text-[10px] tabular-nums "+(tab===t.id?"bg-white/20":"bg-slate-200/70")}>{t.count}</span>}</button>)}
+    {([{id:"pos",label:"Atendimento",icon:ShoppingCart},{id:"commercial",label:"Venda comercial",icon:Banknote},{id:"internal",label:"Venda interna",icon:Banknote},{id:"quotes",label:"Orçamentos",icon:FileText,count:quotes.length},{id:"history",label:"Vendas",icon:Receipt,count:history.length},{id:"training",label:"Treinamento",icon:ClipboardList,count:trainingSales.length}] as const).filter(t=>t.id!=="internal"||qaCheckout||tab==="internal").map(t=><button key={t.id} type="button" aria-pressed={tab===t.id} onClick={()=>{if(t.id==="commercial")setTrainingMode(false);setTab(t.id);}} className={"flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 "+(tab===t.id?"bg-violet-700 text-white shadow-sm":"text-slate-600 hover:bg-white hover:text-violet-700")}><t.icon className="h-4 w-4"/>{t.label}{"count" in t&&<span className={"rounded-md px-1.5 py-0.5 text-[10px] tabular-nums "+(tab===t.id?"bg-white/20":"bg-slate-200/70")}>{t.count}</span>}</button>)}
    </nav>
   </header>
   {tab==="pos"&&trainingMode&&permitted&&<div role="status" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">Treinamento ativo — a simulação não registra venda real.</div>}
@@ -279,7 +280,7 @@ export default function SalesPage(){
   </div>}
   {!authLoading&&!permitted?<div className="rounded-xl bg-white p-12 text-center text-sm text-slate-500">Acesso negado. Permissão <strong>sales.pos.use</strong> necessária.</div>
   :loading?<div className="rounded-xl bg-white p-16 text-center text-sm text-slate-500"><RefreshCw className="mx-auto mb-3 h-6 w-6 animate-spin"/>Consultando o Neon...</div>
-  :tab==="internal"?<>{!qaCheckout&&<div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{internalChecked?"Venda interna indisponível nesta sessão.":"Verificando disponibilidade..."}</div>}</>:tab==="pos"?<div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,390px)] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+  :tab==="commercial"?<CommercialCheckoutPanel onChange={()=>{void api<{sales:Sale[]}>("/api/sales").then(x=>setHistory(x.sales)).catch(()=>{});}}/>:tab==="internal"?<>{!qaCheckout&&<div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">{internalChecked?"Venda interna indisponível nesta sessão.":"Verificando disponibilidade..."}</div>}</>:tab==="pos"?<div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,390px)] 2xl:grid-cols-[minmax(0,1fr)_420px]">
    <div className="min-w-0 space-y-4">
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-xs font-black text-slate-900"><ScanBarcode className="h-4 w-4 text-violet-600"/> Adicionar produtos</h2><span className={pill}>{aux.products.length} SKUs reais</span></div>
@@ -359,7 +360,7 @@ export default function SalesPage(){
         onClick={()=>void saveTraining()}>
         <Receipt className="mr-2 inline h-4 w-4"/>{saving?"Salvando...":"Registrar venda SIMULADA — sem financeiro / fiscal"}
        </button>}
-       {!qaCheckout&&!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
+       {!trainingMode&&<button className={button+" w-full"} type="button" onClick={()=>setTab("commercial")}><Banknote className="h-4 w-4"/> Consultar checkout comercial</button>}
     {qaCheckout&&!trainingMode&&<button type="button" className={button+" w-full"} onClick={()=>setTab("internal")}><Banknote className="h-4 w-4"/> Venda interna (homologação)<ChevronRight className="ml-auto h-4 w-4"/></button>}
 <button type="button" aria-pressed={trainingMode} disabled={!trainingToggleAllowed} onClick={toggleTraining} className={button+" w-full "+(trainingMode?"!border-rose-200 !text-rose-700":"")}><ClipboardList className="h-4 w-4"/>{trainingMode?"Desativar treinamento":"Ativar treinamento"}<kbd className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">Ctrl + F1</kbd></button>
 <p className="text-[11px] leading-relaxed text-slate-500">{trainingMode?"Comprovante de simulação, sem efeito comercial, financeiro ou fiscal.":"Orçamento não confirma pagamento, não reserva estoque e não emite documento fiscal."}</p></section>
