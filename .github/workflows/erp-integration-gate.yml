@@ -46,6 +46,8 @@ jobs:
         run: node --test tests/loyalty-v15.test.mjs
       - name: Notifications security and wiring regression
         run: node --test tests/notifications-v18.test.mjs
+      - name: Birthday date regression
+        run: node --experimental-strip-types --test tests/birthday-v19.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build

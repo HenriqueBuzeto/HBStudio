@@ -83,7 +83,7 @@ export default function CrmPage(){
  const [priorityFilter,setPriorityFilter]=useState("all");
  const [tab,setTab]=useState<"board"|"leads"|"activities">("board");
  const [birthdaysOpen,setBirthdaysOpen]=useState(false);
- useEffect(()=>{if(new URLSearchParams(window.location.search).get("tab")==="birthdays")setBirthdaysOpen(true);},[]);
+ useEffect(()=>{const open=()=>setBirthdaysOpen(true);const read=()=>{if(new URLSearchParams(window.location.search).get("tab")==="birthdays")open();};read();window.addEventListener("hb:birthdays",open);window.addEventListener("popstate",read);return()=>{window.removeEventListener("hb:birthdays",open);window.removeEventListener("popstate",read);};},[]);
  const [openModal,setOpenModal]=useState<"pipeline"|"lead"|"opportunity"|"activity"|"loss"|"archive"|null>(null);
  const [selected,setSelected]=useState<Opportunity|null>(null);
  const [form,setForm]=useState(initialForm);

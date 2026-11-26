@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     if (!name) return NextResponse.json({ error: "O nome completo ou razão social é obrigatório." }, { status: 400 });
 
     const type = body.type === 2 ? 2 : 1;
-    let birthDate:string|null;try{birthDate=birthDateOrNull(body.birthDate,type);}catch(e){return NextResponse.json({error:(e as Error).message},{status:400});}
+    let birthDate:string|null;try{birthDate=birthDateOrNull(typeof body.birthDate==="string"&&/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(body.birthDate)?body.birthDate.slice(0,10):body.birthDate,type);}catch(e){return NextResponse.json({error:(e as Error).message},{status:400});}
     const cleanDoc = typeof body.documentNumber === "string"
       ? normalizeDocument(body.documentNumber) : null;
     if (cleanDoc && cleanDoc.length !== (type === 2 ? 14 : 11)) {
