@@ -22,7 +22,7 @@ export async function GET(request:NextRequest) {
  try {
   const ctx=await authorizeFleet(request,"cash.shift.view");
   const [registers,shifts]=await Promise.all([
-   ctx.db.query(`SELECT r."Id"::text AS id,r."Code" AS code,r."Name" AS name,r."Status" AS status
+   ctx.db.query(`SELECT r."Id"::text AS id,r."Code" AS code,r."Name" AS name,r."Status" AS status, (r."Status"=1 AND NOT EXISTS(SELECT 1 FROM cash_shifts x WHERE x."TenantId"=r."TenantId" AND x."BranchId"=r."BranchId" AND x."CashRegisterId"=r."Id" AND x."Status" IN(1,2,3,4))) AS available
     FROM cash_registers r WHERE r."TenantId"=$1::uuid AND r."BranchId"=$2::uuid
     ORDER BY r."Code"`,[ctx.tenantId,ctx.branchId]),
    ctx.db.query(`SELECT sh."Id"::text AS id,sh."CashRegisterId"::text AS "registerId",
@@ -42,7 +42,7 @@ export async function GET(request:NextRequest) {
       SELECT SUM(CASE WHEN cm."Direction"=1 THEN cm."Amount" ELSE -cm."Amount" END) "movementNet",
         COUNT(*)::int "movementCount"
       FROM cash_movements cm
-      WHERE cm."TenantId"=sh."TenantId" AND cm."CashShiftId"=sh."Id"
+      WHERE cm."TenantId"=sh."TenantId" AND cm."BranchId"=sh."BranchId" AND cm."CashShiftId"=sh."Id"
      ) m ON true
      WHERE sh."TenantId"=$1::uuid AND sh."BranchId"=$2::uuid
      ORDER BY sh."OpenedAtUtc" DESC LIMIT 100`,[ctx.tenantId,ctx.branchId])
@@ -50,6 +50,7 @@ export async function GET(request:NextRequest) {
   // Costs/finance are not returned. CurrentBalance is a recorded value, not a reconciled cash count.
   return NextResponse.json({registers,shifts,
    canOpen:ctx.permissions.has("cash.open"),
+   canManageRegisters:ctx.permissions.has("cash.register.manage"),
    canViewMovements:ctx.permissions.has("cash.movement.view"),
    note:"Saldos registrados no Neon; divergências exigem conciliação."},
    {headers:headers(cid)});
@@ -61,12 +62,13 @@ export async function POST(request:NextRequest) {
  try {
   guardOrigin(request);
   const ctx=await authorizeFleet(request,"cash.open");
+  if(!ctx.permissions.has("cash.shift.view"))throw new FleetError(403,"FORBIDDEN","Permissão de consulta dos turnos necessária.");
   const body=await request.json();
   if(!body||typeof body!=="object"||Array.isArray(body))throw new FleetError(422,"VALIDATION_ERROR","Dados de abertura inválidos.");
   const registerId=uuid(body.registerId,"Caixa");
   const requestKey=uuid(body.requestKey,"Chave da solicitação");
   const amount=Number(body.openingFloat);
-  if(body.openingFloat===null||body.openingFloat===undefined||body.openingFloat===""||
+  if(typeof body.openingFloat!=="number"||
    !Number.isFinite(amount)||amount<0||amount>1000000||
    Math.abs(Math.round(amount*100)-amount*100)>0.000001)
    throw new FleetError(422,"INVALID_AMOUNT","O fundo inicial precisa ser um valor em reais e centavos.");
