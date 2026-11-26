@@ -1,7 +1,7 @@
 name: Safe POS training gate (no deployment)
 on:
   push:
-    branches: [feat/safe-pdv-training-ledger-20261123]
+    branches: [feat/safe-pdv-training-ledger-20261123, feat/manufacturing-cost-foundation-20261125]
   pull_request:
     paths:
       - 'apps/web/**'
@@ -27,5 +27,6 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: node scripts/test-br-format.cjs
       - run: node scripts/test-acquirer-fees.cjs
+      - run: node --experimental-strip-types --test tests/pos-training-shortcut.test.mjs
       - run: npx tsc --noEmit
       - run: npm run build

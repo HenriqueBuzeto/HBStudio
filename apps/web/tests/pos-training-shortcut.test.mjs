@@ -1,0 +1,10 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {canToggleTraining,isTrainingShortcut} from "../lib/pos-training-shortcut.ts";
+const context={tab:"pos",authorized:true,loading:false,saving:false,modalOpen:false};
+const key={key:"F1",ctrlKey:true,altKey:false,shiftKey:false,metaKey:false,repeat:false,isComposing:false,defaultPrevented:false};
+test("training independent of internal availability",()=>{for(const qaCheckout of [true,false])assert.equal(canToggleTraining({...context,qaCheckout}),true);});
+test("training requires authorized idle POS",()=>{for(const change of [{tab:"internal"},{authorized:false},{loading:true},{saving:true},{modalOpen:true}])assert.equal(canToggleTraining({...context,...change}),false);});
+test("Ctrl+F1 ignores repeats and other modifiers",()=>{assert.equal(isTrainingShortcut(key),true);for(const change of [{key:"F2"},{ctrlKey:false},{altKey:true},{shiftKey:true},{metaKey:true},{repeat:true},{isComposing:true},{defaultPrevented:true}])assert.equal(isTrainingShortcut({...key,...change}),false);});
+test("POS wiring retains simulated checkout and real checkout lock",()=>{const source=readFileSync(new URL("../app/sales/page.tsx",import.meta.url),"utf8");assert.match(source,/trainingToggleAllowed&&isTrainingShortcut\(event\)/);assert.match(source,/\{trainingMode&&<button type="button"/);assert.doesNotMatch(source,/!qaCheckout&&trainingMode|trainingMode&&!qaCheckout/);assert.match(source,/const canQuote=!trainingMode&&/);assert.match(source,/onClick=\{toggleTraining\}/);assert.match(source,/Concluir venda — em homologação/);assert.match(source,/api<\{id:string;number:string\}>\("\/api\/sales\/training","POST"/);});

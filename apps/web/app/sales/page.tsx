@@ -5,6 +5,7 @@ import RootShellLayout from "@/components/RootShellLayout";
 import InternalCheckoutPanel from "./InternalCheckoutPanel";
 import {useAuth} from "@/lib/auth";
 import {distributeInstallments} from "@/lib/pos-installments";
+import {canToggleTraining,isTrainingShortcut} from "@/lib/pos-training-shortcut";
 import {formatCpfCnpj} from "@/lib/br-format";
 import {buildPrintUrl,getBrowserPrintSettings} from "@/lib/browser-print";
 import {ShoppingCart,Search,Plus,Minus,Trash2,Receipt,FileText,RefreshCw,
@@ -119,16 +120,18 @@ export default function SalesPage(){
    setDocumentModeError(e instanceof Error?e.message:"Não foi possível validar a situação fiscal.");
   }finally{setCheckingDocumentMode(false);}
  },[checkingDocumentMode,documentMode,customerId,fiscalRequested]);
+ const trainingToggleAllowed=canToggleTraining({tab,authorized:!authLoading&&permitted,loading,saving,modalOpen:!!(selectedQuote||selectedSale||confirmClear)});
+ const toggleTraining=useCallback(()=>{if(trainingToggleAllowed){setTrainingMode(v=>!v);setError("");}},[trainingToggleAllowed]);
  useEffect(()=>{
   const handler=(event:KeyboardEvent)=>{
-   if(tab==="pos"&&!qaCheckout&&event.ctrlKey&&!event.altKey&&!event.shiftKey&&event.key==="F1"){
-    event.preventDefault();setTrainingMode(v=>!v);setError("");
+   if(trainingToggleAllowed&&isTrainingShortcut(event)){
+    event.preventDefault();toggleTraining();
    }else if(tab==="pos"&&event.key==="F2"&&!event.ctrlKey&&!event.altKey&&!event.shiftKey&&!event.metaKey&&!selectedQuote&&!selectedSale&&!confirmClear){event.preventDefault();searchRef.current?.focus();
    }
   };
   window.addEventListener("keydown",handler);
   return ()=>window.removeEventListener("keydown",handler);
- },[qaCheckout,tab,selectedQuote,selectedSale,confirmClear]);
+ },[trainingToggleAllowed,toggleTraining,tab,selectedQuote,selectedSale,confirmClear]);
 
  useEffect(()=>{setDocumentMode("FISCAL");setDocumentModeError("");},[customerId,fiscalRequested,items.length]);
   const customer=aux.customers.find(x=>x.id===customerId);
@@ -170,7 +173,7 @@ export default function SalesPage(){
  const visibleParts=distributeInstallments(totalCents,installments);
  const change=Math.max(0,cents(Number(cashReceived||0))-totalCents)/100;
  const isDiscountValid=Number.isFinite(requestedDiscount)&&requestedDiscount>=0&&(discountMode!=="percent"||requestedDiscount<=100)&&maxDiscount<=subtotalCents;
- const canQuote=permitted&&aux.capabilities.saveQuote&&hasPermission("sales.create")&&items.length>0&&!!sellerId&&totalCents>0&&isDiscountValid&&(discountCents===0||aux.capabilities.discountOverride);
+ const canQuote=!trainingMode&&permitted&&aux.capabilities.saveQuote&&hasPermission("sales.create")&&items.length>0&&!!sellerId&&totalCents>0&&isDiscountValid&&(discountCents===0||aux.capabilities.discountOverride);
  const addProduct=(p:Product)=>{
   setItems(prev=>{const found=prev.find(x=>x.product.id===p.id);return found?prev.map(x=>x.product.id===p.id?{...x,quantity:Math.min(100,x.quantity+1)}:x):[...prev,{product:p,quantity:1}];});
   setQuery("");searchRef.current?.focus();
@@ -268,7 +271,7 @@ export default function SalesPage(){
     {([{id:"pos",label:"Atendimento",icon:ShoppingCart},{id:"internal",label:"Venda interna",icon:Banknote},{id:"quotes",label:"Orçamentos",icon:FileText,count:quotes.length},{id:"history",label:"Vendas",icon:Receipt,count:history.length},{id:"training",label:"Treinamento",icon:ClipboardList,count:trainingSales.length}] as const).filter(t=>t.id!=="internal"||qaCheckout||tab==="internal").map(t=><button key={t.id} type="button" aria-pressed={tab===t.id} onClick={()=>setTab(t.id)} className={"flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 "+(tab===t.id?"bg-violet-700 text-white shadow-sm":"text-slate-600 hover:bg-white hover:text-violet-700")}><t.icon className="h-4 w-4"/>{t.label}{"count" in t&&<span className={"rounded-md px-1.5 py-0.5 text-[10px] tabular-nums "+(tab===t.id?"bg-white/20":"bg-slate-200/70")}>{t.count}</span>}</button>)}
    </nav>
   </header>
-  {tab==="pos"&&trainingMode&&!qaCheckout&&<div role="status" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">Treinamento ativo — a simulação não registra venda real.</div>}
+  {tab==="pos"&&trainingMode&&permitted&&<div role="status" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800">Treinamento ativo — a simulação não registra venda real.</div>}
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button type="button" className="ml-auto" onClick={()=>{setError("");setNotice("");}} aria-label="Fechar alerta"><X className="h-4 w-4"/></button></div>}
   {printRetryUrl&&<div role="status" className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs font-bold text-violet-800">
     <Printer className="h-4 w-4"/><span>Orçamento salvo. A impressão não é garantia de papel emitido.</span>
@@ -348,21 +351,22 @@ export default function SalesPage(){
       </div>}
      
      {!isDiscountValid&&<p className="text-xs text-rose-600">Desconto inválido. Ajuste antes de salvar.</p>}
-     <button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>
+     {!trainingMode&&<button className={primary+" w-full"} disabled={!canQuote||saving} onClick={()=>void saveQuote()}><FileText className="h-4 w-4"/>{saving?"Salvando no Neon...":"Salvar orçamento real"}</button>}
      {!aux.capabilities.saveQuote&&<p className="text-xs text-amber-700">Permissão sales.create é necessária para salvar.</p>}
-     {!qaCheckout&&trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
+     {trainingMode&&<button type="button" className="w-full rounded-xl bg-rose-700 p-3 text-xs font-black text-white disabled:opacity-50"
         disabled={saving||!items.length||!sellerId||totalCents<=0||!isDiscountValid||
          (discountCents>0&&!aux.capabilities.discountOverride)}
         onClick={()=>void saveTraining()}>
         <Receipt className="mr-2 inline h-4 w-4"/>{saving?"Salvando...":"Registrar venda SIMULADA — sem financeiro / fiscal"}
        </button>}
        {!qaCheckout&&!trainingMode&&<button className={button+" w-full"} disabled title="Checkout aguarda conciliação real de estoque e pagamentos"><LockKeyhole className="h-4 w-4"/> Concluir venda — em homologação</button>}
-    {qaCheckout&&<button type="button" className={button+" w-full"} onClick={()=>setTab("internal")}><Banknote className="h-4 w-4"/> Venda interna (homologação)<ChevronRight className="ml-auto h-4 w-4"/></button>}
-<p className="text-[11px] leading-relaxed text-slate-500">Orçamento não confirma pagamento, não reserva estoque e não emite documento fiscal.</p></section>
-<section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 text-sm font-black text-slate-900"><ShieldAlert className="h-4 w-4 text-amber-600"/> Situação operacional</h2><p className="text-xs font-semibold text-amber-800">Emissão fiscal ainda não homologada.</p><p className="text-xs text-slate-600">{aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno aberto para este operador."} A finalização comercial real permanece protegida.</p><a href="/cash" className={button+" w-full"}><Clock className="h-4 w-4"/> Consultar caixa e turnos</a><details className="group rounded-xl border border-slate-200 bg-slate-50 p-3" open={trainingMode&&!qaCheckout||documentMode==="INTERNAL"||!!documentModeError?true:undefined}><summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold text-slate-700"><Info className="h-4 w-4"/> Fiscal, treinamento e pré-requisitos<ChevronRight className="ml-auto h-4 w-4 group-open:rotate-90"/></summary><div className="mt-3 space-y-3">{!qaCheckout&&<>     <div className={"rounded-xl border p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
+    {qaCheckout&&!trainingMode&&<button type="button" className={button+" w-full"} onClick={()=>setTab("internal")}><Banknote className="h-4 w-4"/> Venda interna (homologação)<ChevronRight className="ml-auto h-4 w-4"/></button>}
+<button type="button" aria-pressed={trainingMode} disabled={!trainingToggleAllowed} onClick={toggleTraining} className={button+" w-full "+(trainingMode?"!border-rose-200 !text-rose-700":"")}><ClipboardList className="h-4 w-4"/>{trainingMode?"Desativar treinamento":"Ativar treinamento"}<kbd className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">Ctrl + F1</kbd></button>
+<p className="text-[11px] leading-relaxed text-slate-500">{trainingMode?"Comprovante de simulação, sem efeito comercial, financeiro ou fiscal.":"Orçamento não confirma pagamento, não reserva estoque e não emite documento fiscal."}</p></section>
+<section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 text-sm font-black text-slate-900"><ShieldAlert className="h-4 w-4 text-amber-600"/> Situação operacional</h2><p className="text-xs font-semibold text-amber-800">Emissão fiscal ainda não homologada.</p><p className="text-xs text-slate-600">{aux.cashShift?"Turno encontrado: "+aux.cashShift.register:"Nenhum turno aberto para este operador."} A finalização comercial real permanece protegida.</p><a href="/cash" className={button+" w-full"}><Clock className="h-4 w-4"/> Consultar caixa e turnos</a><details className="group rounded-xl border border-slate-200 bg-slate-50 p-3" open={documentMode==="INTERNAL"||!!documentModeError?true:undefined}><summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold text-slate-700"><Info className="h-4 w-4"/> Fiscal, treinamento e pré-requisitos<ChevronRight className="ml-auto h-4 w-4 group-open:rotate-90"/></summary><div className="mt-3 space-y-3">{<>     <div className={"rounded-xl border p-3 text-xs "+(trainingMode?"border-rose-700 bg-rose-50 text-rose-900":"border-slate-200 bg-slate-50 text-slate-800")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
        <strong>{trainingMode?"TREINAMENTO ATIVO — NÃO É VENDA REAL":"TREINAMENTO DESATIVADO"}</strong>
-       <button type="button" onClick={()=>setTrainingMode(v=>!v)}
+       <button type="button" aria-pressed={trainingMode} disabled={!trainingToggleAllowed} onClick={toggleTraining}
         className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Ctrl + F1 • {trainingMode?"Desativar":"Ativar simulação"}</button>
       </div>
       <p className="mt-2">{trainingMode?
