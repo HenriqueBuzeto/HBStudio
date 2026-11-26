@@ -235,6 +235,7 @@ export default function InventoryPage() {
       case 9: return "Consumo técnico";
       case 10: return "Consumo fabricação 3D";
       case 11: return "Entrada de produto fabricado";
+      case 12: return "Entrega de recompensa";
       default: return "Movimentação";
     }
   };
