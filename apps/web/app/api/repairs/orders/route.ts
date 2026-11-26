@@ -11,7 +11,7 @@ function failure(error: unknown, cid: string) {
   const code = message.match(/REPAIR_[A-Z_]+/)?.[0];
   if (code) {
     const status = (code.includes("CONFLICT") || code.includes("IDEMPOTENCY_MISMATCH")) ? 409 : code.includes("NOT_FOUND") ? 404 : 422;
-    return NextResponse.json({ code, error: "Os dados não atendem às regras da ordem de serviço.", }, { status, headers: headers(cid) });
+    return NextResponse.json({ code, error: code==="REPAIR_INVALID_STOCK_AVAILABLE"?"Saldo insuficiente na filial. Atualize a lista de produtos.":code==="REPAIR_INVALID_CATALOG_PRICE"?"Preço do catálogo mudou. Selecione novamente o item.":"Os dados não atendem às regras da ordem de serviço.", }, { status, headers: headers(cid) });
   }
   console.error("[Repairs][" + cid + "] database failure:", error instanceof Error ? error.name : "unknown");
   return NextResponse.json({ code: "REPAIRS_UNAVAILABLE", error: "Não foi possível concluir a operação de OS." }, { status: 503, headers: headers(cid) });
@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
     const model=required(body.model,"Modelo",160);
     const defect=required(body.reportedDefect,"Defeito relatado",2000);
     const items=validateItems(body.items||[]);
+    if(items.length&&!ctx.permissions.has("catalog.products.view"))throw new FleetError(403,"FORBIDDEN","Permissão de catálogo necessária.");
+    if(items.some(i=>i.itemType===2)&&!ctx.permissions.has("inventory.view"))throw new FleetError(403,"FORBIDDEN","Permissão de estoque necessária.");
+    if(items.some(i=>!i.productSkuId))throw new FleetError(422,"REPAIR_INVALID_CATALOG_REQUIRED","Selecione os serviços e produtos cadastrados.");
     const requestKey=uuid(body.requestKey,"Chave de idempotência");
     const rows=await ctx.db.query(
       'SELECT * FROM repair_enterprise_create($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::text,$14::text,$15::text,$16::jsonb,$17::uuid)',

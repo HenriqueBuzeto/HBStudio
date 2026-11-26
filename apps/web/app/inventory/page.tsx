@@ -73,7 +73,7 @@ export interface ProductSkuOption {
 }
 
 export default function InventoryPage() {
-  const {hasPermission}=useAuth();const canManage=hasPermission("catalog.products.manage");const canInventoryCost=hasPermission("inventory.cost.view");const [isIntakeOpen,setIntakeOpen]=useState(false);const [warehouseOpen,setWarehouseOpen]=useState(false);
+  const {hasPermission}=useAuth();const canManage=hasPermission("catalog.products.manage");const canInventoryCost=hasPermission("inventory.cost.view");const [isIntakeOpen,setIntakeOpen]=useState(false);const [serviceOnly,setServiceOnly]=useState(false);const [warehouseOpen,setWarehouseOpen]=useState(false);
   const [balances, setBalances] = useState<StockBalance[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
@@ -241,7 +241,7 @@ export default function InventoryPage() {
   return (
     <RootShellLayout>
       <div className="space-y-6">
-        {warehouseOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Novo depósito" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Novo depósito</h2><WarehouseCreateForm onClose={()=>setWarehouseOpen(false)} onDone={async()=>{await loadInventoryData();setWarehouseOpen(false);}}/></section></div>}{isIntakeOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Cadastro e entrada inicial" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Cadastro e entrada inicial</h2><CatalogIntakeForm onClose={()=>setIntakeOpen(false)} onDone={async()=>{await loadInventoryData();setIntakeOpen(false);}}/></section></div>}
+        {warehouseOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Novo depósito" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Novo depósito</h2><WarehouseCreateForm onClose={()=>setWarehouseOpen(false)} onDone={async()=>{await loadInventoryData();setWarehouseOpen(false);}}/></section></div>}{isIntakeOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Cadastro e entrada inicial" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">{serviceOnly?"Cadastrar serviço":"Cadastro e entrada inicial"}</h2><CatalogIntakeForm serviceOnly={serviceOnly} onClose={()=>setIntakeOpen(false)} onDone={async()=>{await loadInventoryData();setIntakeOpen(false);}}/></section></div>}
         {/* Notificações */}
         {errorMsg && (
           <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center justify-between">
@@ -283,7 +283,7 @@ export default function InventoryPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {hasPermission("inventory.adjust")&&<button type="button" onClick={()=>setWarehouseOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Depósito</button>}{canManage&&<button type="button" onClick={()=>setIntakeOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar produto</button>}
+            {hasPermission("inventory.adjust")&&<button type="button" onClick={()=>setWarehouseOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Depósito</button>}{canManage&&<button type="button" onClick={()=>{setServiceOnly(false);setIntakeOpen(true);}} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar produto</button>}{canManage&&<button type="button" onClick={()=>{setServiceOnly(true);setIntakeOpen(true);}} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar serviço</button>}
             <button
               onClick={() => setCanViewCost(!canViewCost)} disabled={!canInventoryCost}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
@@ -292,7 +292,7 @@ export default function InventoryPage() {
               <span>{canViewCost ? "Ocultar Custos" : "Ver Custos Reais"}</span>
             </button>
             <button
-              onClick={() => setIntakeOpen(true)}
+              onClick={() => {setServiceOnly(false);setIntakeOpen(true);}}
               disabled={!canManage||!hasPermission("inventory.adjust")||!canInventoryCost}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
