@@ -82,54 +82,10 @@ export default function UsersManagementPage() {
         const data = await res.json();
         setUsers(data);
       } else {
-        setUsers([
-          {
-            id: "u-henrique-01",
-            fullName: "Henrique Buzeto",
-            email: "henriquebuzeto@hbstudio.com",
-            isActive: true,
-            securityStamp: 1,
-            createdAtUtc: "2026-11-16T12:00:00Z",
-            isPartner: true,
-            partnerRole: "CEO",
-            roles: ["CEO", "Sócio Fundador", "Acesso Master"]
-          },
-          {
-            id: "u-bruno-02",
-            fullName: "Bruno Santos",
-            email: "bruno@hbstudio.com.br",
-            isActive: true,
-            securityStamp: 1,
-            createdAtUtc: "2026-11-14T10:00:00Z",
-            isPartner: true,
-            partnerRole: "COO",
-            roles: ["COO", "Diretor Operacional", "Acesso Master"]
-          },
-          {
-            id: "u-carlos-03",
-            fullName: "Carlos Alberto",
-            email: "carlos@hbstudio.com.br",
-            isActive: true,
-            securityStamp: 1,
-            createdAtUtc: "2026-11-12T14:00:00Z",
-            isPartner: true,
-            partnerRole: "CFO",
-            roles: ["CFO", "Diretor Financeiro", "Acesso Master"]
-          },
-          {
-            id: "u-operador-04",
-            fullName: "Lucas Atendente Balcão",
-            email: "lucas.vendas@hbstudio.com.br",
-            isActive: true,
-            securityStamp: 1,
-            createdAtUtc: "2026-11-15T09:30:00Z",
-            isPartner: false,
-            roles: ["Vendedor / Atendente PDV"]
-          }
-        ]);
+        const problem=await res.json().catch(()=>({}));setUsers([]);setErrorMsg(problem.error||"Não foi possível consultar os usuários.");
       }
     } catch {
-      // Ignora erro em modo offline
+      setUsers([]);setErrorMsg("Falha ao consultar usuários. Nenhum dado foi confirmado.");
     } finally {
       setIsLoading(false);
     }
@@ -201,28 +157,7 @@ export default function UsersManagementPage() {
         setErrorMsg(data.error || "Não foi possível criar o usuário.");
       }
     } catch {
-      const chosenRole = roleTitle.trim() || (isPartner ? "CEO" : "Operador Geral");
-      const localNewUser: UserItem = {
-        id: `u-${Date.now()}`,
-        fullName: fullName.trim(),
-        email: email.trim(),
-        isActive: true,
-        securityStamp: 1,
-        createdAtUtc: new Date().toISOString(),
-        isPartner,
-        partnerRole: isPartner ? chosenRole : undefined,
-        roles: isPartner ? [chosenRole, "Acesso Master"] : [chosenRole]
-      };
-      setUsers([localNewUser, ...users]);
-      setSuccessMsg(`Usuário ${fullName} cadastrado com sucesso como "${chosenRole}"!`);
-      setShowCreateModal(false);
-      setFullName("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-      setIsPartner(false);
-      setRoleTitle("Vendedor / Atendente PDV");
-      setDocumentNumber("");
+      setErrorMsg("Cadastro não confirmado pelo servidor. Nenhum usuário local foi criado.");
     } finally {
       setIsSubmitting(false);
     }
@@ -262,11 +197,7 @@ export default function UsersManagementPage() {
         setPasswordErrorMsg(data.error || "Erro ao redefinir a senha.");
       }
     } catch {
-      setSuccessMsg(`Senha do usuário ${selectedUserForPassword.fullName} atualizada.`);
-      setShowPasswordModal(false);
-      setNewPassword("");
-      setConfirmNewPassword("");
-      setSelectedUserForPassword(null);
+      setPasswordErrorMsg("Alteração de senha não confirmada.");
     }
   };
 
@@ -278,14 +209,15 @@ export default function UsersManagementPage() {
     if (!confirmAction) return;
 
     try {
-      await fetch(`/api/users/${userToToggle.id}`, {
+      const response=await fetch(`/api/users/${userToToggle.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle-status" })
       });
+      if(!response.ok){const problem=await response.json().catch(()=>({}));throw new Error(problem.error||"Alteração não confirmada.");}
       loadUsers();
-    } catch {
-      setUsers(users.map(u => u.id === userToToggle.id ? { ...u, isActive: !u.isActive } : u));
+    } catch (e) {
+      setErrorMsg(e instanceof Error?e.message:"Alteração não confirmada.");
     }
   };
 
@@ -313,14 +245,14 @@ export default function UsersManagementPage() {
                 Segurança & Controle de Acessos
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
-                Acesso Master para Sócios
+                Permissões por papéis
               </span>
             </div>
             <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
               Gestão de Usuários, Senhas & Funções
             </h1>
             <p className="text-xs text-slate-500">
-              Defina os usuários, senhas de login, cargos de atuação (CEO, Gerente, Balcão, etc.) e identifique sócios com Acesso Master.
+              Defina os usuários, senhas de login, cargos de atuação (CEO, Gerente, Balcão, etc.) e identifique sócios vinculados ao cadastro oficial.
             </p>
           </div>
 
@@ -339,6 +271,7 @@ export default function UsersManagementPage() {
           </div>
         </div>
 
+        {errorMsg&&!showCreateModal&&<div role="alert" className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-sm text-rose-800">{errorMsg}</div>}
         {/* Notificação de Sucesso */}
         {successMsg && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-emerald-800 text-xs font-bold animate-in fade-in">
@@ -367,7 +300,7 @@ export default function UsersManagementPage() {
 
           <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Sócios (Acesso Master)</span>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Sócios vinculados</span>
               <span className="text-2xl font-black text-amber-600 font-mono">{totalPartners}</span>
               <span className="text-[11px] text-slate-400 block mt-0.5">CEO / Gestão Executiva HB</span>
             </div>

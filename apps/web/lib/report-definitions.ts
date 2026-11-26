@@ -2192,6 +2192,214 @@ export const REPORTS:ReportSpec[]=[
     "order": "\"day\" DESC,id",
     "sql": "SELECT a.\"Id\" id,a.\"CreatedAtUtc\" AS \"day\",a.\"EntityType\" entity,a.\"Action\" action,a.\"EntityId\" reference,a.\"CorrelationId\" correlation FROM audit_events a CROSS JOIN scope s WHERE a.\"TenantId\"=s.t AND a.\"BranchId\"=s.b AND a.\"CreatedAtUtc\">=s.start_at AND a.\"CreatedAtUtc\"<s.end_at",
     "totals": []
+  },
+  {
+    "id": "investment-position",
+    "group": "Sócios",
+    "title": "Investimentos gerenciais: posição consolidada",
+    "permissions": [
+      "partners.view",
+      "finance.reports.view"
+    ],
+    "mode": "company",
+    "note": "Responsabilidades gerenciais por investimento, separadas de capital social, quotas e mútuos formais. Valores amortizados líquidos de reversões.",
+    "columns": [
+      {
+        "key": "name",
+        "label": "Investimento",
+        "format": "text"
+      },
+      {
+        "key": "category",
+        "label": "Categoria",
+        "format": "text"
+      },
+      {
+        "key": "invested",
+        "label": "Valor inicial",
+        "format": "money"
+      },
+      {
+        "key": "paid",
+        "label": "Amortizado líquido",
+        "format": "money"
+      },
+      {
+        "key": "balance",
+        "label": "Saldo",
+        "format": "money"
+      },
+      {
+        "key": "participants",
+        "label": "Participantes",
+        "format": "qty"
+      },
+      {
+        "key": "reference",
+        "label": "Referência",
+        "format": "text"
+      }
+    ],
+    "order": "name,id",
+    "sql": "SELECT i.id,i.name,CASE i.category WHEN 'WORKS' THEN 'Obra' WHEN 'STOCK' THEN 'Estoque' WHEN 'CASH' THEN 'Capital de giro' WHEN 'EQUIPMENT' THEN 'Equipamentos' ELSE 'Outros' END category,i.amount_cents/100.0 invested,coalesce(sum(v.paid_cents),0)/100.0 paid,coalesce(sum(v.balance_cents),0)/100.0 balance,count(v.partner_id) participants,i.reference FROM partner_investments_v10 i LEFT JOIN partner_investment_balances_v10 v ON v.tenant_id=i.tenant_id AND v.investment_id=i.id CROSS JOIN scope s WHERE i.tenant_id=s.t GROUP BY i.tenant_id,i.id",
+    "totals": [
+      "invested",
+      "paid",
+      "balance"
+    ]
+  },
+  {
+    "id": "investment-shares",
+    "group": "Sócios",
+    "title": "Investimentos: saldo individual por sócio",
+    "permissions": [
+      "partners.view",
+      "finance.reports.view"
+    ],
+    "mode": "company",
+    "note": "Responsabilidade histórica de cada participante, sem transferência automática de dívida a outros sócios.",
+    "columns": [
+      {
+        "key": "partner",
+        "label": "Sócio",
+        "format": "text"
+      },
+      {
+        "key": "name",
+        "label": "Investimento",
+        "format": "text"
+      },
+      {
+        "key": "principal",
+        "label": "Responsabilidade",
+        "format": "money"
+      },
+      {
+        "key": "paid",
+        "label": "Amortizado líquido",
+        "format": "money"
+      },
+      {
+        "key": "balance",
+        "label": "Saldo",
+        "format": "money"
+      }
+    ],
+    "order": "partner,name,investment_id,partner_id",
+    "sql": "SELECT v.investment_id,v.partner_id,p.\"Name\" partner,i.name,v.principal_cents/100.0 principal,v.paid_cents/100.0 paid,v.balance_cents/100.0 balance FROM partner_investment_balances_v10 v JOIN partners p ON p.\"TenantId\"=v.tenant_id AND p.\"Id\"=v.partner_id JOIN partner_investments_v10 i ON i.tenant_id=v.tenant_id AND i.id=v.investment_id CROSS JOIN scope s WHERE v.tenant_id=s.t",
+    "totals": [
+      "principal",
+      "paid",
+      "balance"
+    ]
+  },
+  {
+    "id": "investment-payments",
+    "group": "Sócios",
+    "title": "Amortizações: extrato individual",
+    "permissions": [
+      "partners.view",
+      "finance.reports.view"
+    ],
+    "mode": "company-period",
+    "note": "Alocações registradas com comprovante externo ou liquidação associada; reversões negativas. Não representa saída adicional no caixa.",
+    "columns": [
+      {
+        "key": "day",
+        "label": "Data",
+        "format": "day"
+      },
+      {
+        "key": "partner",
+        "label": "Sócio",
+        "format": "text"
+      },
+      {
+        "key": "investment",
+        "label": "Investimento",
+        "format": "text"
+      },
+      {
+        "key": "mode",
+        "label": "Tipo",
+        "format": "text"
+      },
+      {
+        "key": "source",
+        "label": "Origem",
+        "format": "text"
+      },
+      {
+        "key": "reference",
+        "label": "Comprovante",
+        "format": "text"
+      },
+      {
+        "key": "amount",
+        "label": "Amortização líquida",
+        "format": "money"
+      }
+    ],
+    "order": "\"day\" DESC,payment_id,investment_id,partner_id",
+    "sql": "SELECT a.paid_on::text AS \"day\",l.payment_id,l.investment_id,l.partner_id,p.\"Name\" partner,i.name investment,CASE a.mode WHEN 'PERSONAL' THEN 'Individual' WHEN 'COLLECTIVE' THEN 'Coletiva' ELSE 'Reversão' END mode,CASE a.source WHEN 'EXTERNAL' THEN 'Comprovante externo' WHEN 'SETTLEMENT' THEN 'Liquidação' ELSE 'Reversão' END source,a.reference,l.amount_cents/100.0 amount FROM partner_investment_payment_lines_v10 l JOIN partner_investment_payments_v10 a ON a.tenant_id=l.tenant_id AND a.id=l.payment_id JOIN partner_investments_v10 i ON i.tenant_id=l.tenant_id AND i.id=l.investment_id JOIN partners p ON p.\"TenantId\"=l.tenant_id AND p.\"Id\"=l.partner_id CROSS JOIN scope s WHERE l.tenant_id=s.t AND a.paid_on>=(s.start_at AT TIME ZONE 'America/Sao_Paulo')::date AND a.paid_on<(s.end_at AT TIME ZONE 'America/Sao_Paulo')::date",
+    "totals": [
+      "amount"
+    ]
+  },
+  {
+    "id": "investment-plans",
+    "group": "Sócios",
+    "title": "Planejamentos mensais aprovados",
+    "permissions": [
+      "partners.view",
+      "finance.reports.view",
+      "partners.compensation.manage",
+      "finance.journal.view",
+      "finance.payables.view",
+      "finance.banks.manage"
+    ],
+    "mode": "company-period",
+    "note": "Snapshots de planejamento, não pagamentos. Disponibilidade calculada com posição bancária conciliada na data da aprovação, não saldo histórico de fechamento.",
+    "columns": [
+      {
+        "key": "day",
+        "label": "Competência",
+        "format": "day"
+      },
+      {
+        "key": "name",
+        "label": "Sócio",
+        "format": "text"
+      },
+      {
+        "key": "base",
+        "label": "Base planejada",
+        "format": "money"
+      },
+      {
+        "key": "monthly",
+        "label": "Parcela prevista",
+        "format": "money"
+      },
+      {
+        "key": "amortization",
+        "label": "Amortização planejada",
+        "format": "money"
+      },
+      {
+        "key": "released",
+        "label": "Parcela liberada",
+        "format": "money"
+      },
+      {
+        "key": "potential",
+        "label": "Valor potencial",
+        "format": "money"
+      }
+    ],
+    "order": "\"day\" DESC,name,id,partner_id",
+    "sql": "SELECT c.id,l->>'partnerId' partner_id,c.month::text AS \"day\",l->>'name' name,(l->>'baseCents')::numeric/100 base,(l->>'monthlyCents')::numeric/100 monthly,(l->>'amortizeCents')::numeric/100 amortization,(l->>'releaseCents')::numeric/100 released,(l->>'potentialCents')::numeric/100 potential FROM partner_monthly_closings_v10 c CROSS JOIN LATERAL jsonb_array_elements(c.snapshot->'lines') l CROSS JOIN scope s WHERE c.tenant_id=s.t AND c.month>=(s.start_at AT TIME ZONE 'America/Sao_Paulo')::date AND c.month<(s.end_at AT TIME ZONE 'America/Sao_Paulo')::date",
+    "totals": []
   }
 ];
 export const REPORT_PERMISSIONS=[...new Set(REPORTS.flatMap(r=>r.permissions))];

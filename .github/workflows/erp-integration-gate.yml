@@ -32,6 +32,8 @@ jobs:
         run: node --experimental-strip-types --test tests/inventory-units.test.mjs
       - name: Reporting permissions, range and export tests
         run: node --experimental-strip-types --test tests/reports.test.mjs
+      - name: Partner investment calculations
+        run: node --experimental-strip-types --test tests/partner-investments.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build

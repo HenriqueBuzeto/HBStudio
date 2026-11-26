@@ -1,262 +1,90 @@
 "use client";
-
-import React, { useState } from "react";
+import {useState,useEffect,useRef,useMemo} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
-import {formatCpf} from "@/lib/br-format";
-import {
-  Users,
-  Building2,
-  Plus,
-  FolderOpen
-} from "lucide-react";
-
-interface PartnerView {
-  id: string;
-  name: string;
-  document: string;
-  role: string;
-  equityPercentage: number;
-  quotas: number;
-  nominalValue: number;
-  monthlyProLaboreCap: number;
-  active: boolean;
-  notes: string;
-}
-
-export default function PartnersPage() {
-  const [partners, setPartners] = useState<PartnerView[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [name, setName] = useState("");
-  const [doc, setDoc] = useState("");
-  const [role, setRole] = useState("Sócio Administrador");
-  const [percentage, setPercentage] = useState("");
-  const [capital, setCapital] = useState("");
-
-  const totalEquity = partners.reduce((acc, p) => acc + p.equityPercentage, 0);
-  const totalNominalCapital = partners.reduce((acc, p) => acc + p.nominalValue, 0);
-
-  const handleAddPartner = (e: React.FormEvent) => {
-    e.preventDefault();
-    window.alert("Cadastro societário indisponível até integração com Neon e validação do contrato social.");
-  };
-
-  return (
-    <RootShellLayout>
-      <div className="space-y-6">
-        {/* Header estilo HBVisionX */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                Governança & Capital
-              </span>
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900 mt-1">
-              Sócios & Capital Social
-            </h1>
-            <p className="text-xs text-slate-500">
-              Quotas societárias (100%), integralização de capital, mútuos, pró-labore e distribuição de resultados.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              disabled title="Aguardando integração societária com Neon"
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Cadastrar Sócio
-            </button>
-          </div>
-        </div>
-
-        {/* Indicadores Topo estilo HBVisionX */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-purple-600" />
-              Estrutura Societária Consolidada
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-purple-600"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Capital Social Subscrito
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">
-                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalNominalCapital)}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Capital integralizado</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Soma de Quotas
-              </span>
-              <div className="text-lg font-extrabold text-emerald-600">{totalEquity}%</div>
-              <p className="text-[10px] text-slate-400 mt-1">{totalEquity === 100 ? "Equilíbrio exato 100%" : "Cadastre os sócios"}</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Sócios Registrados
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">{partners.length} Sócios</div>
-              <p className="text-[10px] text-slate-400 mt-1">Acordo societário</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Teto Pró-Labore
-              </span>
-              <div className="text-lg font-extrabold text-slate-900">R$ 0,00</div>
-              <p className="text-[10px] text-slate-400 mt-1">Remuneração mensal</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabela de Sócios */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-600" />
-              Quadro Societário & Participação
-            </h3>
-            <span className="text-xs text-slate-500 font-medium">Contrato Social Vigente</span>
-          </div>
-
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
-              <tr>
-                <th className="py-3 px-4">Sócio</th>
-                <th className="py-3 px-4">Papel / Função</th>
-                <th className="py-3 px-4">Participação</th>
-                <th className="py-3 px-4">Quotas</th>
-                <th className="py-3 px-4">Valor Nominal</th>
-                <th className="py-3 px-4">Teto Pró-Labore</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {partners.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="font-extrabold text-slate-900">{p.name}</div>
-                    <div className="text-[10px] font-mono text-slate-400">{formatCpf(p.document)}</div>
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-600 font-medium">{p.role}</td>
-                  <td className="py-3.5 px-4 font-extrabold text-purple-700 text-sm">
-                    {p.equityPercentage}%
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-slate-700">
-                    {p.quotas.toLocaleString("pt-BR")}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.nominalValue)}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-slate-600">
-                    {p.monthlyProLaboreCap > 0
-                      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.monthlyProLaboreCap)
-                      : "Sem pró-labore"}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Regular
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {partners.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
-                    <FolderOpen className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-700">Nenhum sócio cadastrado</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Quadro societário aguardando integração com Neon. O vínculo de autenticação atual foi preservado.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Modal Cadastrar Sócio */}
-        {showModal && (
-          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl border border-slate-200 max-w-sm w-full p-6 shadow-xl space-y-4">
-              <h3 className="text-sm font-extrabold text-slate-900">Cadastrar Sócio</h3>
-              <form onSubmit={handleAddPartner} className="space-y-3 text-xs">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nome Completo *</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Nome do sócio"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">CPF</label>
-                  <input
-                    type="text"
-                    value={doc}
-                    onChange={(e) => setDoc(formatCpf(e.target.value))}
-                    placeholder="000.000.000-00"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Participação (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      required
-                      value={percentage}
-                      onChange={(e) => setPercentage(e.target.value)}
-                      placeholder="Ex: 50"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Aporte Nominal (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={capital}
-                      onChange={(e) => setCapital(e.target.value)}
-                      placeholder="50000.00"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20"
-                  >
-                    Salvar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
-    </RootShellLayout>
-  );
+import {useAuth} from "@/lib/auth";
+import {csvEscape} from "@/lib/report-export";
+import {parsePartnerCents as cents,splitPartnerPayment,releaseMonthly} from "@/lib/partner-calculations";
+import {Users,Plus,RefreshCw,Download,Printer,Wallet,Building2,ArrowDownRight,CheckCircle2,AlertTriangle,FileText} from "lucide-react";
+type Cents=number|string|null;
+type Partner={id:string;name:string;type:number;status:number;email:string;document:string|null;notes:string|null;userId:string|null;jobTitle:string|null;erpAccess:boolean;share:number|null;nominal:number|null;capCents:Cents;baseCents:Cents;monthlyCents:Cents;principalCents:Cents;paidCents:Cents;balanceCents:Cents};
+type Investment={id:string;name:string;category:string;date:string;reference:string;notes:string;payableId:string|null;amountCents:Cents;paidCents:Cents;balanceCents:Cents;participants:number};
+type Share={investmentId:string;partnerId:string;name:string;principalCents:Cents;paidCents:Cents;balanceCents:Cents};
+type Payment={id:string;mode:string;source:string;reference:string;date:string;amountCents:Cents;requestedCents:Cents;settlementId:string|null;reversesId:string|null;actor:string;branch:string;reversible:boolean;total:number};
+type Line={paymentId:string;partnerId:string;investmentId:string;partner:string;investment:string;amountCents:Cents};
+type PlanLine={partnerId:string;name:string;balanceCents:Cents;baseCents:Cents;monthlyCents:Cents;amortizeCents:Cents;releaseCents:Cents;potentialCents:Cents};
+type Plan={id?:string;month:string;bankCents:Cents;bankCount:number;payablesCents:Cents;revenueCents:Cents;expenseCents:Cents;resultCents:Cents;journalCount:number;unbalancedCount:number;cashReserveCents:Cents;stockReserveCents:Cents;otherReserveCents:Cents;availableCents:Cents;baseCents:Cents;monthlyCents:Cents;poolCents:Cents;eligible:boolean;lines:PlanLine[];snapshotAt:string};
+type Data={partners:Partner[];users:{id:string;name:string;jobTitle:string;email:string;partnerId:string|null}[];investments:Investment[];shares:Share[];payments:Payment[];lines:Line[];plans:{id:string;month:string;snapshot:Plan;createdAt:string}[];payables:{id:string;title:string;description:string;amountCents:Cents}[];settlements:{id:string;investmentId:string;reference:string;date:string;amountCents:Cents}[];allowed:{manage:boolean;link:boolean;comp:boolean;finance:boolean;capital:boolean;plan:boolean;approve:boolean;settlement:boolean}};
+type Modal="PARTNER"|"INVEST"|"PAY"|"REVERSE";
+type Draft={id:string;name:string;document:string;email:string;type:string;userId:string;enableAccess:boolean;cap:string;base:string;monthly:string;notes:string;category:string;amount:string;date:string;reference:string;partnerIds:string[];payableId:string;mode:string;source:string;partnerId:string;investmentId:string;settlementId:string;confirmed:boolean;acceptPartial:boolean;paymentId:string};
+const n=(v:Cents|undefined)=>Number(v||0);
+const brl=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
+const money=(v:Cents|undefined)=>v==null?"—":brl.format(n(v)/100);
+const day=(v:string)=>v?.slice(0,10).split("-").reverse().join("/")||"—";
+const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).filter(x=>["year","month","day"].includes(x.type)).sort((a,b)=>["year","month","day"].indexOf(a.type)-["year","month","day"].indexOf(b.type)).map(x=>x.value).join("-");
+const initial=():Draft=>({id:"",name:"",document:"",email:"",type:"1",userId:"",enableAccess:false,cap:"0",base:"0",monthly:"0",notes:"",category:"WORKS",amount:"",date:"",reference:"",partnerIds:[],payableId:"",mode:"COLLECTIVE",source:"EXTERNAL",partnerId:"",investmentId:"",settlementId:"",confirmed:false,acceptPartial:false,paymentId:""});
+const value=(v:Cents)=>String(n(v)/100);
+const cats:Record<string,string>={WORKS:"Obra e instalações",STOCK:"Produtos para estoque",CASH:"Capital de giro",EQUIPMENT:"Equipamentos",OTHER:"Outros"};
+const types:Record<number,string>={1:"Administrador",2:"Operacional",3:"Investidor",4:"Conselheiro"};
+const modes:Record<string,string>={PERSONAL:"Individual",COLLECTIVE:"Coletivo",REVERSAL:"Estorno"};
+const sources:Record<string,string>={EXTERNAL:"Comprovante externo",SETTLEMENT:"Liquidação financeira",REVERSAL:"Reversão de registro"};
+const panel="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
+const btn="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-violet-300 disabled:opacity-50";
+const primary="inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-50";
+const input="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:outline-violet-500 disabled:bg-slate-100";
+function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="block text-xs font-semibold text-slate-600">{label}{children}</label>}
+function Table({headers,rows}:{headers:string[];rows:React.ReactNode[][]}){return <div className="overflow-x-auto rounded-xl border border-slate-200 print:overflow-visible"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-slate-600"><tr>{headers.map((h,i)=><th key={i} className="whitespace-nowrap px-3 py-3 font-bold">{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i} className="border-t border-slate-100 align-top">{r.map((c,j)=><td key={j} className="px-3 py-3 tabular-nums">{c}</td>)}</tr>)}</tbody></table>{!rows.length&&<p className="p-8 text-center text-sm text-slate-500">Nenhum registro encontrado.</p>}</div>}
+function Stat({label,amount,sub}:{label:string;amount:string;sub?:string}){return <div className={panel}><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-1 text-xl font-extrabold text-slate-900">{amount}</p>{sub&&<p className="mt-1 text-[11px] text-slate-500">{sub}</p>}</div>}
+export default function PartnersPage(){
+ const {hasPermission}=useAuth();
+ const [data,setData]=useState<Data|null>(null),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[tab,setTab]=useState("overview"),[modal,setModal]=useState<Modal|null>(null),[draft,setDraft]=useState<Draft>(initial),[query,setQuery]=useState(""),[expanded,setExpanded]=useState(""),[selectedPartner,setSelectedPartner]=useState(""),[plan,setPlan]=useState<Plan|null>(null),[month,setMonth]=useState(""),[cashReserve,setCashReserve]=useState("0"),[stockReserve,setStockReserve]=useState("0"),[otherReserve,setOtherReserve]=useState("0"),[planRef,setPlanRef]=useState(""),[planConfirmed,setPlanConfirmed]=useState(false);
+ const run=useRef(false),request=useRef<{key:string;fingerprint:string}|null>(null),sequence=useRef(0);
+ const load=async()=>{const seq=++sequence.current;setLoading(true);setError("");try{const r=await fetch("/api/partners",{cache:"no-store"}),v=await r.json();if(!r.ok)throw Error(v.error);if(seq===sequence.current)setData(v);}catch(e){if(seq===sequence.current){setData(null);setError(e instanceof Error?e.message:"Dados indisponíveis.");}}finally{if(seq===sequence.current)setLoading(false);}};
+ useEffect(()=>{setMonth(today().slice(0,7));void load();return()=>{sequence.current++;};},[]);
+ const permitted=(key:string,flag:boolean|undefined)=>!!flag&&hasPermission(key);
+ const manage=permitted("partners.manage",data?.allowed.manage),capital=permitted("partners.capital.manage",data?.allowed.capital),comp=permitted("partners.compensation.manage",data?.allowed.comp),link=permitted("access.manage",data?.allowed.link);
+ const update=<K extends keyof Draft>(k:K,v:Draft[K])=>setDraft(d=>({...d,[k]:v}));
+ const open=(kind:Modal,d:Partial<Draft>={})=>{setError("");setNotice("");request.current=null;setDraft({...initial(),date:today(),...(kind==="INVEST"?{partnerIds:data?.partners.filter(p=>p.status===1).map(p=>p.id)||[]}:{}),...d});setModal(kind);};
+ const edit=(p:Partner)=>open("PARTNER",{id:p.id,name:p.name,document:p.document||"",email:p.email,type:String(p.type),userId:p.userId||"",enableAccess:false,cap:value(p.capCents),base:value(p.baseCents),monthly:value(p.monthlyCents),notes:p.notes||""});
+ const mutate=async(action:string,payload:object)=>{const fingerprint=JSON.stringify({action,payload});if(request.current?.fingerprint!==fingerprint)request.current={fingerprint,key:crypto.randomUUID()};const r=await fetch("/api/partners",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,payload,requestKey:request.current.key})}),v=await r.json().catch(()=>({}));if(!r.ok)throw Error(v.error||"Operação não confirmada.");return v;};
+ const submit=async(e:React.FormEvent)=>{e.preventDefault();if(run.current||!modal)return;run.current=true;setSaving(true);setError("");try{
+ let p:Record<string,unknown>;
+ if(modal==="PARTNER"){p={id:draft.id||null,name:draft.name,document:draft.document,email:draft.email,type:Number(draft.type),userId:link?draft.userId||null:null,enableAccess:link&&draft.enableAccess,notes:draft.notes,...(comp?{capCents:cents(draft.cap),baseCents:cents(draft.base),monthlyCents:cents(draft.monthly)}:{})};}
+ else if(modal==="INVEST"){p={name:draft.name,category:draft.category,amountCents:cents(draft.amount),date:draft.date,reference:draft.reference,notes:draft.notes,partnerIds:draft.partnerIds,payableId:draft.payableId||null};}
+ else if(modal==="PAY"){p={mode:draft.mode,source:draft.source,amountCents:cents(draft.amount),date:draft.date,reference:draft.reference,partnerId:draft.mode==="PERSONAL"?draft.partnerId:null,investmentId:draft.investmentId||null,settlementId:draft.source==="SETTLEMENT"?draft.settlementId:null,confirmed:draft.confirmed,acceptPartial:draft.acceptPartial};}
+ else p={paymentId:draft.paymentId,reference:draft.reference};
+ const v=await mutate(modal,p);setModal(null);request.current=null;setPlan(null);setNotice(modal==="PAY"?"Amortização registrada: "+money(v.allocatedCents)+(n(v.unallocatedCents)>0?" · Não alocado: "+money(v.unallocatedCents):""):"Operação registrada com sucesso.");await load();
+ }catch(e){setError(e instanceof Error?e.message:"Operação não confirmada.");}finally{run.current=false;setSaving(false);}};
+ const planPayload=()=>({month:month+"-01",cashReserveCents:cents(cashReserve),stockReserveCents:cents(stockReserve),otherReserveCents:cents(otherReserve),reference:planRef,confirmed:planConfirmed});
+ const getPlan=async(save:boolean)=>{if(run.current)return;run.current=true;setSaving(true);setError("");setNotice("");try{const p={...planPayload(),...(save&&plan?{expected:{...plan,snapshotAt:undefined}}:{})};if(save&&(!plan?.eligible||!planConfirmed))throw Error("Confirme a proposta elegível antes de salvar.");const v=await mutate(save?"CLOSE":"PREVIEW",p);setPlan(v);if(save){setNotice("Planejamento aprovado e registrado. Nenhum pagamento foi executado.");request.current=null;await load();}}catch(e){setError(e instanceof Error?e.message:"Planejamento indisponível.");}finally{run.current=false;setSaving(false);}};
+ const filtered=(s:string)=>s.toLocaleLowerCase("pt-BR").includes(query.toLocaleLowerCase("pt-BR"));
+ const totals=useMemo(()=>({invested:data?.investments.reduce((s,x)=>s+n(x.amountCents),0)||0,paid:data?.investments.reduce((s,x)=>s+n(x.paidCents),0)||0,balance:data?.investments.reduce((s,x)=>s+n(x.balanceCents),0)||0}),[data]);
+ const tabs=[["overview","Visão geral"],["partners","Sócios"],...(data?.allowed.finance?[["investments","Investimentos"],["payments","Amortizações"],["statement","Extratos"]]:[]),...(data?.allowed.plan?[["closing","Fechamento mensal"]]:[]),["reports","Relatórios"]];
+ const exportCsv=(headers:string[],rows:(string|number)[][],name:string)=>{const text="\uFEFF"+[headers.map(x=>csvEscape(x,"text")).join(";"),...rows.map(r=>r.map(x=>csvEscape(x,typeof x==="number"?"money":"text")).join(";"))].join("\r\n");const url=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");a.href=url;a.download="HBStudio-"+name+".csv";a.click();URL.revokeObjectURL(url);};
+ const active=data?.partners.filter(p=>p.status===1)||[];
+ const selectedShares=data?.shares.filter(s=>(!draft.investmentId||s.investmentId===draft.investmentId)&&(draft.mode!=="PERSONAL"||s.partnerId===draft.partnerId)&&(!draft.date||(data.investments.find(i=>i.id===s.investmentId)?.date||"")<=draft.date)&&(draft.source==="SETTLEMENT"||!data.investments.find(i=>i.id===s.investmentId)?.payableId))||[];
+ const previewAmount=(()=>{try{return cents(draft.amount)}catch{return 0}})();
+ const paymentPreview=useMemo(()=>{const ids=[...new Set(selectedShares.map(s=>s.partnerId))].sort();return splitPartnerPayment(previewAmount,ids.map(id=>({id,name:selectedShares.find(s=>s.partnerId===id)?.name||id,balance:selectedShares.filter(s=>s.partnerId===id).reduce((a,s)=>a+n(s.balanceCents),0)})));},[selectedShares,previewAmount]);
+ const allocatedPreview=paymentPreview.reduce((s,x)=>s+x.allocation,0);
+ const chooseUser=(id:string)=>{const u=data?.users.find(x=>x.id===id);setDraft(d=>({...d,userId:id,email:u?.email||d.email,name:d.name||u?.name||""}));};
+ const chooseSettlement=(id:string)=>{const s=data?.settlements.find(x=>x.id===id);setDraft(d=>({...d,settlementId:id,investmentId:s?.investmentId||"",amount:s?value(s.amountCents):"",date:s?.date||today(),reference:s?.reference||""}));};
+ return <RootShellLayout><div className="space-y-5">
+ <header className={panel+" flex flex-wrap items-center justify-between gap-4"}><div><p className="text-[11px] font-bold uppercase tracking-wider text-violet-700">Governança · Capital e investimentos</p><h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold"><Users className="h-6 w-6 text-violet-700"/>Sócios & Investimentos</h1><p className="mt-1 text-xs text-slate-500">Responsabilidades individuais, amortizações, remuneração e planejamento financeiro.</p></div><div className="flex flex-wrap gap-2 print:hidden"><button className={btn} disabled={loading||saving} onClick={()=>void load()}><RefreshCw size={15}/>Atualizar</button>{manage&&<button className={btn} onClick={()=>open("PARTNER")}><Plus size={15}/>Sócio</button>}{capital&&<><button className={btn} onClick={()=>open("INVEST")}><Plus size={15}/>Investimento</button><button className={primary} onClick={()=>open("PAY")}><Wallet size={15}/>Registrar amortização</button></>}</div></header>
+ {error&&<div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}{notice&&<div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</div>}
+ {loading&&!data?<div className={panel}>Consultando dados oficiais...</div>:!data?<div className={panel}>Dados não confirmados. Use Atualizar.</div>:<>
+ <nav className="flex flex-wrap gap-1 rounded-xl border bg-white p-2 print:hidden">{tabs.map(([k,label])=><button key={k} onClick={()=>{setTab(k);setQuery("");}} className={"rounded-lg px-3 py-2 text-xs font-bold "+(tab===k?"bg-violet-700 text-white":"text-slate-600 hover:bg-violet-50")}>{label}</button>)}</nav>
+ {tab==="overview"&&<><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Stat label="Sócios ativos" amount={String(active.length)} sub="Quadro societário registrado"/><Stat label="Investimentos rateados" amount={data.allowed.finance?money(totals.invested):"Restrito"}/><Stat label="Amortizado líquido" amount={data.allowed.finance?money(totals.paid):"Restrito"}/><Stat label="Saldo a amortizar" amount={data.allowed.finance?money(totals.balance):"Restrito"}/></div><section className={panel}><h2 className="mb-3 text-sm font-extrabold">Posição individual</h2><Table headers={["Sócio","Cargo","Responsabilidade","Amortizado","Saldo","Parcela liberável/mês","Progresso"]} rows={data.partners.map(p=>[p.name,p.jobTitle||types[p.type],money(p.principalCents),money(p.paidCents),money(p.balanceCents),p.monthlyCents==null||p.balanceCents==null?"—":money(releaseMonthly(n(p.monthlyCents),n(p.balanceCents))),p.balanceCents==null?"—":<div className="min-w-[100px]"><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-violet-600" style={{width:(n(p.principalCents)>0?Math.min(100,n(p.paidCents)/n(p.principalCents)*100):0)+"%"}}/></div><p className="mt-1 text-[10px]">{n(p.principalCents)===0?"Sem investimento":n(p.balanceCents)===0?"Quitado":Math.floor(n(p.paidCents)/n(p.principalCents)*100)+"% amortizado"}</p></div>])}/></section><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Rateio gerencial não altera capital social, quotas ou aportes formalizados. As amortizações não geram pagamentos bancários automaticamente.</div></>}
+ {tab==="partners"&&<section className={panel}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-extrabold">Cadastro e vínculo de usuários</h2><input className="rounded-lg border px-3 py-2 text-xs" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar sócio"/>{manage&&<button className={primary} onClick={()=>open("PARTNER")}><Plus size={14}/>Cadastrar sócio</button>}</div><Table headers={["Nome","Tipo / cargo","Usuário vinculado","Acesso ERP","Participação","Base mensal","Parcela investimento","Ações"]} rows={data.partners.filter(p=>filtered(p.name+" "+(p.jobTitle||""))).map(p=>[p.name,types[p.type]+" · "+(p.jobTitle||"Sem cargo"),p.userId?p.email:"Sem vínculo",p.erpAccess?"Habilitado":"Não habilitado",p.share==null?"Não formalizada":p.share+"%",money(p.baseCents),money(p.monthlyCents),manage?<button className={btn} onClick={()=>edit(p)}>Editar</button>:"—"])}/><p className="mt-3 text-xs text-slate-500">Participação societária é consultada do contrato registrado. O cadastro de usuário não cria quotas, e a função CEO não concede permissões por si só.</p></section>}
+ {tab==="investments"&&<section className={panel}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-extrabold">Investimentos e rateios</h2><input className="rounded-lg border px-3 py-2 text-xs" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar investimento"/>{capital&&<button className={primary} onClick={()=>open("INVEST")}><Plus size={14}/>Novo investimento</button>}<button className={btn} onClick={()=>exportCsv(["Investimento","Categoria","Data","Valor","Amortizado","Saldo"],data.investments.filter(i=>filtered(i.name+" "+i.reference)).map(i=>[i.name,cats[i.category],i.date,n(i.amountCents)/100,n(i.paidCents)/100,n(i.balanceCents)/100]),"investimentos")}><Download size={14}/>CSV</button><button className={btn} onClick={()=>window.print()}><Printer size={14}/>Imprimir / PDF</button></div><Table headers={["Investimento","Data","Categoria","Referência","Total","Amortizado","Saldo","Sócios"]} rows={data.investments.filter(i=>filtered(i.name+" "+i.reference)).map(i=>[<button key={i.id} className="text-left font-bold text-violet-700" onClick={()=>setExpanded(expanded===i.id?"":i.id)}>{i.name}</button>,day(i.date),cats[i.category],i.reference+(i.payableId?" · Título vinculado":""),money(i.amountCents),money(i.paidCents),money(i.balanceCents),i.participants])}/>{expanded&&data.investments.some(i=>i.id===expanded)&&<div className="mt-4"><h3 className="mb-2 text-xs font-bold">Rateio · {data.investments.find(i=>i.id===expanded)?.name}</h3><Table headers={["Sócio","Responsabilidade","Amortizado","Saldo"]} rows={data.shares.filter(s=>s.investmentId===expanded).map(s=>[s.name,money(s.principalCents),money(s.paidCents),money(s.balanceCents)])}/></div>}</section>}
+ {tab==="payments"&&<section className={panel}><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-extrabold">Histórico de amortizações</h2><input className="rounded-lg border px-3 py-2 text-xs" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar comprovante"/>{capital&&<button className={primary} onClick={()=>open("PAY")}>Registrar pagamento</button>}<button className={btn} onClick={()=>window.print()}><Printer size={14}/>Imprimir / PDF</button></div>{(data.payments[0]?.total||0)>1000&&<p className="mb-2 text-xs text-amber-700">Últimos 1.000 pagamentos. Consulte o histórico completo por período na Central de Relatórios.</p>}<Table headers={["Data","Tipo","Origem","Referência","Valor","Operador / filial","Ações"]} rows={data.payments.filter(p=>filtered(p.reference+" "+p.actor)).map(p=>[day(p.date),modes[p.mode],sources[p.source],<button key={p.id} className="text-left font-bold text-violet-700" onClick={()=>setExpanded(expanded===p.id?"":p.id)}>{p.reference}</button>,money(p.mode==="REVERSAL"?-n(p.amountCents):p.amountCents),p.actor+" · "+p.branch,capital&&p.reversible?<button className={btn} onClick={()=>open("REVERSE",{paymentId:p.id})}>Reverter registro</button>:"—"])}/>{expanded&&data.payments.some(p=>p.id===expanded)&&<div className="mt-4"><h3 className="mb-2 text-xs font-bold">Detalhamento do pagamento</h3><Table headers={["Sócio","Investimento","Valor aplicado"]} rows={data.lines.filter(l=>l.paymentId===expanded).map(l=>[l.partner,l.investment,money(l.amountCents)])}/></div>}</section>}
+ {tab==="statement"&&<section className={panel}><div className="mb-4 flex flex-wrap items-center gap-2"><h2 className="mr-auto text-sm font-extrabold">Extrato individual</h2><select className="rounded-xl border px-3 py-2 text-sm" value={selectedPartner} onChange={e=>setSelectedPartner(e.target.value)}><option value="">Todos os sócios</option>{data.partners.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button className={btn} onClick={()=>exportCsv(["Sócio","Investimento","Responsabilidade","Amortizado","Saldo"],data.shares.filter(s=>!selectedPartner||s.partnerId===selectedPartner).map(s=>[s.name,data.investments.find(i=>i.id===s.investmentId)?.name||"",n(s.principalCents)/100,n(s.paidCents)/100,n(s.balanceCents)/100]),"extrato-socios")}><Download size={14}/>CSV</button><button className={btn} onClick={()=>window.print()}><Printer size={14}/>Imprimir / PDF</button></div><Table headers={["Sócio","Investimento","Responsabilidade","Amortizado","Saldo"]} rows={data.shares.filter(s=>!selectedPartner||s.partnerId===selectedPartner).map(s=>[s.name,data.investments.find(i=>i.id===s.investmentId)?.name||"—",money(s.principalCents),money(s.paidCents),money(s.balanceCents)])}/><h3 className="mb-2 mt-5 text-xs font-bold">Pagamentos por sócio · últimos registros</h3><Table headers={["Data","Sócio","Investimento","Comprovante","Valor aplicado"]} rows={data.lines.filter(l=>!selectedPartner||l.partnerId===selectedPartner).map(l=>[day(data.payments.find(p=>p.id===l.paymentId)?.date||""),l.partner,l.investment,data.payments.find(p=>p.id===l.paymentId)?.reference||"—",money(l.amountCents)])}/></section>}
+ {tab==="closing"&&<section className={panel}><h2 className="text-sm font-extrabold">Planejamento de fechamento mensal</h2><p className="mt-1 text-xs text-slate-500">Competência dos lançamentos e posição bancária conciliada atual. Não representa fechamento contábil certificado nem executa pagamentos. Aprovação apenas para mês encerrado, filial única e recursos suficientes.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:hidden"><Field label="Mês de referência"><input className={input} type="month" value={month} onChange={e=>{setMonth(e.target.value);setPlan(null);setPlanConfirmed(false);}}/></Field>{[["Reserva de caixa",cashReserve,setCashReserve],["Reserva de estoque",stockReserve,setStockReserve],["Outras reservas",otherReserve,setOtherReserve]].map(([label,v,set])=><Field key={String(label)} label={String(label)}><input className={input} type="number" min="0" step="0.01" value={String(v)} onChange={e=>{(set as (x:string)=>void)(e.target.value);setPlan(null);setPlanConfirmed(false);}}/></Field>)}</div><button className={primary+" mt-3 print:hidden"} disabled={saving||!month} onClick={()=>{setPlanConfirmed(false);void getPlan(false);}}>Calcular proposta</button>{plan&&<div className="mt-4 space-y-4"><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[["Receitas registradas",plan.revenueCents],["Despesas registradas",plan.expenseCents],["Resultado de competência",plan.resultCents],["Saldo bancário considerado",plan.bankCents],["Obrigações em aberto",plan.payablesCents],["Disponibilidade após reservas",plan.availableCents],["Remuneração-base planejada",plan.baseCents],["Limite extra disponível",plan.poolCents]].map(([l,v])=><Stat key={String(l)} label={String(l)} amount={money(v)}/>)}</div><div className={"rounded-xl p-3 text-xs "+(plan.eligible?"bg-emerald-50 text-emerald-800":"bg-amber-50 text-amber-900")}>{plan.eligible?"Proposta elegível para aprovação, sujeita à conferência financeira.":"Proposta bloqueada: verifique competência encerrada, disponibilidade conciliada, lançamentos íntegros, reservas e valores mensais."} · {plan.bankCount} conta(s) · {plan.journalCount} lançamento(s) · {plan.unbalancedCount} divergência(s).</div><Table headers={["Sócio","Saldo atual","Base","Parcela mensal","Amortização planejada","Parcela liberada","Potencial bruto","Registro"]} rows={plan.lines.map(l=>[l.name,money(l.balanceCents),money(l.baseCents),money(l.monthlyCents),money(l.amortizeCents),money(l.releaseCents),money(l.potentialCents),capital&&plan.id&&n(l.amortizeCents)>0?<button className={btn} onClick={()=>open("PAY",{mode:"PERSONAL",partnerId:l.partnerId,amount:value(l.amortizeCents)})}>Registrar após pagar</button>:"—"])}/>{data.allowed.approve&&plan.eligible&&!plan.id&&<div className="space-y-2 print:hidden"><Field label="Referência da deliberação / aprovação"><input className={input} value={planRef} onChange={e=>setPlanRef(e.target.value)} maxLength={250}/></Field><label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={planConfirmed} onChange={e=>setPlanConfirmed(e.target.checked)}/>Confirmei os saldos, obrigações e reservas. Aprovo apenas o planejamento; a liquidação será registrada separadamente.</label><button className={primary} disabled={saving||!planConfirmed||planRef.trim().length<5} onClick={()=>void getPlan(true)}>Registrar planejamento aprovado</button></div>}</div>}<h3 className="mb-2 mt-6 text-sm font-bold">Planejamentos registrados</h3><Table headers={["Competência","Disponibilidade","Resultado registrado","Consulta"]} rows={data.plans.map(p=>[p.month.slice(0,7),money(p.snapshot.availableCents),money(p.snapshot.resultCents),<button className={btn} onClick={()=>{setPlan({...p.snapshot,id:p.id});setPlanConfirmed(false);}}>Abrir snapshot</button>])}/></section>}
+ {tab==="reports"&&<section className={panel}><h2 className="text-sm font-extrabold">Relatórios societários e financeiros</h2><p className="mt-2 text-xs text-slate-500">Consulte valores oficiais por período, exporte CSV compatível com Excel ou imprima/salve PDF pelo navegador. Capital social, mútuos, lucros e amortizações gerenciais permanecem distintos.</p><a href="/reports" className={primary+" mt-4"}><FileText size={15}/>Abrir Central de Relatórios</a></section>}
+ </>}
+ {modal&&data&&<div role="dialog" aria-modal="true" aria-label="Cadastro societário" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 print:hidden"><form onSubmit={submit} className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-extrabold">{modal==="PARTNER"?draft.id?"Editar sócio":"Cadastrar sócio":modal==="INVEST"?"Novo investimento":modal==="PAY"?"Registrar amortização":"Reverter amortização"}</h2><button type="button" className={btn} disabled={saving} onClick={()=>setModal(null)}>Fechar</button></div>{error&&<div role="alert" className="mb-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-800">{error}</div>}<fieldset disabled={saving} className="space-y-3">
+ {modal==="PARTNER"&&<><div className="grid gap-3 sm:grid-cols-2"><Field label="Nome completo"><input required className={input} value={draft.name} onChange={e=>update("name",e.target.value)} maxLength={200}/></Field><Field label="CPF ou CNPJ"><input required className={input} value={draft.document} onChange={e=>update("document",e.target.value)} maxLength={20}/></Field><Field label="Tipo societário"><select className={input} value={draft.type} onChange={e=>update("type",e.target.value)}>{Object.entries(types).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field><Field label="E-mail"><input type="email" className={input} value={draft.email} disabled={!!draft.userId} onChange={e=>update("email",e.target.value)}/></Field></div>{link&&<><Field label="Vincular usuário existente (cargo do cadastro)"><select className={input} value={draft.userId} onChange={e=>chooseUser(e.target.value)}><option value="">Sem vínculo</option>{data.users.filter(u=>!u.partnerId||u.partnerId===draft.id).map(u=><option key={u.id} value={u.id}>{u.name} · {u.jobTitle}</option>)}</select></Field><label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!draft.userId} checked={draft.enableAccess} onChange={e=>update("enableAccess",e.target.checked)}/>Habilitar acesso ERP explicitamente (somente usuário já autorizado por papéis)</label><p className="text-[11px] text-slate-500">Vincular não cria senha ou papel de segurança. O acesso ativo existente não é revogado por desmarcar.</p></>}{comp&&<div className="grid gap-3 sm:grid-cols-3">{[["Teto pró-labore","cap"],["Remuneração-base","base"],["Parcela mensal investimento","monthly"]].map(([l,k])=><Field key={k} label={l+" (R$)"}><input required className={input} type="number" min="0" step="0.01" value={String(draft[k as "cap"|"base"|"monthly"])} onChange={e=>update(k as "cap"|"base"|"monthly",e.target.value)}/></Field>)}</div>}<Field label="Observações"><textarea className={input} maxLength={1000} value={draft.notes} onChange={e=>update("notes",e.target.value)}/></Field></>}
+ {modal==="INVEST"&&<><Field label="Nome do investimento"><input className={input} required maxLength={200} value={draft.name} onChange={e=>update("name",e.target.value)} placeholder="Obra da loja"/></Field><div className="grid gap-3 sm:grid-cols-3"><Field label="Categoria"><select className={input} value={draft.category} onChange={e=>update("category",e.target.value)}>{Object.entries(cats).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></Field><Field label="Valor (R$)"><input className={input} type="number" min="0.01" step="0.01" required value={draft.amount} onChange={e=>update("amount",e.target.value)}/></Field><Field label="Data"><input className={input} type="date" required value={draft.date} onChange={e=>update("date",e.target.value)}/></Field></div><Field label="Documento / referência"><input className={input} required minLength={3} maxLength={250} value={draft.reference} onChange={e=>update("reference",e.target.value)}/></Field><Field label="Título a pagar existente (opcional)"><select className={input} value={draft.payableId} onChange={e=>{const a=data.payables.find(x=>x.id===e.target.value);setDraft(d=>({...d,payableId:e.target.value,amount:a?value(a.amountCents):d.amount}));}}><option value="">Sem título associado</option>{data.payables.map(a=><option key={a.id} value={a.id}>{a.title} · {a.description} · {money(a.amountCents)}</option>)}</select></Field><p className="text-xs font-bold">Participantes · rateio igualitário</p><div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border p-3">{active.map(p=><label key={p.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draft.partnerIds.includes(p.id)} onChange={e=>update("partnerIds",e.target.checked?[...draft.partnerIds,p.id]:draft.partnerIds.filter(id=>id!==p.id))}/>{p.name}</label>)}</div>{draft.partnerIds.length>0&&previewAmount>0&&<div className="rounded-lg bg-violet-50 p-3 text-xs text-violet-900">Rateio: {draft.partnerIds.length} sócios · aproximadamente {money(Math.floor(previewAmount/draft.partnerIds.length))} por sócio. Diferenças de centavos serão distribuídas deterministicamente.</div>}<Field label="Observações"><textarea className={input} maxLength={1000} value={draft.notes} onChange={e=>update("notes",e.target.value)}/></Field></>}
+ {modal==="PAY"&&<><div className="grid gap-3 sm:grid-cols-2"><Field label="Forma de amortização"><select className={input} value={draft.mode} onChange={e=>update("mode",e.target.value)}><option value="COLLECTIVE">Coletiva / igualitária</option><option value="PERSONAL">Individual</option></select></Field><Field label="Origem comprovada"><select className={input} value={draft.source} onChange={e=>setDraft(d=>({...d,source:e.target.value,settlementId:"",investmentId:"",confirmed:false}))}><option value="EXTERNAL">Pagamento externo comprovado</option>{data.allowed.settlement&&<option value="SETTLEMENT">Liquidação registrada no financeiro</option>}</select></Field></div>{draft.mode==="PERSONAL"&&<Field label="Sócio"><select required className={input} value={draft.partnerId} onChange={e=>update("partnerId",e.target.value)}><option value="">Selecione</option>{data.partners.filter(p=>n(p.balanceCents)>0).map(p=><option key={p.id} value={p.id}>{p.name} · {money(p.balanceCents)}</option>)}</select></Field>}{draft.source==="SETTLEMENT"?<Field label="Liquidação do título vinculado"><select required className={input} value={draft.settlementId} onChange={e=>chooseSettlement(e.target.value)}><option value="">Selecione</option>{data.settlements.map(s=><option key={s.id} value={s.id}>{s.reference} · {money(s.amountCents)}</option>)}</select></Field>:<Field label="Investimento"><select className={input} value={draft.investmentId} onChange={e=>update("investmentId",e.target.value)}><option value="">Todos os elegíveis (mais antigos primeiro)</option>{data.investments.filter(i=>!i.payableId&&n(i.balanceCents)>0).map(i=><option key={i.id} value={i.id}>{i.name} · {money(i.balanceCents)}</option>)}</select></Field>}<div className="grid gap-3 sm:grid-cols-2"><Field label="Valor efetivamente pago (R$)"><input type="number" min="0.01" step="0.01" required className={input} readOnly={draft.source==="SETTLEMENT"} value={draft.amount} onChange={e=>update("amount",e.target.value)}/></Field><Field label="Data do pagamento"><input type="date" required className={input} readOnly={draft.source==="SETTLEMENT"} value={draft.date} onChange={e=>update("date",e.target.value)}/></Field></div><Field label="Referência única do comprovante"><input className={input} required minLength={3} maxLength={250} value={draft.reference} onChange={e=>update("reference",e.target.value)}/></Field>{previewAmount>0&&<div className="space-y-2 rounded-lg bg-violet-50 p-3 text-xs"><p className="font-bold">Prévia de alocação (saldo atual; backend recalcula)</p>{paymentPreview.map(p=><div key={p.id} className="flex justify-between gap-2"><span>{p.name}</span><strong>{money(p.allocation)}</strong></div>)}<div className="flex justify-between border-t pt-2"><strong>Alocado</strong><strong>{money(allocatedPreview)}</strong></div>{allocatedPreview<previewAmount&&<p className="text-amber-800">Não alocado: {money(previewAmount-allocatedPreview)}. O excesso não reduz os demais saldos.</p>}</div>}{draft.mode==="COLLECTIVE"&&draft.source==="EXTERNAL"&&<label className="flex gap-2 text-xs"><input type="checkbox" checked={draft.acceptPartial} onChange={e=>update("acceptPartial",e.target.checked)}/>Aceito registrar somente a parcela alocável; eventual excesso não será contabilizado neste módulo.</label>}<label className="flex items-start gap-2 text-xs"><input required type="checkbox" checked={draft.confirmed} onChange={e=>update("confirmed",e.target.checked)}/>Confirmo que o pagamento ocorreu e que a referência é válida. Esta ação não transfere dinheiro.</label></>}
+ {modal==="REVERSE"&&<><p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">O estorno corrige o registro gerencial e reabre os saldos individuais. Não estorna dinheiro em banco nem apaga o histórico.</p><Field label="Motivo e referência da correção"><input className={input} required minLength={5} maxLength={250} value={draft.reference} onChange={e=>update("reference",e.target.value)}/></Field></>}
+ </fieldset><div className="mt-5 flex justify-end gap-2"><button type="button" disabled={saving} className={btn} onClick={()=>setModal(null)}>Cancelar</button><button className={primary} disabled={saving||(modal==="INVEST"&&!draft.partnerIds.length)||(modal==="PAY"&&(!draft.confirmed||allocatedPreview===0))}>{saving?"Registrando...":"Confirmar"}</button></div></form></div>}
+ </div></RootShellLayout>;
 }
