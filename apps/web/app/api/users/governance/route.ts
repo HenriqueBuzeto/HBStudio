@@ -1,23 +1,10 @@
 import {NextRequest,NextResponse,connection} from "next/server";
 import {randomBytes,pbkdf2} from "node:crypto";
 import {promisify} from "node:util";
-import {z} from "zod";
+import {governanceSchemas,governanceValidationMessage} from "@/lib/governance-validation";
 import {authorizeFleet,guardOrigin,FleetError} from "@/lib/fleet-session";
 const noCache={"Cache-Control":"no-store"};
-const id=z.string().uuid();
-const optId=z.union([id,z.literal("")]).optional().default("");
-const money=z.number().int().min(0).max(100000000000);
-const version=z.string().min(1).max(100);
-const secret=z.string().min(12).max(128);
-const named={name:z.string().trim().min(2).max(100),description:z.string().max(500).optional().default("")};
-const schemas=z.discriminatedUnion("action",[
- z.object({action:z.literal("POSITION"),payload:z.object({...named,id:optId,version:version.optional(),code:z.string().trim().max(30).optional().default(""),level:z.enum(["EXECUTIVE","MANAGEMENT","OPERATIONAL","OTHER"]).optional().default("OTHER"),recommendedRoleId:optId,active:z.boolean().optional().default(true)})}),
- z.object({action:z.literal("CENTER"),payload:z.object({...named,name:z.string().trim().min(2).max(150),code:z.string().trim().min(1).max(50)})}),
- z.object({action:z.literal("ROLE"),payload:z.object({...named,id:optId,version:version.optional(),permissions:z.array(z.string().min(1).max(150)).min(1).max(500)})}),
- z.object({action:z.literal("USER"),payload:z.object({id:optId,version:version.optional(),name:z.string().trim().min(2).max(200),email:z.string().trim().email().max(250),positionId:optId,centerId:optId,partnerId:optId,roleIds:z.array(id).max(100),phone:z.string().max(40),notes:z.string().max(1000),admissionDate:z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/),z.literal("")]),baseCents:money.optional(),capCents:money.optional(),monthlyCents:money.optional(),expectedComp:z.object({baseCents:money.nullable(),capCents:money.nullable(),monthlyCents:money.nullable()}).optional(),password:secret.optional()})}),
- z.object({action:z.literal("PASSWORD"),payload:z.object({id,version,password:secret})}),
- z.object({action:z.literal("STATUS"),payload:z.object({id,version,active:z.boolean()})})
-]);
+
 function fail(e:unknown){if(e instanceof FleetError)return NextResponse.json({error:e.message},{status:e.status,headers:noCache});
  const x=e as {code?:string;message?:string};const msg=x.message||"";
  const rules:Record<string,string>={GOV_FORBIDDEN:"Você não possui permissão para esta operação.",GOV_PERMISSION_ESCALATION:"Você não pode conceder permissões que não possui nem alterar uma conta mais privilegiada.",GOV_SYSTEM_ROLE:"O perfil original do sistema é protegido. Crie um perfil personalizado.",GOV_PROTECTED_ROLE:"Não é possível alterar um perfil utilizado pela sua própria conta ou por usuários mais privilegiados.",GOV_PROTECTED_USER:"Sua própria conta não pode ser desativada ou ter os acessos alterados por esta tela.",GOV_CONFLICT:"O registro foi alterado por outro usuário. Atualize e tente novamente.",GOV_INVALID_PARTNER:"Selecione um sócio ativo, sem vínculo, com e-mail correspondente e perfil de acesso válido.",GOV_EMAIL_PROTECTED:"O e-mail de acesso existente é protegido para preservar o vínculo societário.",GOV_CENTER_ASSIGNED:"O centro de custo não está disponível ou já possui outro responsável.",GOV_INVALID_POSITION:"Selecione um cargo ativo cadastrado.",GOV_POSITION_IN_USE:"Este cargo ainda possui usuários vinculados. Transfira-os antes de inativá-lo.",GOV_POSITION_MISMATCH:"Cargo e cadastro do usuário não correspondem.",GOV_PARTNER_CHANGED:"O vínculo societário mudou. Atualize o cadastro.",GOV_COMP_CONFLICT:"A remuneração foi alterada em Sócios & Capital. Atualize antes de salvar.",GOV_REQUIRED_ROLE:"O sócio com acesso ativo precisa de um perfil de permissão.",GOV_VALIDATION:"Revise os campos, inclusive remuneração e teto de pró-labore.",GOV_DUPLICATE:"Já existe um registro com esse nome.",GOV_NOT_FOUND:"Registro não encontrado."};
@@ -36,7 +23,7 @@ export async function GET(req:NextRequest){
  }catch(e){return fail(e);}
 }
 export async function POST(req:NextRequest){try{guardOrigin(req);const ctx=await authorizeFleet(req,"access.manage");const raw=await req.text();if(raw.length>60000)throw new FleetError(413,"SIZE","Solicitação muito extensa.");let body:unknown;try{body=JSON.parse(raw)}catch{throw new FleetError(422,"BODY","Dados inválidos.");}
- const parsed=schemas.safeParse(body);if(!parsed.success)throw new FleetError(422,"VALIDATION","Revise os campos obrigatórios. A senha deve ter entre 12 e 128 caracteres.");
+ const parsed=governanceSchemas.safeParse(body);if(!parsed.success)throw new FleetError(422,"VALIDATION",governanceValidationMessage(parsed.error));
  const {action,payload}=parsed.data;const p:Record<string,unknown>={...payload};
  if((action==="USER"||action==="ROLE"||action==="POSITION")&&p.id&&!p.version)throw new FleetError(422,"VERSION","Atualize o registro antes de editar.");
  if(action==="PASSWORD"||action==="USER"&&!p.id){if(typeof p.password!=="string")throw new FleetError(422,"PASSWORD","Informe a senha inicial.");const salt=randomBytes(16),hash=await promisify(pbkdf2)(p.password,salt,600000,32,"sha256");p.hash="v1.600000."+salt.toString("base64")+"."+hash.toString("base64");}
