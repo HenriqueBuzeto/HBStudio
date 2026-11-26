@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import crypto from "crypto";
+import {fleetSource} from "@/lib/fleet-source";
 import { authorizeFleet, guardOrigin, FleetError, uuid, string, optional, decimal, enumValue, type FleetSession } from "@/lib/fleet-session";
 
 const json=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
 function issue(e:unknown,cid:string){
  if(e instanceof FleetError)return NextResponse.json({code:e.code,error:e.message},{status:e.status,headers:{"X-Correlation-Id":cid,"Cache-Control":"no-store"}});
  const message=e instanceof Error?e.message:"unknown";
- console.error("[FLEET]["+cid+"]",message);
+ console.error("[FLEET]["+cid+"]",e instanceof Error?e.name:"unknown");
  if(/unique|duplicate key|23505/i.test(message))return NextResponse.json({code:"DUPLICATE",error:"Já existe veículo ou viagem com esta identificação."},{status:409});
  return NextResponse.json({code:"FLEET_DATABASE_ERROR",error:"Operação não concluída. Verifique os dados e tente novamente."},{status:503,headers:{"X-Correlation-Id":cid}});
 }
@@ -22,7 +23,7 @@ async function audit(ctx:FleetSession,entity:string,id:string,action:string,deta
 }
 async function overview(ctx:FleetSession){
  const [vehicles,trips,maintenance,fuelings,partners]=await Promise.all([
-  ctx.db.query('SELECT v."Id"::text AS id,v."InternalCode" AS name,v."Plate" AS plate,v."Brand" AS brand,v."Model" AS model,v."Year" AS year,v."Type" AS type,v."Ownership" AS ownership,v."Fuel" AS fuel,v."TankCapacityLiters"::float8 AS "tankLiters",v."AverageConsumptionKmPerLiter"::float8 AS "kmPerLiter",v."InitialOdometerKm"::float8 AS "initialKm",v."CurrentOdometerKm"::float8 AS "currentKm",v."OwnerPartnerId"::text AS "partnerId",v."ResponsibleName" AS "ownerName",v."Status" AS status,v."Notes" AS notes,v."CreatedAtUtc" AS "createdAt",v.xmin::text AS version FROM fleet_vehicles v WHERE v."TenantId"=$1::uuid AND v."BranchId"=$2::uuid ORDER BY v."InternalCode" LIMIT 500',[ctx.tenantId,ctx.branchId]),
+  ctx.db.query('SELECT v."Id"::text AS id,v."InternalCode" AS name,v."Plate" AS plate,v."Brand" AS brand,v."Model" AS model,v."Year" AS year,v."Type" AS type,v."Ownership" AS ownership,v."Fuel" AS fuel,v."TankCapacityLiters"::float8 AS "tankLiters",v."AverageConsumptionKmPerLiter"::float8 AS "kmPerLiter",v."InitialOdometerKm"::float8 AS "initialKm",v."CurrentOdometerKm"::float8 AS "currentKm",v."OwnerPartnerId"::text AS "partnerId",v."ResponsibleName" AS "ownerName",v."Status" AS status,v."Notes" AS notes,v."CreatedAtUtc" AS "createdAt",v.xmin::text AS version FROM fleet_vehicles v WHERE v."TenantId"=$1::uuid AND v."BranchId"=$2::uuid ORDER BY v."InternalCode",v."Id"',[ctx.tenantId,ctx.branchId]),
   ctx.db.query('SELECT t."Id"::text AS id,t."TripNumber" AS number,t."VehicleId"::text AS "vehicleId",v."Plate" AS plate,v."InternalCode" AS "vehicleName",t."DriverName" AS driver,t."Purpose" AS purpose,t."OriginCity" AS origin,t."DestinationCity" AS destination,t."Description" AS description,t."InitialOdometerKm"::float8 AS "startKm",t."FinalOdometerKm"::float8 AS "endKm",t."DistanceKm"::float8 AS distance,t."Status" AS status,t."StartTimeUtc" AS "startedAt",t."EndTimeUtc" AS "endedAt",t."Notes" AS notes,t."TotalFuelExpenses"::float8 AS "fuelExpenses",t.xmin::text AS version FROM fleet_trips t JOIN fleet_vehicles v ON v."Id"=t."VehicleId" AND v."TenantId"=t."TenantId" AND v."BranchId"=t."BranchId" WHERE t."TenantId"=$1::uuid AND t."BranchId"=$2::uuid ORDER BY t."StartTimeUtc" DESC LIMIT 500',[ctx.tenantId,ctx.branchId]),
   ctx.db.query('SELECT p."Id"::text AS id,p."VehicleId"::text AS "vehicleId",p."PlanName" AS name,p."RecommendedIntervalKm" AS "intervalKm",p."RecommendedIntervalDays" AS "intervalDays",p."NextServiceOdometerKm"::float8 AS "nextKm",p."NextServiceDateUtc" AS "nextDate",p."IsActive" AS active FROM fleet_maintenance_plans p JOIN fleet_vehicles v ON v."Id"=p."VehicleId" AND v."TenantId"=p."TenantId" AND v."BranchId"=$2::uuid WHERE p."TenantId"=$1::uuid AND p."IsActive"=true ORDER BY p."PlanName"',[ctx.tenantId,ctx.branchId]),
   ctx.permissions.has("fleet.cost.view") ? ctx.db.query('SELECT f."Id"::text AS id,f."VehicleId"::text AS "vehicleId",f."TripId"::text AS "tripId",f."FuelingDateUtc" AS date,f."GasStationName" AS station,f."TotalAmount"::float8 AS amount,f."Liters"::float8 AS liters,f."OdometerKm"::float8 AS odometer FROM fleet_fuelings f WHERE f."TenantId"=$1::uuid AND f."BranchId"=$2::uuid ORDER BY f."FuelingDateUtc" DESC LIMIT 100',[ctx.tenantId,ctx.branchId]) : Promise.resolve([]),
@@ -118,6 +119,7 @@ async function finishTrip(ctx:FleetSession,id:string,b:Record<string,unknown>,ci
 
 type RouteContext={params:Promise<{path:string[]}>};
 async function handle(request:NextRequest,ctx:RouteContext,method:"GET"|"POST"|"PATCH"){
+ await connection();
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try {
   const path=(await ctx.params).path;
@@ -129,8 +131,12 @@ async function handle(request:NextRequest,ctx:RouteContext,method:"GET"|"POST"|"
    else throw new FleetError(404,"NOT_FOUND","Rota não encontrada.");
   }
   const auth=await authorizeFleet(request,permission);
+  const identity=await auth.db.query('SELECT current_setting(\'neon.branch_id\',true) AS "neonBranch",b."Name" AS "branchName" FROM branches b WHERE b."TenantId"=$1::uuid AND b."Id"=$2::uuid AND b."IsActive"',[auth.tenantId,auth.branchId]);
+  const source=identity[0]?fleetSource(identity[0].neonBranch,process.env.VERCEL_ENV,identity[0].branchName):null;
+  if(!source)throw new FleetError(503,"FLEET_SOURCE_UNVERIFIED","Origem do banco ou filial não confirmada. Nenhuma operação foi executada.");
+  if(method!=="GET"&&!source.writable)throw new FleetError(403,"FLEET_MAIN_READ_ONLY","O banco principal está em modo somente leitura fora da produção. Acesse o endereço oficial para alterar dados.");
   let result:unknown,status=200;
-  if(method==="GET"&&path.length===1&&path[0]==="overview")result=await overview(auth);
+  if(method==="GET"&&path.length===1&&path[0]==="overview")result={...await overview(auth),source};
   else if(method==="POST"&&path.length===1&&path[0]==="vehicles"){result=await registerVehicle(auth,await body(request),cid);status=201;}
   else if(method==="PATCH"&&path.length===2&&path[0]==="vehicles"){result=await editVehicle(auth,uuid(path[1]),await body(request),cid);}
   else if(method==="PATCH"&&path.length===3&&path[0]==="vehicles"&&path[2]==="odometer"){result=await correctOdometer(auth,uuid(path[1]),await body(request),cid);}

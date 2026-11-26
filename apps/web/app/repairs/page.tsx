@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import RepairCatalogPicker,{type RepairCatalogOption,repairMoney} from "@/components/RepairCatalogPicker";
 import {getBrowserPrintSettings,buildPrintUrl} from "@/lib/browser-print";
 import { useAuth } from "@/lib/auth";
 import {
@@ -56,7 +57,7 @@ export default function RepairsPage() {
   const [deliveryRequest, setDeliveryRequest] = useState<string | null>(null);
   const [deliveryRecipient, setDeliveryRecipient] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
-  const [itemDraft,setItemDraft]=useState<{orderId:string;itemType:1|2;description:string;quantity:string;unitPrice:string}|null>(null);
+  const [itemDraft,setItemDraft]=useState<{orderId:string;itemType:1|2;description:string;quantity:string;unitPrice:string;productSkuId?:string}|null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [tvMode, setTvMode] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
@@ -64,7 +65,7 @@ export default function RepairsPage() {
 
   // Dados auxiliares para vincular cliente e produtos
   const [auxCustomers, setAuxCustomers] = useState<{ id: string; name: string }[]>([]);
-  const [auxProducts, setAuxProducts] = useState<{ id: string; name: string; skuCode: string; price: number }[]>([]);
+  const [auxProducts, setAuxProducts] = useState<RepairCatalogOption[]>([]);
 
   // Modais
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -93,6 +94,7 @@ export default function RepairsPage() {
       setLoading(true);
       const data = await readApi(await fetch("/api/repairs/orders", { cache: "no-store" }));
       setOrders(data.orders || []);
+      setSelectedOrder((prev:any)=>prev?(data.orders||[]).find((o:any)=>o.id===prev.id)||null:null);
     } catch(err) {
       setErrorMessage(err instanceof Error ? err.message : "Falha ao consultar OS no Neon.");
     } finally { setLoading(false); }
@@ -103,6 +105,7 @@ export default function RepairsPage() {
       setAuxCustomers(data.customers || []);
       setAuxProducts(data.products || []);
     } catch(err) {
+      setAuxProducts([]);
       setErrorMessage(err instanceof Error ? err.message : "Falha ao consultar dados auxiliares.");
     }
   };
@@ -119,13 +122,14 @@ export default function RepairsPage() {
   const handleCreateSubmit = async (event:React.FormEvent) => {
     event.preventDefault();
     if(saving) return;
-    const prefs=getBrowserPrintSettings();
-    const pendingPrint=prefs.autoPrintService?window.open("about:blank","_blank"):null;
+    if(initialItems.some(i=>!i.productSkuId||i.quantity<=0)){setErrorMessage("Selecione os itens cadastrados e informe as quantidades.");return;}
     setPrintRetryUrl("");
     if (!reportedDefect.trim() || (!selectedCustomerId && !createCustomerName.trim())) {
       setErrorMessage("Informe o cliente e o defeito relatado.");
       return;
     }
+    const prefs=getBrowserPrintSettings();
+    const pendingPrint=prefs.autoPrintService?window.open("about:blank","_blank"):null;
     try {
       setSaving(true); setErrorMessage(null);setSuccessMessage(null);
       if (!createRequestKey.current) createRequestKey.current = crypto.randomUUID();
@@ -192,13 +196,12 @@ export default function RepairsPage() {
       setSaving(true);setErrorMessage(null);setSuccessMessage(null);
       await readApi(await fetch(`/api/repairs/orders/${encodeURIComponent(orderId)}`,{
         method:"PUT",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({items:updatedItems.map(i=>({itemType:i.itemType,
+        body:JSON.stringify({items:updatedItems.map(i=>({id:i.id||null,itemType:i.itemType,
           description:i.description,quantity:i.quantity,unitPrice:i.unitPrice,productSkuId:i.productSkuId||null})),
           expectedStatus:current.status,expectedUpdatedAtUtc:current.updatedAtUtc||null})
       }));
       setSuccessMessage("Itens e totais da OS atualizados com sucesso.");
       await loadOrders();
-      setSelectedOrder((prev:any)=>prev?.id===orderId?{...prev,items:updatedItems}:prev);
       return true;
     } catch(err) {
       setErrorMessage(err instanceof Error?err.message:"Erro ao salvar itens.");
@@ -378,7 +381,7 @@ export default function RepairsPage() {
             </button>
 
             <button
-              onClick={() => {setErrorMessage(null);createRequestKey.current="";setShowCreateModal(true);}}
+              onClick={() => {setErrorMessage(null);createRequestKey.current="";void loadAuxData();setShowCreateModal(true);}}
               disabled={!canCreate}
               className="h-10 px-5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
             >
@@ -460,7 +463,7 @@ export default function RepairsPage() {
                   {stageOrders.map((order) => (
                     <div
                       key={order.id}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => {setSelectedOrder(order);void loadAuxData();}}
                       className="bg-white p-4 rounded-xl border border-slate-200/80 hover:border-purple-400 hover:shadow-md transition-all cursor-pointer space-y-2.5 group"
                     >
                       {/* Topo do Card: Número da OS e Tipo */}
@@ -675,58 +678,16 @@ export default function RepairsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                    {initialItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-white border border-slate-200">
-                          {item.itemType === 1 ? "Mão de Obra" : "Produto"}
-                        </span>
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => {
-                            const copy = [...initialItems];
-                            copy[idx].description = e.target.value;
-                            setInitialItems(copy);
-                          }}
-                          className="flex-1 p-1 text-xs bg-white border border-slate-200 rounded-lg"
-                        />
-                        <div className="w-16">
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const copy = [...initialItems];
-                              copy[idx].quantity = Number(e.target.value);
-                              setInitialItems(copy);
-                            }}
-                            className="w-full p-1 text-xs bg-white border border-slate-200 rounded-lg text-center font-mono"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.unitPrice}
-                            onChange={(e) => {
-                              const copy = [...initialItems];
-                              copy[idx].unitPrice = Number(e.target.value);
-                              setInitialItems(copy);
-                            }}
-                            className="w-full p-1 text-xs bg-white border border-slate-200 rounded-lg font-mono text-right"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setInitialItems(initialItems.filter((_, i) => i !== idx))}
-                          className="p-1 text-rose-500 hover:bg-rose-50 rounded-md cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500"><span>Preços oficiais do catálogo. Peças com saldo disponível; serviços sem estoque físico.</span><button type="button" onClick={()=>void loadAuxData()} className="font-bold text-violet-700">Atualizar catálogo</button><a href="/catalog" target="_blank" rel="noopener noreferrer" className="font-bold text-violet-700 underline">Cadastrar serviço ou produto</a></div>
+                  <div className="space-y-2">
+                    {initialItems.map((item,idx)=>{
+                      const chosen=auxProducts.find(x=>x.id===item.productSkuId),hourly=item.itemType===1&&chosen?.serviceUnit==="HOUR";
+                      return <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2"><div className="flex items-center justify-between"><span className="text-[11px] font-bold text-slate-700">{item.itemType===1?"Serviço":"Peça / produto"}</span><button type="button" disabled={saving} aria-label="Remover item" onClick={()=>setInitialItems(old=>old.filter((_,i)=>i!==idx))} className="p-1 text-rose-500"><Trash2 className="w-4 h-4"/></button></div>
+                      <RepairCatalogPicker type={item.itemType} options={auxProducts} value={item.productSkuId||""} disabled={saving} onChange={x=>setInitialItems(old=>old.map((i,j)=>j===idx?{...i,description:x?.name||"",productSkuId:x?.id,unitPrice:x?.price??0,quantity:1}:i))}/>
+                      <div className="grid grid-cols-3 gap-2 text-xs"><label className="font-semibold text-slate-600">{hourly?"Horas":"Quantidade"}<input required disabled={saving} type="number" min={hourly?"0.001":"1"} step={hourly?"0.001":"1"} max={item.itemType===2?chosen?.available??1:10000} value={item.quantity} onChange={e=>setInitialItems(old=>old.map((i,j)=>j===idx?{...i,quantity:Number(e.target.value)}:i))} className="mt-1 w-full rounded-lg border bg-white p-2"/></label><div><p className="font-semibold text-slate-600">Preço unitário</p><p className="mt-1 rounded-lg border bg-white p-2">{repairMoney(item.unitPrice)}</p></div><div><p className="font-semibold text-slate-600">Subtotal</p><p className="mt-1 p-2 font-bold">{repairMoney(Math.round(item.quantity*item.unitPrice*100)/100)}</p></div></div></div>;
+                    })}
                   </div>
+                  <div className="rounded-xl bg-purple-50 p-3 text-sm text-purple-900"><div className="flex justify-between text-xs"><span>Serviços</span><strong>{repairMoney(initialItems.filter(i=>i.itemType===1).reduce((s,i)=>s+Math.round(i.quantity*i.unitPrice*100)/100,0))}</strong></div><div className="mt-1 flex justify-between text-xs"><span>Peças / produtos</span><strong>{repairMoney(initialItems.filter(i=>i.itemType===2).reduce((s,i)=>s+Math.round(i.quantity*i.unitPrice*100)/100,0))}</strong></div><div className="mt-2 flex justify-between border-t border-purple-200 pt-2 font-bold"><span>Total previsto</span><span>{repairMoney(initialItems.reduce((s,i)=>s+Math.round(i.quantity*i.unitPrice*100)/100,0))}</span></div></div>
                 </div>
 
                 {/* Botões do Modal */}
@@ -740,7 +701,7 @@ export default function RepairsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={saving||!canCreate}
+                    disabled={saving||!canCreate||initialItems.some(i=>!i.productSkuId)}
                     className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-extrabold rounded-xl shadow-md hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 cursor-pointer"
                   >
                     {saving ? "Salvando OS..." : "Gerar Ordem de Serviço"}
@@ -998,32 +959,18 @@ export default function RepairsPage() {
               e.preventDefault();
               if(!selectedOrder||selectedOrder.id!==itemDraft.orderId)return;
               const quantity=Number(itemDraft.quantity),unitPrice=Number(itemDraft.unitPrice);
-              if(!itemDraft.description.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitPrice)||unitPrice<0||Math.abs(Math.round(unitPrice*100)-unitPrice*100)>0.000001){
+              if(!itemDraft.productSkuId||!itemDraft.description.trim()||!Number.isFinite(quantity)||quantity<=0||!Number.isFinite(unitPrice)||unitPrice<0||Math.abs(Math.round(unitPrice*100)-unitPrice*100)>0.000001){
                 setErrorMessage("Informe descrição, quantidade e preço válido em centavos.");return;
               }
               const ok=await handleSaveOrderItems(itemDraft.orderId,[...(selectedOrder.items||[]),{
-                itemType:itemDraft.itemType,description:itemDraft.description.trim(),quantity,unitPrice
+                itemType:itemDraft.itemType,description:itemDraft.description.trim(),quantity,unitPrice,productSkuId:itemDraft.productSkuId
               }]);
               if(ok)setItemDraft(null);
             }} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
               <h3 className="text-base font-black text-slate-900">Adicionar {itemDraft.itemType===1?"serviço":"peça"} à OS</h3>
               {errorMessage && <div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs font-bold text-rose-800">{errorMessage}</div>}
-              <label className="block text-xs font-bold text-slate-700">Descrição
-                <input required maxLength={400} value={itemDraft.description} onChange={e=>setItemDraft({...itemDraft,description:e.target.value})}
-                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block text-xs font-bold text-slate-700">Quantidade
-                  <input required type="number" min="0.001" step="0.001" max="10000" value={itemDraft.quantity}
-                    onChange={e=>setItemDraft({...itemDraft,quantity:e.target.value})}
-                    className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
-                </label>
-                <label className="block text-xs font-bold text-slate-700">Preço unitário (R$)
-                  <input required type="number" min="0" step="0.01" max="100000000" value={itemDraft.unitPrice}
-                    onChange={e=>setItemDraft({...itemDraft,unitPrice:e.target.value})}
-                    className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/>
-                </label>
-              </div>
+              <RepairCatalogPicker type={itemDraft.itemType} options={auxProducts} value={itemDraft.productSkuId||""} disabled={saving} onChange={x=>setItemDraft({...itemDraft,productSkuId:x?.id,description:x?.name||"",unitPrice:String(x?.price??0),quantity:"1"})}/>
+              <div className="grid grid-cols-2 gap-3"><label className="block text-xs font-bold text-slate-700">Quantidade / horas<input required type="number" min={itemDraft.itemType===1&&auxProducts.find(x=>x.id===itemDraft.productSkuId)?.serviceUnit==="HOUR"?"0.001":"1"} step={itemDraft.itemType===1&&auxProducts.find(x=>x.id===itemDraft.productSkuId)?.serviceUnit==="HOUR"?"0.001":"1"} max={itemDraft.itemType===2?auxProducts.find(x=>x.id===itemDraft.productSkuId)?.available??1:10000} value={itemDraft.quantity} onChange={e=>setItemDraft({...itemDraft,quantity:e.target.value})} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"/></label><div className="text-xs font-bold text-slate-700">Preço unitário<p className="mt-1 rounded-lg border p-2.5 text-sm">{repairMoney(Number(itemDraft.unitPrice))}</p></div></div><p className="text-right text-sm font-bold text-violet-800">Subtotal: {repairMoney(Math.round(Number(itemDraft.quantity)*Number(itemDraft.unitPrice)*100)/100)}</p>
               <div className="flex justify-end gap-2">
                 <button type="button" disabled={saving} onClick={()=>{setItemDraft(null);setErrorMessage(null);}}
                   className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold">Cancelar</button>

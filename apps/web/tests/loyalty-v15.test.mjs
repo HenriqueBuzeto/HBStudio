@@ -1,0 +1,8 @@
+import test from "node:test";import assert from "node:assert/strict";import {readFileSync} from "node:fs";
+const migration=readFileSync(new URL("../../../db/migrations/20261126_loyalty_v15.sql",import.meta.url),"utf8");
+const api=readFileSync(new URL("../app/api/loyalty/route.ts",import.meta.url),"utf8");
+const page=readFileSync(new URL("../app/parties/page.tsx",import.meta.url),"utf8");
+test("commercial accrual is independent of fiscal issuance",()=>{const accrual=migration.split("CREATE OR REPLACE FUNCTION public.loyalty_accrue_sale")[1].split("CREATE OR REPLACE FUNCTION")[0];assert.doesNotMatch(accrual,/fiscal_documents|NFC-e|SEFAZ/);assert.match(accrual,/s\."Status" NOT IN\(4,5\)/);assert.match(accrual,/paid<net/);assert.match(accrual,/QA-CHECKOUT-/);assert.match(accrual,/TRAINING-/);assert.match(accrual,/EnabledSinceUtc/);});
+test("ledger earn and reversal are idempotent",()=>{assert.match(migration,/'SALE_EARN:'\|\|s\."Id"/);assert.match(migration,/ON CONFLICT\("TenantId","EventKey"\) DO NOTHING/);assert.match(migration,/EarnBaseCents/);assert.match(migration,/target-already/);assert.match(migration,/DEFERRABLE INITIALLY DEFERRED/);});
+test("permission, origin and production source are enforced",()=>{assert.match(api,/authorizeFleet\(req,"loyalty.view"\)/);assert.match(api,/customers.view/);assert.match(api,/guardOrigin\(req\)/);assert.match(api,/!c.source.writable/);assert.match(migration,/loyalty.manage/);assert.match(migration,/loyalty.redeem/);});
+test("customer card uses real API not placeholder",()=>{assert.match(page,/<LoyaltyPanel/);assert.match(page,/useLoyaltySummaries/);assert.doesNotMatch(page,/Fidelidade e recompensas em homologação/);});

@@ -1,9 +1,11 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { readSidebarPosition, saveSidebarPosition, restoreSidebarPosition, sidebarStorageKey } from "@/lib/sidebar-scroll";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import NotificationBell from "./NotificationBell";
 import {
   LayoutDashboard,
   Users,
@@ -18,7 +20,6 @@ import {
   X,
   ChevronRight,
   LogOut,
-  Bell,
   Search,
   Sparkles,
   TrendingUp,
@@ -42,6 +43,7 @@ interface NavSection {
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
+    anyPermissions?: string[];
   }[];
 }
 
@@ -51,6 +53,7 @@ const navSections: NavSection[] = [
     items: [
       { name: "Visão Geral", href: "/", icon: LayoutDashboard },
       { name: "PDV Balcão", href: "/sales", icon: ShoppingCart, badge: "PDV" },
+      { name: "Impressoras & Documentos", href: "/documents/printers", icon: Printer, anyPermissions: ["sales.pos.use","repairs.view"] },
     ],
   },
   {
@@ -79,7 +82,10 @@ const navSections: NavSection[] = [
     items: [
       { name: "Caixa & Turnos", href: "/cash", icon: CircleDollarSign },
       { name: "Financeiro & DRE", href: "/financial", icon: TrendingUp },
-      { name: "Sócios & Capital", href: "/partners", icon: Building2 },
+      { name: "Crédito / Débito & Pix", href: "/financial/acquirers", icon: Receipt,
+        anyPermissions: ["finance.reports.view","finance.banks.manage"] },
+      { name: "Sócios & Capital", href: "/partners", icon: Building2, anyPermissions: ["partners.view"] },
+      { name: "Relatórios & Inteligência", href: "/reports", icon: FileText, anyPermissions: ["sales.pos.use","sales.cost.view","cash.shift.view","cash.movement.view","inventory.view","inventory.cost.view","purchases.view","purchases.cost.view","finance.reports.view","finance.payables.view","finance.receivables.view","finance.journal.view","finance.banks.manage","partners.view","manufacturing.view","manufacturing.costs.view","repairs.view","projects.view","fleet.view","fleet.reports.view","fleet.cost.view","crm.view","messaging.view","customers.view","suppliers.view","loyalty.view","fiscal.documents.view","audit.view"] },
       { name: "Usuários & Senhas", href: "/users", icon: UserCheck, badge: "Master" },
     ],
   },
@@ -92,8 +98,33 @@ export default function RootShellLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile,setIsMobile]=useState(false);
+  useEffect(()=>{const media=window.matchMedia("(max-width: 767px)");const update=()=>setIsMobile(media.matches);update();media.addEventListener("change",update);return()=>media.removeEventListener("change",update);},[]);
+  const navRef = useRef<HTMLElement>(null);
+  const storageKey = user && isAuthenticated ? sidebarStorageKey(user.tenantId, user.id, user.branchId) : null;
+  // Pages currently mount their own shell; restore before the new sidebar is painted.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !storageKey || isLoading) return;
+    const saved = readSidebarPosition(storageKey);
+    if (saved !== null) {
+      restoreSidebarPosition(nav, saved);
+    } else {
+      // Direct entry into a deep route: reveal only the active item inside the menu.
+      const active = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (active) {
+        const bounds = nav.getBoundingClientRect(), item = active.getBoundingClientRect();
+        if (item.bottom > bounds.bottom) restoreSidebarPosition(nav, nav.scrollTop + item.bottom - bounds.bottom + 12);
+        else if (item.top < bounds.top) restoreSidebarPosition(nav, nav.scrollTop + item.top - bounds.top - 12);
+      }
+      saveSidebarPosition(storageKey, nav.scrollTop);
+    }
+  }, [storageKey, isLoading, pathname]);
+  const rememberSidebar = () => {
+    if (storageKey && navRef.current) saveSidebarPosition(storageKey, navRef.current.scrollTop);
+  };
 
   useEffect(() => {
     // Redireciona para o login se a sessão não for confirmada
@@ -114,9 +145,9 @@ export default function RootShellLayout({
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans">
+    <div className={"h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans "+((pathname==="/reports"||pathname==="/partners")?"print:block print:h-auto print:w-auto print:overflow-visible print:bg-white":"")}>
       {/* Mobile Top Header */}
-      <header className="md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50">
+      <header className={"md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50 "+((pathname==="/reports"||pathname==="/partners")?"print:hidden":"")}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center font-bold text-white shadow-md shadow-purple-900/30">
             HB
@@ -126,13 +157,14 @@ export default function RootShellLayout({
             <span className="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider">Sistema de Gestão</span>
           </div>
         </div>
+        <div className="flex items-center gap-2">{isMobile&&<NotificationBell mobile/>}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 rounded-lg text-slate-300 hover:bg-[#1e293b]"
           aria-label="Menu"
         >
           {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        </button></div>
       </header>
 
       {/* Sidebar FIXA HB Studio Style */}
@@ -140,7 +172,7 @@ export default function RootShellLayout({
         className={`
           fixed inset-y-0 left-0 z-40 w-72 bg-[#090e1a] text-slate-300 border-r border-[#1a2236] flex flex-col transition-transform duration-300 ease-in-out
           md:static md:translate-x-0 md:h-screen md:flex-shrink-0
-          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${(pathname==="/reports"||pathname==="/partners")?"print:hidden":""}
         `}
       >
         {/* Brand Header */}
@@ -162,7 +194,7 @@ export default function RootShellLayout({
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-3.5 py-5 space-y-6 overflow-y-auto dark-scrollbar">
+        <nav ref={navRef} onScroll={rememberSidebar} aria-label="Menu principal" className="flex-1 min-h-0 px-3.5 py-5 space-y-6 overflow-y-auto overscroll-y-contain dark-scrollbar">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1.5">
               <h3 className="px-3.5 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -170,13 +202,16 @@ export default function RootShellLayout({
               </h3>
               <div className="space-y-1 pt-1">
                 {section.items.map((item) => {
+                  if(item.anyPermissions?.length && !item.anyPermissions.some(key=>hasPermission(key)))return null;
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
+                      aria-current={isActive ? "page" : undefined}
+                      scroll={false}
+                      onClick={() => { rememberSidebar(); setMobileMenuOpen(false); }}
                       className={`flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all group relative ${
                         isActive
                           ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-600/35"
@@ -233,9 +268,9 @@ export default function RootShellLayout({
       </aside>
 
       {/* Main Content Viewport com Fundo Quadriculado Sutil */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden hb-grid-background">
+      <div className={"flex-1 flex flex-col min-w-0 h-full overflow-hidden hb-grid-background "+((pathname==="/reports"||pathname==="/partners")?"print:block print:h-auto print:overflow-visible print:bg-none":"")}>
         {/* Top Navbar IDÊNTICO AO DESIGN SYSTEM HBVISIONX */}
-        <header className="h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
+        <header className={"h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs "+((pathname==="/reports"||pathname==="/partners")?"print:hidden":"")}>
           {/* Lado Esquerdo: Saudação, Data e Status do Caixa */}
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
@@ -268,14 +303,7 @@ export default function RootShellLayout({
 
           {/* Lado Direito: Notificações, Tema & Perfil com Badge de Cargo */}
           <div className="flex items-center gap-3.5">
-            {/* Botão de Notificação */}
-            <button
-              title="Notificações"
-              className="p-2 text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-100 relative transition-colors border border-transparent hover:border-slate-200"
-            >
-              <Bell className="w-4 h-4" />
-              <span className="w-2 h-2 rounded-full bg-purple-600 absolute top-1.5 right-1.5 ring-2 ring-white" />
-            </button>
+            {!isMobile&&<NotificationBell/>}
 
             <div className="h-6 w-px bg-slate-200"></div>
 
@@ -302,7 +330,7 @@ export default function RootShellLayout({
         </header>
 
         {/* Page Container com Scroll Vertical Próprio */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6">
+        <main className={"flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 w-full mx-auto space-y-6 "+(pathname==="/sales"?"max-w-[1600px] ":"max-w-7xl ")+((pathname==="/reports"||pathname==="/partners")?"print:overflow-visible print:max-w-none print:p-0":"")}>
           {children}
         </main>
       </div>

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import BirthdayPanel from "../parties/BirthdayPanel";
 import {formatPhoneBr,maskPhoneInput,normalizePhoneBr} from "@/lib/br-format";
 import { useAuth } from "@/lib/auth";
 import {
@@ -81,6 +82,8 @@ export default function CrmPage(){
  const [filter,setFilter]=useState("open");
  const [priorityFilter,setPriorityFilter]=useState("all");
  const [tab,setTab]=useState<"board"|"leads"|"activities">("board");
+ const [birthdaysOpen,setBirthdaysOpen]=useState(false);
+ useEffect(()=>{const open=()=>setBirthdaysOpen(true);const read=()=>{if(new URLSearchParams(window.location.search).get("tab")==="birthdays")open();};read();window.addEventListener("hb:birthdays",open);window.addEventListener("popstate",read);return()=>{window.removeEventListener("hb:birthdays",open);window.removeEventListener("popstate",read);};},[]);
  const [openModal,setOpenModal]=useState<"pipeline"|"lead"|"opportunity"|"activity"|"loss"|"archive"|null>(null);
  const [selected,setSelected]=useState<Opportunity|null>(null);
  const [form,setForm]=useState(initialForm);
@@ -191,6 +194,7 @@ export default function CrmPage(){
   </div>}
   {!authLoading&&!canView&&<div className="rounded-xl bg-white p-10 text-center text-sm text-slate-500"><ShieldCheck className="mx-auto mb-3 h-8 w-8"/>Você não possui a permissão <strong>crm.view</strong>.</div>}
   {canView&&<>
+   {hasPermission("customers.view")&&<><button className={secondary} onClick={()=>setBirthdaysOpen(v=>!v)}>{birthdaysOpen?"Fechar aniversários":"Aniversários & pós-venda"}</button>{birthdaysOpen&&<BirthdayPanel/>}</>}
    <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
     {[
      {name:"Pipeline em aberto",value:loading?"—":money(pipelineTotal),icon:TrendingUp,color:"text-violet-700 bg-violet-50",sub:currentOpen.length+" oportunidades"},
@@ -230,10 +234,10 @@ export default function CrmPage(){
        {currentStages.map((stage,idx)=>{
         const cards=currentOpportunities.filter(o=>o.stageId===stage.id);
         const total=cards.reduce((s,o)=>s+Number(o.value),0);
-        return <section key={stage.id} onDragOver={e=>{if(canManage)e.preventDefault();}} onDrop={e=>{e.preventDefault();if(!dragId)return;const opp=currentOpportunities.find(o=>o.id===dragId);setDragId(null);if(opp)void switchStage(opp,stage);}} className={"flex w-[265px] shrink-0 flex-col rounded-2xl border p-3 transition-colors "+(dragId?"border-violet-200 bg-violet-50/50":"border-slate-200 bg-slate-50")}>
+        return <section key={stage.id} onDragOver={e=>{if(canManage&&dragId&&!busy){e.preventDefault();e.dataTransfer.dropEffect="move";}}} onDrop={e=>{e.preventDefault();if(!canManage||busy)return;const id=e.dataTransfer.getData("application/x-hbstudio-crm-opportunity")||dragId;if(!id)return;const opp=currentOpportunities.find(o=>o.id===id);setDragId(null);if(opp)void switchStage(opp,stage);}} className={"flex w-[265px] shrink-0 flex-col rounded-2xl border p-3 transition-colors "+(dragId?"border-violet-200 bg-violet-50/50":"border-slate-200 bg-slate-50")}>
           <div className="mb-3 border-b border-slate-200 pb-3"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><span className={"h-2.5 w-2.5 rounded-full "+(stage.isWonStage?"bg-emerald-500":stage.isLostStage?"bg-rose-400":idx===0?"bg-violet-500":"bg-blue-400")}/><h3 className="text-[11px] font-black uppercase tracking-wide text-slate-700">{stage.name}</h3></div><span className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold">{cards.length}</span></div><p className="mt-2 text-xs font-bold text-slate-500">{money(total)}</p></div>
           <div className="min-h-[325px] space-y-2">
-           {cards.map(o=><div key={o.id} draggable={canManage&&o.status===1} onDragStart={e=>{setDragId(o.id);e.dataTransfer.effectAllowed="move";}} onDragEnd={()=>setDragId(null)} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:border-violet-300 hover:shadow-md">
+           {cards.map(o=><div key={o.id} draggable={canManage&&o.status===1&&!busy} onDragStart={e=>{if(!canManage||busy||o.status!==1){e.preventDefault();return;}setDragId(o.id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-hbstudio-crm-opportunity",o.id);e.dataTransfer.setData("text/plain",o.id);}} onDragEnd={()=>setDragId(null)} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:border-violet-300 hover:shadow-md">
              <button onClick={()=>choose(o)} className="block w-full text-left" aria-label={"Abrir oportunidade "+o.title}>
               <div className="flex items-start justify-between gap-2"><span className="line-clamp-2 text-xs font-extrabold text-slate-900">{o.title}</span><GripVertical className="h-4 w-4 shrink-0 text-slate-300"/></div>
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500"><UserRound className="h-3 w-3"/>{o.contactName||"Contato vinculado"}</div>

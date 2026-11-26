@@ -1,0 +1,22 @@
+name: Sidebar scroll regression
+on:
+  push:
+    paths: ['apps/web/components/RootShellLayout.tsx','apps/web/lib/sidebar-scroll.ts','apps/web/tests/sidebar-scroll.test.mjs','.github/workflows/sidebar-scroll-gate.yml']
+  pull_request:
+    paths: ['apps/web/components/RootShellLayout.tsx','apps/web/lib/sidebar-scroll.ts','apps/web/tests/sidebar-scroll.test.mjs','.github/workflows/sidebar-scroll-gate.yml']
+permissions:
+  contents: read
+jobs:
+  sidebar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: node --experimental-strip-types --test tests/sidebar-scroll.test.mjs

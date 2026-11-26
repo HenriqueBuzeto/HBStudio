@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import CatalogIntakeForm from "@/components/CatalogIntakeForm";
+import WarehouseCreateForm from "@/components/WarehouseCreateForm";
+import {useAuth} from "@/lib/auth";
+import {formatStockQuantity,formatStockCost,summarizeStock,type StockUnitMetadata} from "@/lib/inventory-units";
 import { 
   Package, 
   Search, 
@@ -16,7 +20,7 @@ import {
   AlertCircle
 } from "lucide-react";
 
-export interface StockBalance {
+export interface StockBalance extends StockUnitMetadata {
   id: string;
   branchId: string;
   warehouseId: string;
@@ -35,7 +39,7 @@ export interface StockBalance {
   version: number;
 }
 
-export interface StockMovement {
+export interface StockMovement extends StockUnitMetadata {
   id: string;
   branchId: string;
   warehouseId: string;
@@ -70,6 +74,7 @@ export interface ProductSkuOption {
 }
 
 export default function InventoryPage() {
+  const {hasPermission}=useAuth();const canManage=hasPermission("catalog.products.manage");const canInventoryCost=hasPermission("inventory.cost.view");const [isIntakeOpen,setIntakeOpen]=useState(false);const [serviceOnly,setServiceOnly]=useState(false);const [warehouseOpen,setWarehouseOpen]=useState(false);
   const [balances, setBalances] = useState<StockBalance[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
@@ -81,7 +86,7 @@ export default function InventoryPage() {
 
   const [activeTab, setActiveTab] = useState<"balances" | "kardex">("balances");
   const [search, setSearch] = useState("");
-  const [canViewCost, setCanViewCost] = useState(true);
+  const [canViewCost, setCanViewCost] = useState(false);
 
   // Modal Entrada Inicial
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
@@ -104,6 +109,7 @@ export default function InventoryPage() {
         fetch("/api/catalog/models")
       ]);
 
+      if(!balRes.ok||!kardexRes.ok||!whRes.ok||!modelRes.ok)setErrorMsg("Uma ou mais consultas de estoque falharam. Atualize para tentar novamente.");
       if (balRes.ok) {
         setBalances(await balRes.json());
       }
@@ -195,9 +201,9 @@ export default function InventoryPage() {
     }
   };
 
-  const totalOnHand = balances.reduce((acc, curr) => acc + (curr.onHandQuantity || 0), 0);
-  const totalReserved = balances.reduce((acc, curr) => acc + (curr.reservedQuantity || 0), 0);
-  const totalAvailable = balances.reduce((acc, curr) => acc + (curr.availableQuantity || 0), 0);
+  const totalOnHand = summarizeStock(balances,row=>row.onHandQuantity);
+  const totalReserved = summarizeStock(balances,row=>row.reservedQuantity);
+  const totalAvailable = summarizeStock(balances,row=>row.availableQuantity);
   const totalValuation = balances.reduce((acc, curr) => acc + (curr.totalValuedAmount || 0), 0);
 
   const filteredBalances = balances.filter(b => {
@@ -218,15 +224,18 @@ export default function InventoryPage() {
 
   const getMovementTypeName = (type: number) => {
     switch (type) {
-      case 1: return "Entrada Inicial / Compra";
-      case 2: return "Entrada por Transferência";
-      case 3: return "Entrada por Devolução";
-      case 4: return "Ajuste Positivo Inventário";
-      case 5: return "Saída por Venda";
-      case 6: return "Saída por Transferência";
-      case 7: return "Ajuste Negativo Inventário";
-      case 8: return "Consumo Ordem de Serviço";
-      case 9: return "Consumo Fabricação 3D";
+      case 1: return "Saldo inicial";
+      case 2: return "Recebimento de compra";
+      case 3: return "Recompra de usado";
+      case 4: return "Saída por venda";
+      case 5: return "Saída por transferência";
+      case 6: return "Entrada por transferência";
+      case 7: return "Ajuste positivo";
+      case 8: return "Ajuste negativo";
+      case 9: return "Consumo técnico";
+      case 10: return "Consumo fabricação 3D";
+      case 11: return "Entrada de produto fabricado";
+      case 12: return "Entrega de recompensa";
       default: return "Movimentação";
     }
   };
@@ -234,6 +243,7 @@ export default function InventoryPage() {
   return (
     <RootShellLayout>
       <div className="space-y-6">
+        {warehouseOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Novo depósito" className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">Novo depósito</h2><WarehouseCreateForm onClose={()=>setWarehouseOpen(false)} onDone={async()=>{await loadInventoryData();setWarehouseOpen(false);}}/></section></div>}{isIntakeOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3"><section role="dialog" aria-modal="true" aria-label="Cadastro e entrada inicial" className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"><h2 className="mb-4 text-lg font-bold">{serviceOnly?"Cadastrar serviço":"Cadastro e entrada inicial"}</h2><CatalogIntakeForm serviceOnly={serviceOnly} onClose={()=>setIntakeOpen(false)} onDone={async()=>{await loadInventoryData();setIntakeOpen(false);}}/></section></div>}
         {/* Notificações */}
         {errorMsg && (
           <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold flex items-center justify-between">
@@ -274,20 +284,22 @@ export default function InventoryPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {hasPermission("inventory.adjust")&&<button type="button" onClick={()=>setWarehouseOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Depósito</button>}{canManage&&<button type="button" onClick={()=>{setServiceOnly(false);setIntakeOpen(true);}} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar produto</button>}{canManage&&<button type="button" onClick={()=>{setServiceOnly(true);setIntakeOpen(true);}} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar serviço</button>}
             <button
-              onClick={() => setCanViewCost(!canViewCost)}
+              onClick={() => setCanViewCost(!canViewCost)} disabled={!canInventoryCost}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs"
             >
               {canViewCost ? <EyeOff className="w-3.5 h-3.5 text-purple-600" /> : <Eye className="w-3.5 h-3.5 text-slate-400" />}
               <span>{canViewCost ? "Ocultar Custos" : "Ver Custos Reais"}</span>
             </button>
             <button
-              onClick={() => setIsReceiptOpen(true)}
+              onClick={() => {setServiceOnly(false);setIntakeOpen(true);}}
+              disabled={!canManage||!hasPermission("inventory.adjust")||!canInventoryCost}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-purple-600/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              Entrada Oficial no Kardex
+              Entrada inicial / produto
             </button>
           </div>
         </div>
@@ -301,14 +313,15 @@ export default function InventoryPage() {
             </span>
           </div>
 
+          <p className="mb-3 text-[11px] text-slate-500">Filamentos em gramas; peças e insumos unitários em unidades. Os totais são separados por medida.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-slate-900"></div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Saldo Físico (On Hand)
+                Saldo físico
               </span>
-              <div className="text-lg font-extrabold text-slate-900">{totalOnHand} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Presente fisicamente na loja</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-slate-900">{totalOnHand.length?totalOnHand.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Quantidades por unidade de medida</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -316,17 +329,17 @@ export default function InventoryPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 Reservado para Pedidos
               </span>
-              <div className="text-lg font-extrabold text-amber-700">{totalReserved} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Aguardando faturamento no PDV</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-amber-700">{totalReserved.length?totalReserved.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Reservas de venda e produção</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Disponível para Venda
+                Disponível em estoque
               </span>
-              <div className="text-lg font-extrabold text-emerald-700">{totalAvailable} un</div>
-              <p className="text-[10px] text-slate-400 mt-1">Livre para novas vendas</p>
+              <div className="space-y-0.5 text-lg font-extrabold text-emerald-700">{totalAvailable.length?totalAvailable.map(x=><div key={x.unit} className={x.unit==="unknown"?"text-xs text-amber-700":""}>{x.text}</div>):<span>—</span>}</div>
+              <p className="text-[10px] text-slate-400 mt-1">Livre para uso ou venda conforme o tipo</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs relative overflow-hidden">
@@ -426,15 +439,13 @@ export default function InventoryPage() {
                       <td className="py-3 px-4">
                         <span className="font-semibold text-slate-700">{item.warehouseName}</span>
                       </td>
-                      <td className="py-3 px-4 font-extrabold text-slate-900">{item.onHandQuantity} un</td>
-                      <td className="py-3 px-4 font-bold text-amber-700">{item.reservedQuantity} un</td>
-                      <td className="py-3 px-4 font-extrabold text-emerald-700">{item.availableQuantity} un</td>
+                      <td className="py-3 px-4 font-extrabold text-slate-900">{formatStockQuantity(item.onHandQuantity,item)}</td>
+                      <td className="py-3 px-4 font-bold text-amber-700">{formatStockQuantity(item.reservedQuantity,item)}</td>
+                      <td className="py-3 px-4 font-extrabold text-emerald-700">{formatStockQuantity(item.availableQuantity,item)}</td>
                       {canViewCost && (
                         <>
                           <td className="py-3 px-4 font-mono font-bold text-slate-700">
-                            {item.averageCost !== undefined
-                              ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(item.averageCost)
-                              : "—"}
+                            {formatStockCost(item.averageCost,item)}
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-purple-700">
                             {item.totalValuedAmount !== undefined
@@ -506,16 +517,14 @@ export default function InventoryPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 font-extrabold text-slate-900">
-                        {mov.quantity > 0 ? `+${mov.quantity}` : mov.quantity} un
+                        {formatStockQuantity(mov.quantity,mov,true)}
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                        {mov.balanceAfterQuantity} un
+                        {formatStockQuantity(mov.balanceAfterQuantity,mov)}
                       </td>
                       {canViewCost && (
                         <td className="py-3 px-4 font-mono text-slate-700">
-                          {mov.unitCost !== undefined
-                            ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(mov.unitCost)
-                            : "—"}
+                          {formatStockCost(mov.unitCost,mov)}
                         </td>
                       )}
                       <td className="py-3 px-4">

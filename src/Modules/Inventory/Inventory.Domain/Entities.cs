@@ -97,7 +97,9 @@ public enum StockMovementType
     PositiveAdjustment = 7,   // Ajuste de Inventário (+)
     NegativeAdjustment = 8,   // Ajuste de Inventário (-)
     TechnicalConsumption = 9, // Consumo de peça em Ordem de Serviço
-    Manufacturing3DIssue = 10 // Consumo de filamento/resina em lote de impressão 3D
+    Manufacturing3DIssue = 10, // Consumo de filamento/resina em lote de impressão 3D
+    Manufacturing3DReceipt = 11, // Entrada de produto acabado após aprovação da produção
+    LoyaltyRewardIssue = 12 // Baixa de recompensa física entregue
 }
 
 // Kardex Imutável (Append-only Ledger de Estoque)

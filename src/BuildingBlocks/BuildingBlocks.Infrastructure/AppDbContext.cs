@@ -1164,13 +1164,13 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.HasKey(m => m.Id);
 
-            b.Property(m => m.Quantity).HasPrecision(18, 4); // Permite gramas de filamento 3D
+            b.Property(m => m.Quantity).HasPrecision(20, 6); // Permite gramas de filamento 3D
 
             b.Property(m => m.UnitCost).HasPrecision(18, 4);
 
             b.Property(m => m.TotalCost).HasPrecision(18, 2);
 
-            b.Property(m => m.BalanceAfterQuantity).HasPrecision(18, 4);
+            b.Property(m => m.BalanceAfterQuantity).HasPrecision(20, 6);
 
             b.Property(m => m.DocumentReference).HasMaxLength(100).IsRequired();
 
@@ -1248,11 +1248,11 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.HasKey(b => b.Id);
 
-            b.Property(b => b.OnHandQuantity).HasPrecision(18, 4);
+            b.Property(b => b.OnHandQuantity).HasPrecision(20, 6);
 
-            b.Property(b => b.ReservedQuantity).HasPrecision(18, 4);
+            b.Property(b => b.ReservedQuantity).HasPrecision(20, 6);
 
-            b.Property(b => b.BlockedQuantity).HasPrecision(18, 4);
+            b.Property(b => b.BlockedQuantity).HasPrecision(20, 6);
 
             b.Property(b => b.AverageCost).HasPrecision(18, 4);
 
@@ -1386,7 +1386,7 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.HasKey(i => i.Id);
 
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.Quantity).HasPrecision(20, 6);
 
             b.Property(i => i.Version).IsRowVersion();
 
@@ -1434,7 +1434,7 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.HasKey(i => i.Id);
 
-            b.Property(i => i.Quantity).HasPrecision(18, 4);
+            b.Property(i => i.Quantity).HasPrecision(20, 6);
 
             b.Property(i => i.Version).IsRowVersion();
 
@@ -1492,9 +1492,9 @@ public class AppDbContext : DbContext, IIdentityDbContext, IFiscalDbContext
 
             b.HasKey(i => i.Id);
 
-            b.Property(i => i.SystemSnapshotQuantity).HasPrecision(18, 4);
+            b.Property(i => i.SystemSnapshotQuantity).HasPrecision(20, 6);
 
-            b.Property(i => i.CountedQuantity).HasPrecision(18, 4);
+            b.Property(i => i.CountedQuantity).HasPrecision(20, 6);
 
             b.Property(i => i.Notes).HasMaxLength(250);
 

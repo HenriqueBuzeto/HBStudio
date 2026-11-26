@@ -1,8 +1,3 @@
-import { NextRequest } from "next/server";
-import { forwardToBackend } from "@/lib/bff-client";
-
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.toString();
-  return forwardToBackend(request, query ? `/api/inventory/balances?${query}` : "/api/inventory/balances");
-}
+import {NextRequest} from "next/server";
+import {inventoryRead} from "@/lib/inventory-read";
+export async function GET(request:NextRequest){return inventoryRead(request,"balances");}

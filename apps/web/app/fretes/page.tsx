@@ -1,8 +1,9 @@
 "use client";
 
-import React,{useCallback,useEffect,useMemo,useState} from "react";
+import React,{useCallback,useEffect,useMemo,useRef,useState} from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
+import {validFleetOverview,type FleetSource} from "@/lib/fleet-source";
 import {Truck,Fuel,Wrench,Plus,MapPin,RefreshCw,CheckCircle2,AlertTriangle,ArrowRight,ClipboardList,Pencil,Gauge,Info,X,Car,ShieldCheck,CalendarClock,Calculator,History,SlidersHorizontal} from "lucide-react";
 
 type Vehicle={id:string;name:string;plate:string;brand:string;model:string;year:number;type:number;ownership:number;fuel:number;tankLiters:number|null;kmPerLiter:number|null;initialKm:number;currentKm:number;partnerId:string|null;ownerName:string|null;status:number;notes:string|null;createdAt:string;version:string};
@@ -10,7 +11,7 @@ type Trip={id:string;number:string;vehicleId:string;plate:string;vehicleName:str
 type Maintenance={id:string;vehicleId:string;name:string;intervalKm:number;intervalDays:number;nextKm:number|null;nextDate:string|null;active:boolean};
 type Fueling={id:string;vehicleId:string;tripId:string|null;date:string;station:string;amount:number;liters:number|null;odometer:number};
 type Partner={id:string;name:string};
-type Overview={vehicles:Vehicle[];trips:Trip[];maintenance:Maintenance[];fuelings:Fueling[];partners:Partner[]};
+type Overview={vehicles:Vehicle[];trips:Trip[];maintenance:Maintenance[];fuelings:Fueling[];partners:Partner[];source:FleetSource};
 type VehicleForm={name:string;plate:string;brand:string;model:string;year:string;type:string;ownership:string;fuel:string;ownerName:string;partnerId:string;tankLiters:string;kmPerLiter:string;odometer:string;notes:string;status:string};
 const types:Record<number,string>={1:"Automóvel",2:"Motocicleta",3:"Utilitário",4:"Van",5:"Caminhão"};
 const owns:Record<number,string>={1:"Empresa",2:"Sócio",3:"Colaborador",4:"Locação",5:"Terceirizado"};
@@ -42,13 +43,20 @@ function Modal({title,close,children}:{title:string;close:()=>void;children:Reac
 export default function FretesPage(){
  const {user,hasPermission,isLoading:authLoading}=useAuth();
  const canView=hasPermission("fleet.view");
- const canManage=hasPermission("fleet.vehicles.manage");
- const canTrip=hasPermission("fleet.trips.create");
- const canClose=hasPermission("fleet.trips.close");
- const canOdometer=hasPermission("fleet.odometer.correct");
+ const canManagePermission=hasPermission("fleet.vehicles.manage");
+ const canTripPermission=hasPermission("fleet.trips.create");
+ const canClosePermission=hasPermission("fleet.trips.close");
+ const canOdometerPermission=hasPermission("fleet.odometer.correct");
  const canCosts=hasPermission("fleet.cost.view");
  const [tab,setTab]=useState<"vehicles"|"trips"|"fuel"|"maintenance"|"pricing">("vehicles");
- const [data,setData]=useState<Overview>({vehicles:[],trips:[],maintenance:[],fuelings:[],partners:[]});
+ const [snapshot,setSnapshot]=useState<{scope:string;data:Overview}|null>(null);
+ const [readError,setReadError]=useState("");
+ const scope=[user?.id,user?.tenantId,user?.branchId].join(":");
+ const seq=useRef(0),inFlight=useRef(false);
+ const confirmed=snapshot?.scope===scope?snapshot.data:null;
+ const data=confirmed??{vehicles:[],trips:[],maintenance:[],fuelings:[],partners:[],source:null};
+ const writable=!!confirmed?.source.writable;
+ const canManage=canManagePermission&&writable,canTrip=canTripPermission&&writable,canClose=canClosePermission&&writable,canOdometer=canOdometerPermission&&writable;
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [modal,setModal]=useState<"vehicle"|"trip"|"close"|"odometer"|null>(null);
@@ -63,20 +71,23 @@ export default function FretesPage(){
  useEffect(()=>{const now=new Date();setCurrentMonth(now.getFullYear()*12+now.getMonth());setClock(now.getTime());},[]);
  const [pricing,setPricing]=useState({acquisition:"",freight:"",markup:""});
  const load=useCallback(async()=>{
-  if(!canView){setLoading(false);return;}
-  setLoading(true);setError("");
-  try{setData(await api<Overview>("overview"));}
-  catch(e){setError(e instanceof Error?e.message:"Falha na leitura do Neon.");}
-  finally{setLoading(false);}
- },[canView]);
- useEffect(()=>{if(!authLoading)void load();},[authLoading,load]);
+  const ticket=++seq.current;
+  if(!canView){setSnapshot(null);setLoading(false);return;}
+  setLoading(true);setReadError("");
+  try{const next=await api<Overview>("overview");if(!validFleetOverview(next))throw Error("Resposta do banco não confirmada.");if(ticket===seq.current)setSnapshot({scope,data:next});}
+  catch(e){if(ticket===seq.current){setSnapshot(null);setReadError(e instanceof Error?e.message:"Falha na leitura do Neon.");}}
+  finally{if(ticket===seq.current)setLoading(false);}
+ },[canView,scope]);
+ useEffect(()=>{if(!authLoading)void load();return()=>{seq.current++;};},[authLoading,load]);
+ const ready=!!confirmed&&!loading&&!authLoading&&canView;
  const execute=async<T,>(task:()=>Promise<T>,success:string)=>{
-  setSaving(true);setError("");setNotice("");
+  if(inFlight.current||!ready||!writable)return false;
+  inFlight.current=true;setSaving(true);setError("");setNotice("");
   try{await task();setNotice(success);setModal(null);await load();return true;}
   catch(e){setError(e instanceof Error?e.message:"Operação não concluída.");return false;}
-  finally{setSaving(false);}
+  finally{inFlight.current=false;setSaving(false);}
  };
- const showCreate=()=>{setEditing(null);setForm({...defaultForm(),year:String(new Date().getFullYear())});setModal("vehicle");};
+ const showCreate=()=>{if(!ready||!canManage)return;setEditing(null);setForm({...defaultForm(),year:String(new Date().getFullYear())});setModal("vehicle");};
  const showEdit=(v:Vehicle)=>{setEditing(v);setForm({name:v.name,plate:v.plate,brand:v.brand,model:v.model,year:String(v.year),type:String(v.type),ownership:String(v.ownership),fuel:String(v.fuel),ownerName:v.ownerName||"",partnerId:v.partnerId||"",tankLiters:v.tankLiters===null?"":String(v.tankLiters),kmPerLiter:v.kmPerLiter===null?"":String(v.kmPerLiter),odometer:String(v.currentKm),notes:v.notes||"",status:String(v.status)});setModal("vehicle");};
  const saveVehicle=async(e:React.FormEvent)=>{e.preventDefault();
   const body={...form,year:Number(form.year),type:Number(form.type),ownership:Number(form.ownership),fuel:Number(form.fuel),tankLiters:form.tankLiters===""?null:Number(form.tankLiters),kmPerLiter:form.kmPerLiter===""?null:Number(form.kmPerLiter),odometer:Number(form.odometer),partnerId:form.partnerId||null,status:Number(form.status),version:editing?.version};
@@ -96,7 +107,7 @@ export default function FretesPage(){
  const correctOdo=async(e:React.FormEvent)=>{e.preventDefault();if(!editing)return;
   await execute(()=>api("vehicles/"+editing.id+"/odometer","PATCH",{odometer:Number(odoForm.odometer),reason:odoForm.reason,version:editing.version}),"Correção formal de hodômetro auditada.");
  };
- const vehicles=data.vehicles.filter(v=>[v.name,v.plate,v.brand,v.model,v.ownerName].some(s=>s?.toLowerCase().includes(search.toLowerCase())));
+ const vehicles=data.vehicles.filter(v=>[v.name,v.plate,v.brand,v.model,v.ownerName].some(s=>s?.toLowerCase().includes(search.trim().toLowerCase())));
  const available=data.vehicles.filter(v=>v.status===1).length;
  const activeTrips=data.trips.filter(t=>t.status===3);
  const monthDistance=data.trips.filter(t=>t.status===4&&currentMonth!==null&&(new Date(t.endedAt||t.startedAt).getFullYear()*12+new Date(t.endedAt||t.startedAt).getMonth())===currentMonth).reduce((s,t)=>s+t.distance,0);
@@ -112,27 +123,29 @@ export default function FretesPage(){
    </div>
    <div className="flex flex-wrap gap-2">
     <button className={secondary} onClick={()=>void load()} disabled={loading}><RefreshCw className={"h-4 w-4 "+(loading?"animate-spin":"")}/> Atualizar</button>
-    {canManage&&<button className={secondary} onClick={showCreate}><Car className="h-4 w-4"/> Novo veículo</button>}
-    {canTrip&&<button className={primary} onClick={showTrip} disabled={available===0}><Plus className="h-4 w-4"/> Nova viagem</button>}
+    {canManage&&<button className={secondary} disabled={!ready||saving} onClick={showCreate}><Car className="h-4 w-4"/> Novo veículo</button>}
+    {canTrip&&<button className={primary} onClick={showTrip} disabled={!ready||saving||available===0}><Plus className="h-4 w-4"/> Nova viagem</button>}
    </div>
   </section>
   {(error||notice)&&<div role="alert" className={"flex items-start gap-2 rounded-xl border px-4 py-3 text-xs font-semibold "+(error?"border-rose-200 bg-rose-50 text-rose-700":"border-emerald-200 bg-emerald-50 text-emerald-700")}>{error?<AlertTriangle className="h-4 w-4 shrink-0"/>:<CheckCircle2 className="h-4 w-4 shrink-0"/>}<span>{error||notice}</span><button className="ml-auto" onClick={()=>{setError("");setNotice("");}}><X className="h-4 w-4"/></button></div>}
   {!authLoading&&!canView?<div className="rounded-2xl bg-white p-12 text-center text-slate-500"><ShieldCheck className="mx-auto mb-2 h-8 w-8"/> Sem permissão fleet.view.</div>:<>
+  {ready&&confirmed&&<div className={"flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs "+(confirmed.source.database==="main"?"border-slate-200 bg-white text-slate-600":"border-amber-200 bg-amber-50 text-amber-900")}><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4"/><span><strong>{confirmed.source.database==="main"?"Banco principal":"Banco isolado de homologação"}</strong> · {confirmed.source.branchName}{!confirmed.source.writable?" · Somente leitura":""}{confirmed.source.database==="isolated"?" · Os cadastros do banco principal não são copiados automaticamente.":""}</span></div>{confirmed.source.environment!=="production"&&<a href="https://hbstudio.vercel.app/fretes" className="font-bold text-violet-700 underline">Abrir ambiente oficial</a>}</div>}
+  {readError&&<div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800"><div><strong>Não foi possível confirmar os registros no Neon.</strong><p className="mt-1">{readError} Nenhum indicador será apresentado como zero sem consulta confirmada.</p></div><button className={secondary} onClick={()=>void load()} disabled={loading}>Tentar novamente</button></div>}
   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
    {[
-    {title:"Veículos disponíveis",value:loading?"—":String(available)+" / "+data.vehicles.length,subtitle:activeTrips.length+" em viagem",icon:Truck,color:"text-violet-600 bg-violet-50"},
-    {title:"Quilometragem no mês",value:loading?"—":num(monthDistance,1)+" km",subtitle:"Viagens concluídas",icon:MapPin,color:"text-cyan-700 bg-cyan-50"},
-    {title:"Abastecimentos registrados",value:loading?"—":canCosts?money(fuelTotal):"Restrito",subtitle:canCosts?"Histórico real do Neon":"Requer fleet.cost.view",icon:Fuel,color:"text-amber-700 bg-amber-50"},
-    {title:"Manutenções próximas",value:loading?"—":String(nextMaintenance),subtitle:"Até 1.000 km ou 30 dias",icon:Wrench,color:"text-rose-700 bg-rose-50"},
+    {title:"Veículos disponíveis",value:!ready?"—":String(available)+" / "+data.vehicles.length,subtitle:ready?activeTrips.length+" em viagem":"Aguardando confirmação",icon:Truck,color:"text-violet-600 bg-violet-50"},
+    {title:"Quilometragem no mês",value:!ready?"—":num(monthDistance,1)+" km",subtitle:"Viagens concluídas",icon:MapPin,color:"text-cyan-700 bg-cyan-50"},
+    {title:"Abastecimentos registrados",value:!ready?"—":canCosts?money(fuelTotal):"Restrito",subtitle:canCosts?"Histórico real do Neon":"Requer fleet.cost.view",icon:Fuel,color:"text-amber-700 bg-amber-50"},
+    {title:"Manutenções próximas",value:!ready?"—":String(nextMaintenance),subtitle:"Até 1.000 km ou 30 dias",icon:Wrench,color:"text-rose-700 bg-rose-50"},
    ].map(x=><div key={x.title} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase text-slate-500">{x.title}</span><span className={"rounded-xl p-2 "+x.color}><x.icon className="h-4 w-4"/></span></div><div className="mt-2 text-xl font-black text-slate-900">{x.value}</div><div className="mt-1 text-[10px] text-slate-500">{x.subtitle}</div></div>)}
   </div>
   <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
    {([{id:"vehicles",name:"Frota & Hodômetros",icon:Truck},{id:"trips",name:"Viagens & Deslocamentos",icon:MapPin},{id:"fuel",name:"Abastecimentos",icon:Fuel},{id:"maintenance",name:"Manutenção",icon:Wrench},{id:"pricing",name:"Precificação",icon:Calculator}] as const).map(t=><button key={t.id} onClick={()=>setTab(t.id)} className={"flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold "+(tab===t.id?"border-violet-600 bg-violet-600 text-white":"border-slate-200 bg-white text-slate-600 hover:bg-slate-50")}><t.icon className="h-4 w-4"/>{t.name}</button>)}
   </div>
-  {loading?<div className="flex items-center justify-center gap-2 rounded-2xl bg-white p-20 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin"/> Consultando Neon...</div>
-  :tab==="vehicles"?<section className="space-y-4">
+  {loading||authLoading?<div className="flex items-center justify-center gap-2 rounded-2xl bg-white p-20 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin"/> Consultando Neon...</div>
+  :!ready?<div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm text-slate-500">Dados indisponíveis. Atualize a consulta antes de operar a frota.</div>:tab==="vehicles"?<section className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-black text-slate-900">Cadastro de veículos</h2><p className="text-xs text-slate-500">Consumo registrado em km/L e disponibilidade operacional.</p></div><div className="flex items-center gap-2"><input aria-label="Pesquisar veículo" value={search} onChange={e=>setSearch(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs" placeholder="Buscar nome, placa ou proprietário"/>{canManage&&<button className={primary} onClick={showCreate}><Plus className="h-4 w-4"/> Cadastrar veículo</button>}</div></div>
-    {vehicles.length===0?<div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center"><Car className="mx-auto h-11 w-11 text-violet-400"/><h3 className="mt-3 font-black text-slate-800">Nenhum veículo encontrado</h3><p className="mt-1 text-sm text-slate-500">Cadastre seu primeiro veículo para habilitar o cálculo de combustível e novas viagens.</p>{canManage&&<button className={primary+" mt-4"} onClick={showCreate}><Plus className="h-4 w-4"/> Novo veículo</button>}</div>:
+    {vehicles.length===0?<div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center"><Car className="mx-auto h-11 w-11 text-violet-400"/><h3 className="mt-3 font-black text-slate-800">{data.vehicles.length?"Nenhum resultado para a busca":"Nenhum veículo cadastrado neste ambiente"}</h3><p className="mt-1 text-sm text-slate-500">{data.vehicles.length?"Altere o filtro para localizar os veículos cadastrados.":confirmed?.source.database==="isolated"?"Este banco de homologação não possui veículos nesta filial. Consulte o ambiente oficial para ver os registros de produção.":"Nenhum veículo registrado no Neon para esta filial."}</p>{data.vehicles.length?<button className={secondary+" mt-4"} onClick={()=>setSearch("")}>Limpar busca</button>:canManage&&<button className={primary+" mt-4"} onClick={showCreate}><Plus className="h-4 w-4"/> Novo veículo</button>}</div>:
      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{vehicles.map(v=><article key={v.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3"><div><span className="rounded-lg bg-slate-900 px-2.5 py-1 font-mono text-sm font-black tracking-wide text-white">{v.plate}</span><h3 className="mt-3 text-base font-black text-slate-900">{v.name}</h3><p className="mt-1 text-xs text-slate-500">{v.brand} {v.model} • {v.year} • {types[v.type]}</p></div><span className={"rounded-full px-2.5 py-1 text-[10px] font-extrabold "+(v.status===1?"bg-emerald-50 text-emerald-700":v.status===2?"bg-blue-50 text-blue-700":"bg-amber-50 text-amber-700")}>{statuses[v.status]||"—"}</span></div>
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4">
@@ -150,13 +163,13 @@ export default function FretesPage(){
   </section>
   :tab==="fuel"?<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Abastecimentos e histórico</h3><p className="mt-1 text-xs text-slate-500">Os lançamentos efetivos de combustível precisam respeitar financeiro, reembolsos e idempotência. Esta tela exibe apenas registros oficiais já existentes.</p>
    {!hasPermission("fleet.fueling.manage")&&!hasPermission("fleet.fueling.create")?<p className="mt-5 text-xs text-amber-700">Permissão de gerenciamento de combustível necessária para novos lançamentos.</p>:<p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-700">Lançamento de combustível ainda não habilitado neste serviço serverless. Nenhum custo financeiro fictício será criado.</p>}
-   {data.fuelings.length===0?<p className="mt-6 rounded-xl border border-dashed border-slate-200 p-9 text-center text-sm text-slate-400">Nenhum abastecimento registrado.</p>:<div className="mt-4 divide-y divide-slate-100">{data.fuelings.map(t=><div key={t.id} className="flex justify-between py-3 text-xs"><span>{date(t.date)} • {t.station}</span><span>{canCosts?money(t.amount):"Restrito"} • {t.liters!==null?num(t.liters,2)+" L":"Litros não informados"}</span></div>)}</div>}
+   {!canCosts?<p className="mt-6 text-center text-xs text-slate-500">Histórico restrito pela permissão de custos.</p>:data.fuelings.length===0?<p className="mt-6 rounded-xl border border-dashed border-slate-200 p-9 text-center text-sm text-slate-400">Nenhum abastecimento registrado.</p>:<div className="mt-4 divide-y divide-slate-100">{data.fuelings.map(t=><div key={t.id} className="flex justify-between py-3 text-xs"><span>{date(t.date)} • {t.station}</span><span>{canCosts?money(t.amount):"Restrito"} • {t.liters!==null?num(t.liters,2)+" L":"Litros não informados"}</span></div>)}</div>}
   </section>
   :tab==="maintenance"?<section className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Planos preventivos</h3><p className="mt-1 text-xs text-slate-500">Alertas de revisão calculados com base no hodômetro e nas datas cadastradas.</p>{data.maintenance.length===0?<div className="mt-6 rounded-xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500">Nenhum plano de manutenção persistido no Neon.</div>:<div className="mt-4 space-y-3">{data.maintenance.map(p=>{const v=data.vehicles.find(x=>x.id===p.vehicleId);const remaining=p.nextKm!==null&&v?p.nextKm-v.currentKm:null;const overdue=(remaining!==null&&remaining<0)||(p.nextDate!==null&&clock>0&&new Date(p.nextDate).getTime()<clock);return <div key={p.id} className="flex flex-wrap justify-between gap-3 rounded-xl border border-slate-200 p-4"><div><strong className="text-sm">{p.name}</strong><p className="text-xs text-slate-500">{v?.name} • A cada {num(p.intervalKm)} km / {p.intervalDays} dias</p></div><div className={"text-xs font-bold "+(overdue?"text-rose-600":"text-violet-700")}>{remaining!==null?num(remaining)+" km restantes":"Sem previsão em km"} • {date(p.nextDate)}</div></div>;})}</div>}</section>
   :<section className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-200 bg-white p-5"><h3 className="text-sm font-black text-slate-900">Simulação de precificação (não salva)</h3><p className="mt-1 text-xs text-slate-500">Calculadora ilustrativa, sem atualizar catálogo, estoque ou financeiro.</p>{(["acquisition","freight","markup"] as const).map(k=><label key={k} className="mt-4 block"><span className={label}>{k==="acquisition"?"Custo de aquisição (R$)":k==="freight"?"Frete comprovado (R$)":"Markup (%)"}</span><input type="number" min="0" step="0.01" className={f} value={pricing[k]} onChange={e=>setPricing({...pricing,[k]:e.target.value})}/></label>)}</div><div className="rounded-2xl border border-violet-200 bg-violet-50 p-6"><span className="text-xs font-bold text-violet-700">Preço sugerido (simulação)</span><div className="mt-2 text-3xl font-black text-violet-800">{money(listPrice)}</div><p className="mt-4 text-xs text-violet-700">Base: {money(totalBase)} • Markup informado: {pricing.markup||0}%</p><p className="mt-5 text-xs text-slate-600">Não inclui tributos, taxas comerciais ou composição contábil. Nenhum preço é aprovado automaticamente.</p></div></section>}
   </>}
  </div>
- {modal==="vehicle"&&<Modal title={editing?"Editar dados do veículo":"Cadastrar novo veículo"} close={()=>setModal(null)}>
+ {ready&&writable&&modal==="vehicle"&&<Modal title={editing?"Editar dados do veículo":"Cadastrar novo veículo"} close={()=>setModal(null)}>
  <form onSubmit={e=>void saveVehicle(e)} className="space-y-4">
   <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 text-xs text-violet-700">Informações reais serão gravadas no Neon. Placa, identificação, propriedade e hodômetro inicial são preservados após o cadastro; correções de km têm fluxo auditado.</div>
   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -177,7 +190,7 @@ export default function FretesPage(){
    <label className="sm:col-span-2"><span className={label}>Observações</span><textarea rows={3} maxLength={1500} className={f} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></label>
   </div><div className="flex justify-end gap-2"><button type="button" className={secondary} onClick={()=>setModal(null)}>Cancelar</button><button disabled={saving} className={primary}>{editing?"Salvar alterações":"Cadastrar veículo"}</button></div>
  </form></Modal>}
- {modal==="trip"&&<Modal title="Nova viagem e previsão de combustível" close={()=>setModal(null)}><form onSubmit={e=>void startTrip(e)} className="space-y-4">
+ {ready&&writable&&modal==="trip"&&<Modal title="Nova viagem e previsão de combustível" close={()=>setModal(null)}><form onSubmit={e=>void startTrip(e)} className="space-y-4">
  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
  <label className="sm:col-span-2"><span className={label}>Veículo disponível *</span><select required className={f} value={tripForm.vehicleId} onChange={e=>setTripForm({...tripForm,vehicleId:e.target.value})}><option value="">Selecione...</option>{data.vehicles.filter(v=>v.status===1).map(v=><option value={v.id} key={v.id}>{v.name} • {v.plate} • {v.kmPerLiter?num(v.kmPerLiter,2)+" km/L":"Consumo não configurado"}</option>)}</select></label>
  <label><span className={label}>Condutor *</span><input required maxLength={180} className={f} value={tripForm.driver} onChange={e=>setTripForm({...tripForm,driver:e.target.value})}/></label>
@@ -191,7 +204,7 @@ export default function FretesPage(){
  <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><h4 className="flex items-center gap-2 text-sm font-black text-violet-800"><Calculator className="h-4 w-4"/> Planejamento de combustível</h4><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"><div><p className="text-[10px] text-violet-600">Média cadastrada</p><strong className="text-sm">{selectedVehicle?.kmPerLiter?num(selectedVehicle.kmPerLiter,2)+" km/L":"Não configurada"}</strong></div><div><p className="text-[10px] text-violet-600">Distância informada</p><strong className="text-sm">{tripForm.estimatedDistance?num(estimateDistance)+" km":"Não informada"}</strong></div><div><p className="text-[10px] text-violet-600">Litros estimados</p><strong className="text-sm">{liters!==null?num(liters,2)+" L":"Indisponível"}</strong></div><div><p className="text-[10px] text-violet-600">Custo estimado</p><strong className="text-sm">{estimateCost!==null?money(estimateCost):"Indisponível"}</strong></div></div><p className="mt-3 text-[11px] text-slate-600">Estimativa = distância informada ÷ média km/L. Não representa combustível existente no tanque nem lançamento financeiro. A distância real será apurada pelo hodômetro ao concluir.</p></div>
  <div className="flex justify-end gap-2"><button type="button" className={secondary} onClick={()=>setModal(null)}>Cancelar</button><button className={primary} disabled={saving||!tripForm.vehicleId||!tripForm.driver.trim()||!tripForm.origin.trim()||!tripForm.destination.trim()}>Iniciar viagem</button></div>
  </form></Modal>}
- {modal==="close"&&selectedTrip&&<Modal title="Concluir viagem e registrar hodômetro" close={()=>setModal(null)}><form className="space-y-4" onSubmit={e=>void completeTrip(e)}><p className="text-sm text-slate-600">{selectedTrip.vehicleName} • {selectedTrip.number} • Hodômetro inicial: <strong>{num(selectedTrip.startKm)} km</strong></p><label><span className={label}>Hodômetro final real (km) *</span><input required type="number" min={selectedTrip.startKm} step="0.1" className={f} value={finalKm} onChange={e=>setFinalKm(e.target.value)}/></label><div className="rounded-xl bg-violet-50 p-4 text-xs font-bold text-violet-700">Distância percorrida: {Math.max(0,Number(finalKm)-selectedTrip.startKm).toLocaleString("pt-BR")} km</div><label><span className={label}>Observações de conclusão</span><textarea className={f} rows={2} value={completionNotes} onChange={e=>setCompletionNotes(e.target.value)}/></label><div className="flex justify-end"><button className={primary} disabled={saving}>Concluir viagem no Neon</button></div></form></Modal>}
- {modal==="odometer"&&editing&&<Modal title="Correção formal de hodômetro" close={()=>setModal(null)}><form className="space-y-4" onSubmit={e=>void correctOdo(e)}><div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><Info className="mr-2 inline h-4 w-4"/> Correções devem ter justificativa e geram trilha de auditoria. Não use para registrar viagens.</div><label><span className={label}>Novo hodômetro (km) *</span><input required type="number" min="0" step="0.1" className={f} value={odoForm.odometer} onChange={e=>setOdoForm({...odoForm,odometer:e.target.value})}/></label><label><span className={label}>Justificativa obrigatória *</span><textarea required maxLength={400} rows={3} className={f} value={odoForm.reason} onChange={e=>setOdoForm({...odoForm,reason:e.target.value})}/></label><div className="flex justify-end"><button disabled={saving||!odoForm.reason.trim()} className={primary}>Registrar correção auditada</button></div></form></Modal>}
+ {ready&&writable&&modal==="close"&&selectedTrip&&<Modal title="Concluir viagem e registrar hodômetro" close={()=>setModal(null)}><form className="space-y-4" onSubmit={e=>void completeTrip(e)}><p className="text-sm text-slate-600">{selectedTrip.vehicleName} • {selectedTrip.number} • Hodômetro inicial: <strong>{num(selectedTrip.startKm)} km</strong></p><label><span className={label}>Hodômetro final real (km) *</span><input required type="number" min={selectedTrip.startKm} step="0.1" className={f} value={finalKm} onChange={e=>setFinalKm(e.target.value)}/></label><div className="rounded-xl bg-violet-50 p-4 text-xs font-bold text-violet-700">Distância percorrida: {Math.max(0,Number(finalKm)-selectedTrip.startKm).toLocaleString("pt-BR")} km</div><label><span className={label}>Observações de conclusão</span><textarea className={f} rows={2} value={completionNotes} onChange={e=>setCompletionNotes(e.target.value)}/></label><div className="flex justify-end"><button className={primary} disabled={saving}>Concluir viagem no Neon</button></div></form></Modal>}
+ {ready&&writable&&modal==="odometer"&&editing&&<Modal title="Correção formal de hodômetro" close={()=>setModal(null)}><form className="space-y-4" onSubmit={e=>void correctOdo(e)}><div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800"><Info className="mr-2 inline h-4 w-4"/> Correções devem ter justificativa e geram trilha de auditoria. Não use para registrar viagens.</div><label><span className={label}>Novo hodômetro (km) *</span><input required type="number" min="0" step="0.1" className={f} value={odoForm.odometer} onChange={e=>setOdoForm({...odoForm,odometer:e.target.value})}/></label><label><span className={label}>Justificativa obrigatória *</span><textarea required maxLength={400} rows={3} className={f} value={odoForm.reason} onChange={e=>setOdoForm({...odoForm,reason:e.target.value})}/></label><div className="flex justify-end"><button disabled={saving||!odoForm.reason.trim()} className={primary}>Registrar correção auditada</button></div></form></Modal>}
  </RootShellLayout>;
 }

@@ -4115,8 +4115,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("CountedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -4135,8 +4135,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("SystemSnapshotQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4230,8 +4230,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)");
 
                     b.Property<decimal>("BlockedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("BranchId")
                         .HasColumnType("uuid");
@@ -4243,15 +4243,15 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("OnHandQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("ProductSkuId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("ReservedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -4292,8 +4292,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("BalanceAfterQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("BranchId")
                         .HasColumnType("uuid");
@@ -4326,8 +4326,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(250)
@@ -4458,8 +4458,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("StockReservationId")
                         .HasColumnType("uuid");
@@ -4567,8 +4567,8 @@ namespace BuildingBlocks.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasPrecision(20, 6)
+                        .HasColumnType("numeric(20,6)");
 
                     b.Property<Guid>("StockTransferId")
                         .HasColumnType("uuid");

@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {governanceSchemas,governanceValidationMessage} from "../lib/governance-validation.ts";
+const role="c0000000-0000-0000-0000-000000000001",user="d0000000-0000-0000-0000-000000000001",position="27af415b-5a61-458c-b395-8711a8ad5b18",version="2026-11-26 14:39:51.243164+00";
+const edit={action:"POSITION",payload:{id:position,version,name:"CEO",description:"Teste teste teste",code:"",level:"EXECUTIVE",recommendedRoleId:role,active:true}};
+test("CEO edit accepts the actual seeded Master role UUID and optional empty code",()=>{const v=governanceSchemas.safeParse(edit);assert.ok(v.success,JSON.stringify(v.error?.issues));assert.equal(v.data.payload.recommendedRoleId,role);});
+test("position creation accepts no recommendation or a legacy recommendation",()=>{for(const recommendedRoleId of ["",role])assert.ok(governanceSchemas.safeParse({action:"POSITION",payload:{name:"Diretor",recommendedRoleId}}).success);});
+test("user edit and status support seeded identifiers",()=>{assert.ok(governanceSchemas.safeParse({action:"USER",payload:{id:user,version,name:"CEO",email:"ceo@example.invalid",positionId:position,roleIds:[role],phone:"",notes:"",admissionDate:""}}).success);assert.ok(governanceSchemas.safeParse({action:"STATUS",payload:{id:user,version,active:false}}).success);});
+test("invalid role ID is rejected with field-specific message, not a password warning",()=>{const v=governanceSchemas.safeParse({...edit,payload:{...edit.payload,recommendedRoleId:"invalid"}});assert.equal(v.success,false);assert.match(governanceValidationMessage(v.error),/perfil de acesso/);assert.doesNotMatch(governanceValidationMessage(v.error),/senha/);});
+test("password constraints remain enforced and produce the correct message",()=>{const v=governanceSchemas.safeParse({action:"PASSWORD",payload:{id:user,version,password:"short"}});assert.equal(v.success,false);assert.match(governanceValidationMessage(v.error),/senha/);});
+test("role editing accepts legacy ID and rejects malformed IDs",()=>{assert.ok(governanceSchemas.safeParse({action:"ROLE",payload:{id:role,version,name:"Perfil",permissions:["partners.view"]}}).success);assert.equal(governanceSchemas.safeParse({action:"STATUS",payload:{id:"not-uuid",version,active:false}}).success,false);});

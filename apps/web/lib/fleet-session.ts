@@ -29,7 +29,7 @@ export function enumValue(v:unknown,label:string,allowed:number[]):number{
   const n=Number(v);if(!Number.isInteger(n)||!allowed.includes(n))throw new FleetError(400,"VALIDATION_ERROR",label+" inválido.");return n;
 }
 export type FleetSession={db:ReturnType<typeof getDb>;tenantId:string;branchId:string;userId:string;email:string;permissions:Set<string>};
-export async function authorizeFleet(request:NextRequest,permission:string):Promise<FleetSession>{
+export async function authorizeFleet(request:NextRequest,permission:string|readonly string[]):Promise<FleetSession>{
   const token=request.cookies.get("hb_access_token")?.value;
   const secret=process.env.AUTH_SECRET||process.env.JWT_SECRET;
   if(!token)throw new FleetError(401,"UNAUTHORIZED","Sessão não encontrada.");
@@ -54,7 +54,7 @@ export async function authorizeFleet(request:NextRequest,permission:string):Prom
   if(!user||!user.IsActive||user.revoked||!user.partner||String(user.SecurityStamp)!==String(claims.security_stamp))throw new FleetError(401,"UNAUTHORIZED","Acesso não autorizado.");
   const perms=await db.query('SELECT DISTINCT rp."PermissionKey" AS key FROM user_roles ur JOIN role_permissions rp ON rp."RoleId"=ur."RoleId" AND rp."TenantId"=ur."TenantId" WHERE ur."TenantId"=$1::uuid AND ur."UserId"=$2::uuid',[tenantId,userId]);
   const permissions=new Set<string>(perms.map((r:any)=>String(r.key)));
-  if(!permissions.has(permission))throw new FleetError(403,"FORBIDDEN","Permissão "+permission+" necessária.");
+  if(!(typeof permission==="string"?permissions.has(permission):permission.some(key=>permissions.has(key))))throw new FleetError(403,"FORBIDDEN",typeof permission==="string"?"Permissão "+permission+" necessária.":"Permissão necessária para esta consulta.");
   return {db,tenantId,branchId,userId,email:user.Email,permissions};
 }
 export function guardOrigin(request:NextRequest) {

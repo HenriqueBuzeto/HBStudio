@@ -1,0 +1,30 @@
+import {NextRequest,NextResponse} from "next/server";
+import crypto from "node:crypto";
+import {authorizeFleet,guardOrigin,FleetError,uuid} from "@/lib/fleet-session";
+const hdr={"Cache-Control":"no-store"};
+const fail=(e:unknown)=>{if(e instanceof FleetError)return NextResponse.json({code:e.code,error:e.message},{status:e.status,headers:hdr});const code=(e as {code?:string})?.code;if(code==="42501")return NextResponse.json({code:"CHECKOUT_NOT_ALLOWED",error:"Operação indisponível fora da homologação autorizada."},{status:403,headers:hdr});if(["22023","22P02","22003"].includes(code||""))return NextResponse.json({code:"INVALID_CHECKOUT",error:"Revise os dados e as confirmações."},{status:422,headers:hdr});if(["23514","23505","40001","40P01","23503"].includes(code||""))return NextResponse.json({code:"CHECKOUT_CONFLICT",error:"Confira o turno, preço, saldo, configuração financeira ou situação da venda e atualize antes de repetir."},{status:409,headers:hdr});console.error("[InternalCheckout]",e instanceof Error?e.name:"Unknown");return NextResponse.json({code:"CHECKOUT_UNAVAILABLE",error:"Não foi possível confirmar a operação."},{status:503,headers:hdr});};
+export async function GET(req:NextRequest){
+ try{const ctx=await authorizeFleet(req,"sales.pos.use");if(!ctx.permissions.has("sales.create"))return NextResponse.json({enabled:false},{headers:hdr});
+ const [gate]=await ctx.db.query("SELECT public.internal_checkout_qa_enabled_v5() enabled");if(!gate?.enabled)return NextResponse.json({enabled:false},{headers:hdr});
+ const scope=[ctx.tenantId,ctx.branchId];
+ const [cfg,orders,products,customers,shifts,records]=await Promise.all([
+  ctx.db.query("SELECT EXISTS(SELECT 1 FROM internal_checkout_config_v5 WHERE tenant_id=$1::uuid AND branch_id=$2::uuid) configured",scope),
+  ctx.db.query(`SELECT o."Id"::text id,o."OrderNumber" number,d.customer_id::text "customerId",p."Name" customer,d.title,o."ApprovedQuantity" quantity,d.approved_price::float8 total,d.version FROM manufacturing_factory_order_details d JOIN manufacturing_orders o ON o."Id"=d.order_id AND o."TenantId"=d.tenant_id AND o."BranchId"=d.branch_id JOIN parties p ON p."Id"=d.customer_id AND p."TenantId"=d.tenant_id AND p."IsActive" WHERE d.tenant_id=$1::uuid AND d.branch_id=$2::uuid AND o."Status"=12 AND o."SalesOrderId" IS NULL AND o."ApprovedQuantity"=o."PlannedQuantity" ORDER BY o."FinishedAtUtc" DESC LIMIT 200`,scope),
+  ctx.db.query(`SELECT b."Id"::text id,s."SkuCode" code,m."Name"||' · '||s."VariantName" name,w."Name" warehouse,s."DefaultPrice"::float8 price,floor(b."OnHandQuantity"-b."ReservedQuantity"-b."BlockedQuantity")::float8 available FROM stock_balances b JOIN product_skus s ON s."Id"=b."ProductSkuId" AND s."TenantId"=b."TenantId" AND s."IsActive" JOIN product_models m ON m."Id"=s."ProductModelId" AND m."TenantId"=s."TenantId" AND m."IsActive" AND m."Kind" IN(1,5) AND m."SerializationPolicy"=0 JOIN warehouses w ON w."Id"=b."WarehouseId" AND w."TenantId"=b."TenantId" AND w."BranchId"=b."BranchId" AND w."IsActive" WHERE b."TenantId"=$1::uuid AND b."BranchId"=$2::uuid AND b."OnHandQuantity"-b."ReservedQuantity"-b."BlockedQuantity">=1 AND s."DefaultPrice">0 AND s."DefaultPrice"=round(s."DefaultPrice",2) AND b."AverageCost">=0 AND NOT EXISTS(SELECT 1 FROM manufacturing_material_balance_configs c WHERE c.tenant_id=b."TenantId" AND c.branch_id=b."BranchId" AND c.balance_id=b."Id") ORDER BY s."SkuCode",w."Name" LIMIT 500`,scope),
+  ctx.db.query(`SELECT p."Id"::text id,p."Name" name FROM parties p WHERE p."TenantId"=$1::uuid AND p."IsActive" AND EXISTS(SELECT 1 FROM customer_profiles c WHERE c."TenantId"=p."TenantId" AND c."PartyId"=p."Id") ORDER BY p."Name" LIMIT 1000`,[ctx.tenantId]),
+  ctx.db.query(`SELECT s."Id"::text id,r."Name" name FROM cash_shifts s JOIN cash_registers r ON r."Id"=s."CashRegisterId" AND r."TenantId"=s."TenantId" AND r."BranchId"=s."BranchId" AND r."Status"=1 WHERE s."TenantId"=$1::uuid AND s."BranchId"=$2::uuid AND s."OperatorUserId"=$3::uuid AND s."Status"=1 ORDER BY s."OpenedAtUtc" DESC`,[...scope,ctx.userId]),
+  ctx.db.query(`SELECT c.sale_id::text id,s."SaleNumber" number,c.total::float8 total,c.state,c.order_id::text "orderId",c.created_at "createdAt",p."Name" customer,(c.actor_id=$3::uuid) "ownSale" FROM internal_checkout_records_v5 c JOIN sales s ON s."Id"=c.sale_id AND s."TenantId"=c.tenant_id AND s."BranchId"=c.branch_id LEFT JOIN parties p ON p."Id"=c.customer_id AND p."TenantId"=c.tenant_id WHERE c.tenant_id=$1::uuid AND c.branch_id=$2::uuid ORDER BY c.created_at DESC LIMIT 100`,[...scope,ctx.userId])
+ ]);
+ return NextResponse.json({enabled:true,configured:cfg[0]?.configured===true,orders,products,customers,shifts,records,canCancel:ctx.permissions.has("sales.cancel"),paymentMethods:["Cash"]},{headers:hdr});
+ }catch(e){return fail(e);}
+}
+export async function PATCH(req:NextRequest){
+ try{guardOrigin(req);const ctx=await authorizeFleet(req,"sales.pos.use");const raw=await req.text();if(raw.length>16000)throw new FleetError(413,"SIZE_LIMIT","Solicitação muito extensa.");
+ let body:any;try{body=JSON.parse(raw);}catch{throw new FleetError(422,"INVALID_BODY","Dados inválidos.");}
+ if(!body||typeof body!=="object"||Array.isArray(body)||!["DELIVER","CANCEL"].includes(body.action))throw new FleetError(422,"INVALID_ACTION","Ação inválida.");
+ const permission=body.action==="CANCEL"?"sales.cancel":"sales.create";if(!ctx.permissions.has(permission))throw new FleetError(403,"FORBIDDEN","Permissão insuficiente.");
+ const key=uuid(body.requestId,"Operação"),saleId=uuid(body.saleId,"Venda");const payload={action:body.action,saleId,...(body.action==="CANCEL"?{reason:body.reason,cashReturned:body.cashReturned,goodsRetained:body.goodsRetained}:{})};
+ const [row]=await ctx.db.query("SELECT public.internal_checkout_action_v5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb) result",[ctx.tenantId,ctx.branchId,ctx.userId,key,JSON.stringify(payload)]);
+ return NextResponse.json({result:row.result},{headers:hdr});
+ }catch(e){return fail(e);}
+}

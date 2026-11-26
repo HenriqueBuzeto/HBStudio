@@ -13,7 +13,7 @@ function respondError(e:unknown,cid:string) {
   if(message.includes("REPAIR_NOT_FOUND"))
     return NextResponse.json({code:"REPAIR_NOT_FOUND",error:"OS não encontrada nesta filial."},{status:404,headers:responseHeaders(cid)});
   if(/REPAIR_(INVALID_|DELIVERED_|FINALIZED_|DELIVERY_)/.test(message))
-    return NextResponse.json({code:"REPAIR_VALIDATION_ERROR",error:"Transição de status ou itens não permitidos para esta OS."},{status:422,headers:responseHeaders(cid)});
+    return NextResponse.json({code:"REPAIR_VALIDATION_ERROR",error:message.includes("REPAIR_INVALID_STOCK_AVAILABLE")?"Saldo insuficiente na filial. Atualize os produtos.":message.includes("REPAIR_INVALID_CATALOG_PRICE")?"Preço do catálogo mudou. Selecione novamente o item.":"Transição de status ou itens não permitidos para esta OS."},{status:422,headers:responseHeaders(cid)});
   console.error("[Repairs]["+cid+"] update error:",e instanceof Error?e.name:"unknown");
   return NextResponse.json({code:"REPAIR_UPDATE_UNAVAILABLE",error:"Falha ao atualizar ordem de serviço."},{status:503,headers:responseHeaders(cid)});
 }
@@ -57,9 +57,12 @@ export async function PUT(request:NextRequest,{params}:{params:Promise<{id:strin
         !Number.isFinite(price)||price<0||price>100000000||
         Math.abs(Math.round(price*100)-price*100)>0.000001)
         throw new FleetError(422,"VALIDATION_ERROR","Quantidade ou preço inválido.");
-      return {itemType:item.itemType,description:item.description.trim(),quantity,
+      return {id:item.id?uuid(item.id,"Item da OS"):null,itemType:item.itemType,description:item.description.trim(),quantity,
         unitPrice:price,productSkuId:item.productSkuId?uuid(item.productSkuId,"SKU"):null};
     }):null;
+    if(items?.some((i:any)=>!i.id)&&!ctx.permissions.has("catalog.products.view"))throw new FleetError(403,"FORBIDDEN","Permissão de catálogo necessária.");
+    if(items?.some((i:any)=>!i.id&&i.itemType===2)&&!ctx.permissions.has("inventory.view"))throw new FleetError(403,"FORBIDDEN","Permissão de estoque necessária.");
+    if(items?.some((i:any)=>!i.id&&!i.productSkuId))throw new FleetError(422,"REPAIR_INVALID_CATALOG_REQUIRED","Selecione um serviço ou produto cadastrado.");
     const optionalText=(v:unknown,max:number)=> {
       if(v===undefined||v===null||v==="")return null;
       if(typeof v!=="string"||v.length>max)

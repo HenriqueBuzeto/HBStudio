@@ -1,0 +1,11 @@
+import test from "node:test";import assert from "node:assert/strict";import {effectivePolicy,planningRows,allocateBudget} from "../lib/purchase-planning.ts";
+const base={id:"a",sku:"T",name:"Teste",kind:1,serialized:false,physical:0,available:0,incoming:0,pending:0,q7:3,q30:6,q90:9,salesCount:6,conditions:1,lastSale:null,revenue:1200,profit:300,capital:0,samples:0,avgDays:null,fastest:null,entered:null,sold:null,days:null,saleNumber:null,condition:null};
+const rule={skuId:"a",supplierId:"s",lead:5,coverage:14,safety:3,min:2,multiple:2,max:10,version:1};
+const supplier={id:"s",name:"Fornecedor",configured:7,samples:3,days:4};
+const adv={suppliers:[supplier],metrics:[{id:"a",abc:"A",gmroi:1.2,seasonal:null,months:3,costs:[{supplierId:"s",unitCost:10,received:"2026-11-01"}]}]};
+test("supplier measured lead requires three valid observations",()=>{assert.equal(effectivePolicy(rule,supplier).policy.lead,4);assert.equal(effectivePolicy(rule,{...supplier,samples:2}).policy.lead,5);assert.equal(effectivePolicy(rule,{...supplier,days:100}).policy.lead,5);});
+test("rule quantity obeys lot and max",()=>{const r=planningRows([base],[rule],adv)[0];assert.equal(r.quantity,6);assert.equal(r.ruleVersion,1);assert.equal(planningRows([base],[{...rule,max:4}],adv)[0].quantity,4);});
+test("missing rule prevents quantitative recommendation",()=>assert.equal(planningRows([base],[],adv)[0].quantity,null));
+test("budget never exceeds cap; full lots only",()=>{const r=planningRows([base],[rule],adv);assert.equal(allocateBudget(r,"s",5999).length,0);assert.equal(allocateBudget(r,"s",6000)[0].quantity,6);assert.equal(allocateBudget(r,"other",100000).length,0);});
+test("serialized and unknown cost cannot enter automatic budget",()=>{for(const item of [{...base,serialized:true},{...base,profit:null}])assert.equal(allocateBudget(planningRows([item],[rule],adv),"s",100000).length,0);});
+test("insufficient seasonal evidence remains null",()=>assert.equal(planningRows([base],[rule],adv)[0].seasonal,null));

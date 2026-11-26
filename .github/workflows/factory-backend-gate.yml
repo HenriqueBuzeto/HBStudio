@@ -1,0 +1,24 @@
+name: Factory backend gate
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'apps/api/**'
+      - 'tests/**'
+      - 'db/migrations/**'
+      - '.github/workflows/factory-backend-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore HBStudioErp.slnx
+      - run: dotnet build HBStudioErp.slnx --configuration Release --no-restore
+      - run: dotnet test tests/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj --configuration Release --no-build

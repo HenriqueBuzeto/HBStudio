@@ -5,9 +5,9 @@ import RootShellLayout from "@/components/RootShellLayout";
 import {useAuth} from "@/lib/auth";
 import {Wallet,RefreshCw,LockKeyhole,AlertTriangle,CheckCircle2,Plus,History} from "lucide-react";
 
-type CashRegister={id:string;code:string;name:string;status:number};
+type CashRegister={id:string;code:string;name:string;status:number;available:boolean};
 type Shift={id:string;registerId:string;registerName:string;operatorId:string;status:number;openingFloat:number;recordedBalance:number;recordedCashIn:number;recordedCashOut:number;movementNet:number;movementCount:number;openedAtUtc:string;closedAtUtc:string|null;reconciliationMismatch:boolean};
-type Overview={registers:CashRegister[];shifts:Shift[];canOpen:boolean;note:string};
+type Overview={registers:CashRegister[];shifts:Shift[];canOpen:boolean;canManageRegisters:boolean;note:string};
 const money=(n:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);
 const date=(d:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"}).format(new Date(d));
 
@@ -20,6 +20,8 @@ export default function CashPage(){
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [registerId,setRegisterId]=useState(""),[openingFloat,setOpeningFloat]=useState("0.00"),[showOpen,setShowOpen]=useState(false);
  const requestKey=useRef("");
+ const [showRegister,setShowRegister]=useState(false),[registerCode,setRegisterCode]=useState(""),[registerName,setRegisterName]=useState(""),[registerNotes,setRegisterNotes]=useState("");
+ const registerRequest=useRef<{payload:string;key:string}|null>(null);const registerRunning=useRef(false);
  const movementKey=useRef("");
  const [movementShift,setMovementShift]=useState<Shift|null>(null);
  const [movementType,setMovementType]=useState<"SUPPLY"|"WITHDRAWAL">("SUPPLY");
@@ -41,10 +43,16 @@ export default function CashPage(){
   finally{setLoading(false);}
  },[]);
  useEffect(()=>{if(!authLoading&&canView)void load();},[authLoading,canView,load]);
+ const createRegister=async(e:React.FormEvent)=>{
+  e.preventDefault();if(registerRunning.current||saving||!data?.canManageRegisters)return;
+  const payload={code:registerCode.trim().toUpperCase(),name:registerName.trim(),notes:registerNotes.trim()};const fingerprint=JSON.stringify(payload);if(!payload.code||!payload.name){setError("Informe código e nome do caixa.");return;}
+  if(registerRequest.current?.payload!==fingerprint)registerRequest.current={payload:fingerprint,key:crypto.randomUUID()};
+  registerRunning.current=true;setSaving(true);setError("");setNotice("");try{const response=await fetch("/api/cash/registers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...payload,requestKey:registerRequest.current.key})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||"Cadastro não confirmado.");setShowRegister(false);registerRequest.current=null;setNotice("Caixa cadastrado. Agora você pode abrir um turno.");await load();setRegisterId(result.id);}catch(e){setError(e instanceof Error?e.message:"Cadastro não confirmado.");}finally{registerRunning.current=false;setSaving(false);}
+ };
  const openShift=async(e:React.FormEvent)=>{
   e.preventDefault();if(saving)return;
   const amount=Number(openingFloat);
-  if(!registerId||!Number.isFinite(amount)||amount<0||Math.abs(amount*100-Math.round(amount*100))>0.000001){setError("Selecione um caixa e informe o fundo em reais e centavos.");return;}
+  if(!openingFloat.trim()||!registerId||!Number.isFinite(amount)||amount<0||Math.abs(amount*100-Math.round(amount*100))>0.000001){setError("Selecione um caixa e informe o fundo em reais e centavos.");return;}
   if(!requestKey.current)requestKey.current=crypto.randomUUID();
   setSaving(true);setError("");setNotice("");
   try{
@@ -101,27 +109,33 @@ export default function CashPage(){
  };
  if(!authLoading&&!canView)return <RootShellLayout><div className="rounded-xl border border-amber-300 bg-amber-50 p-6 text-sm text-amber-900" role="alert">Sem permissão para visualizar os turnos de caixa.</div></RootShellLayout>;
  const open=data?.shifts.filter(s=>s.status===1)||[];
- const eligible=data?.registers.filter(r=>r.status===1&&!open.some(s=>s.registerId===r.id))||[];
+ const eligible=data?.registers.filter(r=>r.available===true)||[];
+ const canRegister=hasPermission("cash.register.manage")&&data?.canManageRegisters===true;
+ const openingBlocked=!data?"Carregue os dados do caixa.":!canOpen||!data.canOpen?"Sem permissão para abertura de turno.":data.registers.length===0?"Cadastre um caixa antes de abrir o primeiro turno.":eligible.length===0?"Todos os caixas estão ocupados ou indisponíveis.":"";
+ const startRegister=()=>{setError("");setRegisterCode(data?.registers.length===0?"CX-001":"");setRegisterName(data?.registers.length===0?"Caixa Balcão":"");setRegisterNotes("");setShowRegister(true);};
  const mismatch=data?.shifts.filter(s=>s.reconciliationMismatch)||[];
  return <RootShellLayout>
   <div className="space-y-5">
    <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div><span className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">Frente de Loja • Operação Real</span>
      <h1 className="mt-2 text-xl font-extrabold text-slate-900">Caixa & Gestão de Turnos</h1>
-     <p className="mt-1 text-xs text-slate-500">Turnos e movimentações consultados diretamente no Neon; fechamento e conciliação permanecem protegidos até homologação.</p></div>
+     <p className="mt-1 text-xs text-slate-500">Gerencie os terminais da filial, abertura, movimentações e fechamento com conferência de numerário.</p></div>
     <div className="flex gap-2">
      <button type="button" onClick={()=>void load()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50"><RefreshCw className="h-4 w-4"/>Atualizar</button>
-     <button type="button" onClick={()=>{requestKey.current="";setError("");setShowOpen(true);}} disabled={!canOpen||!data||eligible.length===0}
+     {canRegister&&<button type="button" onClick={startRegister} disabled={saving||loading} className="flex items-center gap-2 rounded-xl border border-violet-200 px-3 py-2 text-xs font-bold text-violet-700 disabled:opacity-50"><Plus className="h-4 w-4"/>Cadastrar caixa</button>}
+     <button type="button" title={openingBlocked||"Abrir turno"} onClick={()=>{requestKey.current="";setError("");setRegisterId(eligible.length===1?eligible[0].id:eligible.some(r=>r.id===registerId)?registerId:"");setShowOpen(true);}} disabled={!!openingBlocked||loading||saving}
       className="flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4"/>Abrir turno</button>
     </div>
    </header>
    {error&&<div role="alert" className="flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
    {notice&&<div role="status" className="flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 className="h-5 w-5 shrink-0"/>{notice}</div>}
+   {data&&openingBlocked&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>{openingBlocked}</strong>{data.registers.length===0&&<p className="mt-1 text-xs">{canRegister?"Use Cadastrar caixa para criar o primeiro terminal. O cadastro não gera saldo nem abre turno.":"Solicite a um responsável com permissão de gestão de caixas o cadastro de um terminal."}</p>}</div>}
    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><Wallet className="h-5 w-5 text-violet-700"/><div className="mt-2 text-2xl font-black text-slate-900">{data?open.length:"—"}</div><p className="text-xs text-slate-500">Turnos abertos</p></div>
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><History className="h-5 w-5 text-violet-700"/><div className="mt-2 text-2xl font-black text-slate-900">{data?data.registers.length:"—"}</div><p className="text-xs text-slate-500">Caixas cadastrados na filial</p></div>
     <div className="rounded-2xl border border-slate-200 bg-white p-5"><AlertTriangle className="h-5 w-5 text-amber-600"/><div className="mt-2 text-2xl font-black text-slate-900">{data?mismatch.length:"—"}</div><p className="text-xs text-slate-500">Turnos com diferença entre saldo e movimentos</p></div>
    </div>
+   {data&&data.registers.length>0&&<section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="font-extrabold text-slate-900">Caixas da filial</h2><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{data.registers.map(r=><div key={r.id} className="rounded-xl border border-slate-200 p-3"><p className="text-xs text-slate-500">{r.code}</p><strong className="text-sm">{r.name}</strong><p className={"mt-1 text-xs "+(r.available?"text-emerald-700":"text-slate-500")}>{r.available?"Disponível":r.status===1?"Turno em andamento":r.status===2?"Inativo":"Manutenção"}</p></div>)}</div></section>}
    <div className="rounded-2xl border border-slate-200 bg-white p-5">
     <h2 className="font-extrabold text-slate-900">Histórico de turnos reais</h2>
     <p className="mt-1 text-xs text-slate-500">O saldo registrado não substitui a conferência física de numerário.</p>
@@ -137,6 +151,7 @@ export default function CashPage(){
    </div>
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800"><LockKeyhole className="mr-2 inline h-4 w-4"/>Abertura, suprimentos e sangrias persistem no Neon. Fechamento sem diferença exige contagem física exata; divergências exigem fluxo de aprovação separado. Conciliação bancária, vendas e liquidações seguem bloqueadas até aprovação dos respectivos gates. Esta tela não cria pagamentos.</div>
   </div>
+  {showRegister&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-3" role="dialog" aria-modal="true" aria-label="Cadastrar caixa"><form onSubmit={e=>void createRegister(e)} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl"><h2 className="text-lg font-extrabold">Cadastrar caixa</h2><p className="text-xs text-slate-500">Terminal físico da filial. O cadastro não cria movimentações ou fundo inicial.</p>{error&&<div role="alert" className="rounded-lg bg-rose-50 p-3 text-xs text-rose-800">{error}</div>}<fieldset disabled={saving} className="space-y-3"><label className="block text-xs font-bold">Código<input required maxLength={50} pattern="[A-Za-z0-9][A-Za-z0-9._-]*" value={registerCode} onChange={e=>setRegisterCode(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm" placeholder="CX-001"/></label><label className="block text-xs font-bold">Nome<input required maxLength={150} value={registerName} onChange={e=>setRegisterName(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm" placeholder="Caixa Balcão"/></label><label className="block text-xs font-bold">Observações<textarea maxLength={500} value={registerNotes} onChange={e=>setRegisterNotes(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm"/></label></fieldset><div className="flex justify-end gap-2"><button type="button" disabled={saving} onClick={()=>{setShowRegister(false);setError("");}} className="rounded-xl border px-4 py-2 text-xs font-bold">Cancelar</button><button disabled={saving} className="rounded-xl bg-violet-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{saving?"Registrando...":"Cadastrar caixa"}</button></div></form></div>}
   {showOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-3" role="dialog" aria-modal="true" aria-label="Abrir turno de caixa">
    <form onSubmit={e=>void openShift(e)} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
     <h2 className="text-lg font-extrabold">Abrir turno no Neon</h2>

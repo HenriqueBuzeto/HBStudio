@@ -1,7 +1,7 @@
 name: ERP integration gate (no deployment)
 on:
   push:
-    branches: [integration/erp-end-to-end-20261123]
+    branches: [integration/erp-end-to-end-20261123, feat/manufacturing-cost-foundation-20261125]
   pull_request:
     paths: ['apps/web/**', 'db/migrations/**', '.github/workflows/erp-integration-gate.yml']
   workflow_dispatch:
@@ -24,6 +24,30 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Install pinned dependencies
         run: npm ci --no-audit --no-fund
+      - name: Factory slicer metadata tests
+        run: node --test tests/factory-slicer.test.mjs
+      - name: Factory Kanban transition tests
+        run: node --experimental-strip-types --test tests/factory-kanban.test.mjs
+      - name: Inventory unit presentation tests
+        run: node --experimental-strip-types --test tests/inventory-units.test.mjs
+      - name: Reporting permissions, range and export tests
+        run: node --experimental-strip-types --test tests/reports.test.mjs
+      - name: Partner investment calculations
+        run: node --experimental-strip-types --test tests/partner-investments.test.mjs
+      - name: Governance validation tests
+        run: node --experimental-strip-types --test tests/governance-validation.test.mjs
+      - name: Fleet data source integrity tests
+        run: node --experimental-strip-types --test tests/fleet-source.test.mjs
+      - name: Purchase insights tests
+        run: node --experimental-strip-types --test tests/purchase-insights.test.mjs
+      - name: Purchase planning tests
+        run: node --experimental-strip-types --test tests/purchase-planning.test.mjs
+      - name: Loyalty source and integration regression
+        run: node --test tests/loyalty-v15.test.mjs
+      - name: Notifications security and wiring regression
+        run: node --test tests/notifications-v18.test.mjs
+      - name: Birthday date regression
+        run: node --experimental-strip-types --test tests/birthday-v19.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build

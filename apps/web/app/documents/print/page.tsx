@@ -8,16 +8,20 @@ import {Printer,FileDown,MessageCircle,RefreshCw,AlertTriangle,FileText,ShieldAl
 
 type Paper="58"|"80"|"A4";
 type Document={
- kind:"quote"|"training"|"service"|"contract";documentType:string;number:string;issuedAt:string;
+ kind:"quote"|"training"|"training-sale"|"service"|"contract"|"sale";documentType:string;number:string;issuedAt:string;
  organization:{name:string;legalName:string;branch:string;cnpj:string|null;address:string};
  customer:string;items:Array<{sku?:string;description:string;quantity:number;unitPrice:number;discount:number;category?:string}>;
  totals:{subtotal:number;discount:number;shipping:number;total:number};
+ sale?:{state:"REGISTERED"|"DELIVERED"|"CANCELLED";operator:string;orderNumber:string|null;tendered:number;change:number;cancellation:{at:string;by:string;reason:string}|null};
+ training?:{status:string;operator:string;seller:string;paymentMethod:string;installments:number;cancellation:{at:string;by:string;reason:string;eventId:string|null}|null};
  validUntil?:string;paymentTerms?:string|null;notes?:string|null;disclaimer:string;
  detail?:{equipment:string;defect:string;condition:string|null;diagnostic:string|null;
  resolution:string|null;legalWarrantyDays:number;additionalWarrantyDays:number};
 };
 const money=(value:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(value);
 const date=(value:string)=>new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"}).format(new Date(value));
+const paymentLabel=(method:string)=>({CASH:"Dinheiro",PIX:"Pix",CREDIT:"Cartão de crédito",DEBIT:"Cartão de débito"} as Record<string,string>)[method]||"Não informado";
+const quantity=(v:number)=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:3}).format(v);
 const paperOptions:{code:Paper;name:string}[]=[
  {code:"80",name:"Bobina 80 mm"},{code:"58",name:"Bobina 58 mm"},{code:"A4",name:"Folha A4"}
 ];
@@ -38,7 +42,7 @@ export default function DocumentPrintPage(){
   const defaultPaper=getBrowserPrintSettings().paper;
   const selected= requestedPaper==="58"||requestedPaper==="80"||requestedPaper==="A4"?requestedPaper:defaultPaper;
   setPaper(docKind==="contract"?"A4":selected);
-  if(!["quote","training","service","contract"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
+  if(!["quote","training","training-sale","service","contract","sale"].includes(docKind)||!/^[a-f\d-]{36}$/i.test(docId)){
    setError("Documento ou identificador inválido.");setLoading(false);return;
   }
   const controller=new AbortController();
@@ -59,7 +63,7 @@ export default function DocumentPrintPage(){
   if(params.get("auto")!=="1")return;
   const prefs=getBrowserPrintSettings();
   const authorizedPreference=
-    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService);
+    (kind==="quote"&&prefs.autoPrintQuote)||(kind==="service"&&prefs.autoPrintService)||((kind==="training-sale"||kind==="sale")&&prefs.autoPrintSale);
   if(!authorizedPreference)return;
   attemptedAutoPrint.current=true;
   const onceKey=`hbstudio:autoprint:v1:${kind}:${id}`;
@@ -87,10 +91,17 @@ export default function DocumentPrintPage(){
 
  const isContract=kind==="contract";
  const effectivePaper=isContract?"A4":paper;
- const title=kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
+ const training=document?.training;
+ const sale=document?.sale;
+ const cancelled=training?.status==="VOIDED"||sale?.state==="CANCELLED";
+ const statusLabel=training?.status==="VOIDED"?"CANCELADA":training?.status==="SIMULATED"?"SIMULAÇÃO REGISTRADA":"STATUS NÃO CONFIRMADO";
+ const title=kind==="sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"COMPROVANTE DE VENDA INTERNA"):kind==="training-sale"?(cancelled?"COMPROVANTE DE CANCELAMENTO":"VENDA SIMULADA — TREINAMENTO"):kind==="training"?"SIMULAÇÃO — TESTE DE IMPRESSÃO":kind==="quote"?"ORÇAMENTO COMERCIAL":kind==="contract"?"MINUTA DE TERMO DE SERVIÇO":"ORDEM DE SERVIÇO";
  const shareText=document?
   [title+` ${document.number}`,`Cliente: ${document.customer}`,
-    `Total informado: ${money(document.totals.total)}`,
+    training?`Situação: ${statusLabel}`:"",
+    `${cancelled?"Valor original":"Total informado"}: ${money(document.totals.total)}`,
+    training?.cancellation?`Cancelamento: ${date(training.cancellation.at)}`:sale?.cancellation?`Cancelamento: ${date(sale.cancellation.at)}`:"",
+    training?"Sem pagamento real. Documento de treinamento.":sale?"Comprovante interno de homologação. Não válido para operações comerciais.":"",
     kind==="quote"&&document.validUntil?`Validade: ${date(document.validUntil)}`:"",
     "Documento interno. Não é nota ou cupom fiscal. O PDF pode ser anexado manualmente, após salvar pelo navegador."
    ].filter(Boolean).join("\n"):"";
@@ -107,6 +118,9 @@ export default function DocumentPrintPage(){
  };
  return <RootShellLayout>
   <style>{`
+   .hb-receipt-row{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;}
+   .hb-receipt-row>:first-child{min-width:0;}
+   .hb-receipt-row>:last-child{white-space:nowrap;flex-shrink:0;text-align:right;}
    @media print {
     @page {size: ${effectivePaper==="A4"?"A4":"auto"};margin:${effectivePaper==="A4"?"12mm":"0"};}
     html,body {margin:0!important;padding:0!important;background:#fff!important;color:#000!important;}
@@ -114,14 +128,18 @@ export default function DocumentPrintPage(){
     #hb-printed-document,#hb-printed-document * {visibility:visible!important;}
     #hb-printed-document {position:absolute!important;left:0!important;top:0!important;
       border:0!important;box-shadow:none!important;margin:0!important;
-      padding:${effectivePaper==="A4"?"0":"3mm 2mm"}!important;
-      width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"72mm":"48mm"}!important;
+      padding:${effectivePaper==="A4"?"0":"2mm 1.5mm 4mm"}!important;
+      box-sizing:border-box!important;width:${effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm"}!important;
       max-width:none!important;min-height:auto!important;background:#fff!important;
-      color:#000!important;overflow:visible!important;print-color-adjust:exact;}
+      color:#000!important;overflow:visible!important;overflow-wrap:break-word!important;word-break:normal!important;print-color-adjust:exact;}
+    .hb-receipt-row{display:flex!important;align-items:baseline!important;justify-content:space-between!important;gap:2mm!important;max-width:100%!important;}
+    .hb-receipt-row>:first-child{min-width:0!important;}
+    .hb-receipt-row>:last-child{white-space:nowrap!important;flex-shrink:0!important;text-align:right!important;}
+    .hb-receipt-item{break-inside:avoid!important;page-break-inside:avoid!important;}
     .hb-print-actions {display:none!important;}
     #hb-printed-document table {width:100%;border-collapse:collapse;}
     #hb-printed-document tr {break-inside:avoid;}
-    #hb-printed-document {font-size:${effectivePaper==="58"?"9px":effectivePaper==="80"?"11px":"12px"}!important;}
+    #hb-printed-document {font-family:Arial,Helvetica,sans-serif!important;font-size:${effectivePaper==="58"?"10px":effectivePaper==="80"?"12px":"12px"}!important;line-height:1.35!important;}
    }
   `}</style>
   <div className="mx-auto max-w-5xl space-y-4 pb-12">
@@ -137,7 +155,7 @@ export default function DocumentPrintPage(){
    {loading&&<div className="rounded-xl border bg-white p-6 text-sm">Consultando documento no Neon...</div>}
    {error&&<div role="alert" className="hb-print-actions flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><AlertTriangle className="h-5 w-5 shrink-0"/>{error}</div>}
    {document&&<>
-    {kind==="training"&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: gera apenas uma prévia imprimível do orçamento. Não registra venda, pagamento, movimentação de estoque ou valor em caixa.</div>}
+    {(kind==="training"||kind==="training-sale")&&<div role="alert" className="hb-print-actions rounded-xl border border-red-300 bg-red-50 p-4 text-xs font-black text-red-800">MODO TREINAMENTO: documento de simulação, sem venda comercial, pagamento, movimentação de estoque ou valor em caixa.</div>}
     <div className="hb-print-actions space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
      <div className="flex flex-wrap gap-2">
       {paperOptions.filter(p=>!isContract||p.code==="A4").map(option=>
@@ -156,22 +174,26 @@ export default function DocumentPrintPage(){
      {reference&&<p role="status" className="text-xs font-semibold text-emerald-700">{reference}</p>}
      {autoMessage&&<p role="status" className="text-xs font-semibold text-amber-800">{autoMessage}</p>}
     </div>
-    <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"80mm":"58mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"anywhere"}}>
+    <article id="hb-printed-document" className={"mx-auto border border-slate-200 bg-white p-5 text-slate-900 shadow-sm "+(effectivePaper==="A4"?"max-w-[210mm]":"")} style={{boxSizing:"border-box",width:effectivePaper==="A4"?"100%":effectivePaper==="80"?"68mm":"46mm",fontSize:effectivePaper==="58"?10:effectivePaper==="80"?12:14,overflowWrap:"break-word",wordBreak:"normal"}}>
      <div className="border-b-2 border-slate-900 pb-3 text-center">
-      <h2 className="font-black uppercase">{document.organization.name}</h2>
+      <h2 className="font-black uppercase text-[1.25em]">{document.organization.name||"Empresa não identificada"}</h2>
       {document.organization.cnpj&&<p>CNPJ: {formatCnpj(document.organization.cnpj)}</p>}
+      {document.organization.legalName!==document.organization.name&&<p>{document.organization.legalName}</p>}
       <p>{document.organization.branch}</p>
       {document.organization.address&&<p>{document.organization.address}</p>}
      </div>
      <div className="mt-4 border-b border-dashed border-slate-600 pb-3 text-center">
       <h3 className="font-black">{title}</h3>
       <p>Nº {document.number}</p>
-      <p>{date(document.issuedAt)}</p>
+      <p>Registro: {date(document.issuedAt)}</p>
+      {sale&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center">{sale.state==="CANCELLED"?"CANCELADA":sale.state==="DELIVERED"?"ENTREGUE":"VENDA REGISTRADA"}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}{training&&<div className="hb-receipt-item mt-2 border-2 border-black p-2 font-black text-center text-[1.2em]">{statusLabel}<p className="text-[0.72em]">CONTROLE INTERNO • NÃO FISCAL</p></div>}
      </div>
      <div className="my-3 space-y-1"><p><strong>Cliente:</strong> {document.customer}</p>
+      {sale&&<><p><strong>Operador:</strong> {sale.operator}</p>{sale.orderNumber&&<p><strong>OS:</strong> {sale.orderNumber}</p>}</>}{training&&<><p><strong>Operador:</strong> {training.operator||"Não informado"}</p><p><strong>Vendedor:</strong> {training.seller||"Não informado"}</p></>}
       {document.validUntil&&<p><strong>Válido até:</strong> {date(document.validUntil)}</p>}
       {document.paymentTerms&&<p><strong>Condição prevista:</strong> {document.paymentTerms}</p>}
      </div>
+     {sale?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(sale.cancellation.at)}</p><p><strong>Responsável:</strong> {sale.cancellation.by}</p><p><strong>Motivo:</strong> {sale.cancellation.reason}</p></section>}{training?.cancellation&&<section className="hb-receipt-item my-3 border-y-2 border-black py-2 space-y-1"><h4 className="font-black">DADOS DO CANCELAMENTO</h4><p><strong>Data/hora:</strong> {date(training.cancellation.at)}</p><p><strong>Responsável:</strong> {training.cancellation.by||"Não informado"}</p><p><strong>Motivo:</strong> {training.cancellation.reason||"Não informado"}</p>{training.cancellation.eventId&&<p className="text-[0.85em]"><strong>Registro de auditoria interno:</strong> {training.cancellation.eventId}</p>}</section>}
      {document.detail&&<div className="my-3 border-t border-dashed border-slate-500 pt-2">
       <p><strong>Aparelho:</strong> {document.detail.equipment}</p>
       <p><strong>Defeito relatado:</strong> {document.detail.defect}</p>
@@ -179,21 +201,24 @@ export default function DocumentPrintPage(){
       {document.detail.diagnostic&&<p><strong>Diagnóstico:</strong> {document.detail.diagnostic}</p>}
       {document.detail.resolution&&<p><strong>Serviço realizado:</strong> {document.detail.resolution}</p>}
      </div>}
-     <table className="w-full border-collapse text-left" style={{tableLayout:"fixed"}}>
-      <thead><tr className="border-b border-slate-600"><th className="py-2" style={{width:"56%"}}>Descrição</th><th className="text-center">Qtd.</th><th className="text-right">Total</th></tr></thead>
-      <tbody>{document.items.map((item,i)=><tr key={i} className="border-b border-dotted border-slate-300 align-top">
-       <td className="py-2">{item.description}{item.sku&&<span className="block text-[0.85em]">{item.sku}</span>}</td>
-       <td className="py-2 text-center">{item.quantity}</td>
-       <td className="py-2 text-right">{money(item.quantity*item.unitPrice-item.discount)}</td>
-      </tr>)}</tbody>
-     </table>
-     <div className="mt-4 space-y-1 border-t border-dashed border-slate-600 pt-2 text-right">
-      <p>Subtotal: {money(document.totals.subtotal)}</p>
-      {document.totals.discount>0&&<p>Descontos: − {money(document.totals.discount)}</p>}
-      {document.totals.shipping>0&&<p>Frete: {money(document.totals.shipping)}</p>}
-      <p className="mt-2 border-t border-slate-600 pt-2 text-[1.15em] font-black">TOTAL: {money(document.totals.total)}</p>
+     <section aria-label="Itens" className="border-t border-slate-800 pt-2">
+      <div className="hb-receipt-row border-b border-slate-600 pb-1 font-bold"><span>ITENS / DESCRIÇÃO</span><span>VALOR</span></div>
+      {document.items.map((item,i)=><div key={i} className="hb-receipt-item border-b border-dotted border-slate-400 py-2">
+       <p className="font-semibold">{String(i+1).padStart(2,"0")} · {item.description}</p>
+       {item.sku&&<p className="text-[0.85em]">Cód.: {item.sku}</p>}
+       <div className="hb-receipt-row mt-1"><span>{quantity(item.quantity)} × {money(item.unitPrice)}</span><strong>{money(item.quantity*item.unitPrice-item.discount)}</strong></div>
+       {item.discount>0&&<div className="hb-receipt-row"><span>Desconto do item</span><span>− {money(item.discount)}</span></div>}
+      </div>)}
+     </section>
+     <div className="mt-3 space-y-1 border-t border-dashed border-slate-600 pt-2">
+      <div className="hb-receipt-row"><span>Itens</span><span>{quantity(document.items.reduce((n,i)=>n+i.quantity,0))}</span></div>
+      <div className="hb-receipt-row"><span>Subtotal</span><span>{money(document.totals.subtotal)}</span></div>
+      {document.totals.discount>0&&<div className="hb-receipt-row"><span>Desconto</span><span>− {money(document.totals.discount)}</span></div>}
+      {document.totals.shipping>0&&<div className="hb-receipt-row"><span>Frete</span><span>{money(document.totals.shipping)}</span></div>}
+      <div className="hb-receipt-row mt-2 border-t-2 border-slate-900 pt-2 text-[1.12em] font-black"><span>{cancelled?"TOTAL ORIGINAL":"TOTAL"}</span><span>{money(document.totals.total)}</span></div>
      </div>
-     {document.notes&&<p className="mt-4"><strong>Observações:</strong> {document.notes}</p>}
+     {sale&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO — DINHEIRO</h4><div className="hb-receipt-row"><span>Valor recebido</span><strong>{money(sale.tendered)}</strong></div><div className="hb-receipt-row"><span>Troco</span><strong>{money(sale.change)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno registrado</span><strong>{money(document.totals.total)}</strong></div>}</section>}{training&&<section className="hb-receipt-item mt-3 border-t border-dashed border-black pt-2 space-y-1"><h4 className="font-black">PAGAMENTO SIMULADO{cancelled?" — CANCELADO":""}</h4><p><strong>Forma:</strong> {paymentLabel(training.paymentMethod)}</p><p><strong>Parcelas:</strong> {training.installments}x</p><div className="hb-receipt-row"><span>Recebimento real</span><strong>{money(0)}</strong></div>{cancelled&&<div className="hb-receipt-row"><span>Estorno real</span><strong>{money(0)}</strong></div>}<p className="text-[0.85em]">Autorização fiscal e bancária: não aplicável à simulação.</p></section>}
+     {document.notes&&<p className="mt-4"><strong>{kind==="training-sale"?"Condição simulada:":"Observações:"}</strong> {document.notes}</p>}
      {isContract&&<div className="mt-8 space-y-5 text-sm">
       <p>Este termo acompanha a ordem de serviço identificada e descreve os itens orçados e a condição informada no atendimento. Não substitui termos comerciais específicos nem constitui aceite automático.</p>
       <p>Garantias legais e adicionais serão verificadas de acordo com a operação e a legislação aplicável. Qualquer autorização técnica e serviço adicional depende de concordância registrada.</p>
@@ -202,7 +227,7 @@ export default function DocumentPrintPage(){
        <div className="border-t border-slate-900 pt-2">Responsável pelo atendimento</div>
       </div>
      </div>}
-     <div className="mt-6 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
+     <div className="hb-receipt-item mt-4 border-2 border-slate-900 p-2 text-center text-[0.9em] font-extrabold uppercase">{document.disclaimer}</div>
      <p className="mt-3 text-center text-[0.9em]">Documento gerado a partir de registros internos do HB Studio.</p>
     </article>
     <div className="hb-print-actions rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
