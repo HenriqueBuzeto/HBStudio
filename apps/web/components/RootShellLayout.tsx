@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { readSidebarPosition, saveSidebarPosition, restoreSidebarPosition, sidebarStorageKey } from "@/lib/sidebar-scroll";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -99,6 +100,29 @@ export default function RootShellLayout({
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const storageKey = user && isAuthenticated ? sidebarStorageKey(user.tenantId, user.id, user.branchId) : null;
+  // Pages currently mount their own shell; restore before the new sidebar is painted.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !storageKey || isLoading) return;
+    const saved = readSidebarPosition(storageKey);
+    if (saved !== null) {
+      restoreSidebarPosition(nav, saved);
+    } else {
+      // Direct entry into a deep route: reveal only the active item inside the menu.
+      const active = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (active) {
+        const bounds = nav.getBoundingClientRect(), item = active.getBoundingClientRect();
+        if (item.bottom > bounds.bottom) restoreSidebarPosition(nav, nav.scrollTop + item.bottom - bounds.bottom + 12);
+        else if (item.top < bounds.top) restoreSidebarPosition(nav, nav.scrollTop + item.top - bounds.top - 12);
+      }
+      saveSidebarPosition(storageKey, nav.scrollTop);
+    }
+  }, [storageKey, isLoading, pathname]);
+  const rememberSidebar = () => {
+    if (storageKey && navRef.current) saveSidebarPosition(storageKey, navRef.current.scrollTop);
+  };
 
   useEffect(() => {
     // Redireciona para o login se a sessão não for confirmada
@@ -167,7 +191,7 @@ export default function RootShellLayout({
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 px-3.5 py-5 space-y-6 overflow-y-auto dark-scrollbar">
+        <nav ref={navRef} onScroll={rememberSidebar} aria-label="Menu principal" className="flex-1 min-h-0 px-3.5 py-5 space-y-6 overflow-y-auto overscroll-y-contain dark-scrollbar">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1.5">
               <h3 className="px-3.5 text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -182,7 +206,9 @@ export default function RootShellLayout({
                     <Link
                       key={item.name}
                       href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
+                      aria-current={isActive ? "page" : undefined}
+                      scroll={false}
+                      onClick={() => { rememberSidebar(); setMobileMenuOpen(false); }}
                       className={`flex items-center gap-3.5 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-all group relative ${
                         isActive
                           ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-purple-600/35"
