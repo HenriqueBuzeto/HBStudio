@@ -30,6 +30,8 @@ jobs:
         run: node --experimental-strip-types --test tests/factory-kanban.test.mjs
       - name: Inventory unit presentation tests
         run: node --experimental-strip-types --test tests/inventory-units.test.mjs
+      - name: Reporting permissions, range and export tests
+        run: node --experimental-strip-types --test tests/reports.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build

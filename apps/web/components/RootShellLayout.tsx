@@ -84,6 +84,7 @@ const navSections: NavSection[] = [
       { name: "Crédito / Débito & Pix", href: "/financial/acquirers", icon: Receipt,
         anyPermissions: ["finance.reports.view","finance.banks.manage"] },
       { name: "Sócios & Capital", href: "/partners", icon: Building2 },
+      { name: "Relatórios & Inteligência", href: "/reports", icon: FileText, anyPermissions: ["sales.pos.use","sales.cost.view","cash.shift.view","cash.movement.view","inventory.view","inventory.cost.view","purchases.view","purchases.cost.view","finance.reports.view","finance.payables.view","finance.receivables.view","finance.journal.view","finance.banks.manage","partners.view","manufacturing.view","manufacturing.costs.view","repairs.view","projects.view","fleet.view","fleet.reports.view","fleet.cost.view","crm.view","messaging.view","customers.view","suppliers.view","loyalty.view","fiscal.documents.view","audit.view"] },
       { name: "Usuários & Senhas", href: "/users", icon: UserCheck, badge: "Master" },
     ],
   },
@@ -118,9 +119,9 @@ export default function RootShellLayout({
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans">
+    <div className={"h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#0f172a] flex flex-col md:flex-row font-sans "+(pathname==="/reports"?"print:block print:h-auto print:w-auto print:overflow-visible print:bg-white":"")}>
       {/* Mobile Top Header */}
-      <header className="md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50">
+      <header className={"md:hidden flex items-center justify-between p-3.5 bg-[#090e1a] text-white border-b border-[#1e293b] flex-shrink-0 z-50 "+(pathname==="/reports"?"print:hidden":"")}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center font-bold text-white shadow-md shadow-purple-900/30">
             HB
@@ -144,7 +145,7 @@ export default function RootShellLayout({
         className={`
           fixed inset-y-0 left-0 z-40 w-72 bg-[#090e1a] text-slate-300 border-r border-[#1a2236] flex flex-col transition-transform duration-300 ease-in-out
           md:static md:translate-x-0 md:h-screen md:flex-shrink-0
-          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${pathname==="/reports"?"print:hidden":""}
         `}
       >
         {/* Brand Header */}
@@ -238,9 +239,9 @@ export default function RootShellLayout({
       </aside>
 
       {/* Main Content Viewport com Fundo Quadriculado Sutil */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden hb-grid-background">
+      <div className={"flex-1 flex flex-col min-w-0 h-full overflow-hidden hb-grid-background "+(pathname==="/reports"?"print:block print:h-auto print:overflow-visible print:bg-none":"")}>
         {/* Top Navbar IDÊNTICO AO DESIGN SYSTEM HBVISIONX */}
-        <header className="h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs">
+        <header className={"h-16 bg-white border-b border-slate-200/90 px-6 hidden md:flex items-center justify-between flex-shrink-0 z-30 shadow-xs "+(pathname==="/reports"?"print:hidden":"")}>
           {/* Lado Esquerdo: Saudação, Data e Status do Caixa */}
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
@@ -307,7 +308,7 @@ export default function RootShellLayout({
         </header>
 
         {/* Page Container com Scroll Vertical Próprio */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6">
+        <main className={"flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6 "+(pathname==="/reports"?"print:overflow-visible print:max-w-none print:p-0":"")}>
           {children}
         </main>
       </div>
