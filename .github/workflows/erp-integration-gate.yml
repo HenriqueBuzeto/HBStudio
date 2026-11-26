@@ -1,7 +1,7 @@
 name: ERP integration gate (no deployment)
 on:
   push:
-    branches: [integration/erp-end-to-end-20261123]
+    branches: [integration/erp-end-to-end-20261123, feat/manufacturing-cost-foundation-20261125]
   pull_request:
     paths: ['apps/web/**', 'db/migrations/**', '.github/workflows/erp-integration-gate.yml']
   workflow_dispatch:
@@ -38,6 +38,8 @@ jobs:
         run: node --experimental-strip-types --test tests/governance-validation.test.mjs
       - name: Fleet data source integrity tests
         run: node --experimental-strip-types --test tests/fleet-source.test.mjs
+      - name: Purchase insights tests
+        run: node --experimental-strip-types --test tests/purchase-insights.test.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Production build

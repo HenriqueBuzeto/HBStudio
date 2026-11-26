@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
 import CatalogIntakeForm from "@/components/CatalogIntakeForm";
+import PurchaseInsights from "./PurchaseInsights";
 import {useAuth} from "@/lib/auth";
 import {formatCpfCnpj} from "@/lib/br-format";
 import {
@@ -154,7 +155,7 @@ export type ElectronicCategory = "smartphone" | "computador_gamer" | "videogame"
 
 export default function ProcurementPage() {
   const {hasPermission}=useAuth();const [intakeOpen,setIntakeOpen]=useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "receipts" | "used_devices">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "receipts" | "used_devices" | "suggestions">("orders");
   const [searchTerm, setSearchTerm] = useState("");
   const [canViewCost, setCanViewCost] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -483,7 +484,7 @@ export default function ProcurementPage() {
     <RootShellLayout>
       <div className="space-y-6">
         {/* Header e KPIs de Procurement */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
               <ShoppingCart className="w-7 h-7 text-indigo-600" />
@@ -591,7 +592,7 @@ export default function ProcurementPage() {
         </div>
 
         {/* Navegação por Abas */}
-        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-6 rounded-t-2xl pt-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-xs">
           <button
             onClick={() => setActiveTab("orders")}
             className={`py-3 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5 cursor-pointer ${activeTab === "orders"
@@ -624,9 +625,11 @@ export default function ProcurementPage() {
             <Gamepad2 className="w-4 h-4" />
             Aquisição de Usados & Eletrônicos ({usedDevices.length})
           </button>
+          {["purchases.view","inventory.view","finance.reports.view"].every(hasPermission)&&<button type="button" aria-pressed={activeTab==="suggestions"} onClick={()=>setActiveTab("suggestions")} className={"rounded-lg px-3 py-3 text-xs font-bold "+(activeTab==="suggestions"?"bg-violet-700 text-white":"text-slate-600 hover:bg-violet-50")}>Sugestão de Compras</button>}
         </div>
 
         {/* Conteúdo da Aba Ativa */}
+        {activeTab === "suggestions" && <PurchaseInsights showCosts={canViewCost}/>}
         {activeTab === "orders" && (
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50/50">
