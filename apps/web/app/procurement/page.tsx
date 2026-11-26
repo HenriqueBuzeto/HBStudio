@@ -154,10 +154,12 @@ export interface SkuOption {
 export type ElectronicCategory = "smartphone" | "computador_gamer" | "videogame" | "notebook" | "outro";
 
 export default function ProcurementPage() {
-  const {hasPermission}=useAuth();const [intakeOpen,setIntakeOpen]=useState(false);
+  const {hasPermission,user}=useAuth();const [intakeOpen,setIntakeOpen]=useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "receipts" | "used_devices" | "suggestions">("orders");
   const [searchTerm, setSearchTerm] = useState("");
-  const [canViewCost, setCanViewCost] = useState(true);
+  const [showCost, setShowCost] = useState(true);
+  const canViewCost=showCost&&hasPermission("purchases.cost.view");
+  const [ordersReady,setOrdersReady]=useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -228,6 +230,7 @@ export default function ProcurementPage() {
 
   const loadData = async () => {
     setIsLoading(true);
+    setOrdersReady(false);
     setErrorMessage(null);
 
     try {
@@ -240,8 +243,9 @@ export default function ProcurementPage() {
 
       if (ordRes.status === "fulfilled" && ordRes.value.ok) {
         const data = await ordRes.value.json();
-        setOrders(Array.isArray(data) ? data : []);
-      }
+        if(!Array.isArray(data))throw Error("Resposta de pedidos inválida.");
+        setOrders(data);setOrdersReady(true);
+      }else{setOrders([]);setErrorMessage("Não foi possível confirmar os pedidos oficiais. Atualize a consulta.");}
       if (recRes.status === "fulfilled" && recRes.value.ok) {
         const data = await recRes.value.json();
         setReceipts(Array.isArray(data) ? data : []);
@@ -266,8 +270,8 @@ export default function ProcurementPage() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if(activeTab==="orders")void loadData();
+  }, [activeTab]);
 
   // Handlers de Pedido de Compra
   const handleCreateOrder = async (e: React.FormEvent) => {
@@ -280,9 +284,11 @@ export default function ProcurementPage() {
     setIsSubmitting(true);
     try {
       const selectedSku = skus.find((s) => s.id === orderForm.productSkuId);
+      if(!user?.branchId||!hasPermission("purchases.create")||!hasPermission("purchases.cost.view"))throw Error("Filial ou permissão de compra não confirmada.");
       const payload = {
-        branchId: "00000000-0000-0000-0000-000000000001",
+        branchId: user.branchId,
         supplierPartyId: orderForm.supplierPartyId,
+        shippingCost:0,otherExpenses:0,totalDiscount:0,
         expectedDeliveryDateUtc: orderForm.expectedDeliveryDate ? new Date(orderForm.expectedDeliveryDate).toISOString() : null,
         paymentTerms: orderForm.paymentTerms,
         notes: orderForm.notes || undefined,
@@ -498,7 +504,8 @@ export default function ProcurementPage() {
           <div className="flex flex-wrap items-center gap-2.5">
             {hasPermission("catalog.products.manage")&&<button type="button" onClick={()=>setIntakeOpen(true)} className="rounded-xl border px-3 py-2 text-xs font-bold text-purple-700">+ Cadastrar produto</button>}
             <button
-              onClick={() => setCanViewCost(!canViewCost)}
+              onClick={() => setShowCost(!showCost)}
+              disabled={!hasPermission("purchases.cost.view")}
               className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${canViewCost
                 ? "bg-amber-50 text-amber-700 border-amber-200"
                 : "bg-slate-100 text-slate-600 border-slate-300"
@@ -552,7 +559,7 @@ export default function ProcurementPage() {
               <span>Pedidos em Aberto</span>
               <ShoppingCart className="w-4 h-4 text-purple-600" />
             </div>
-            <div className="mt-2 text-2xl font-extrabold text-slate-900">{orders.length}</div>
+            <div className="mt-2 text-2xl font-extrabold text-slate-900">{ordersReady&&!isLoading?orders.filter(o=>["Draft","Submitted","Approved","Ordered","PartiallyReceived"].includes(o.status)).length:"—"}</div>
             <div className="text-xs text-slate-500 mt-1 font-medium">Pedidos registrados no ERP</div>
           </div>
 
@@ -583,7 +590,7 @@ export default function ProcurementPage() {
               <DollarSign className="w-4 h-4 text-amber-600" />
             </div>
             <div className="mt-2 text-2xl font-extrabold text-slate-900">
-              {canViewCost
+              {!ordersReady||isLoading?"—":canViewCost
                 ? `R$ ${totalCommitted.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
                 : "••••••"}
             </div>
@@ -601,7 +608,7 @@ export default function ProcurementPage() {
               }`}
           >
             <ShoppingCart className="w-4 h-4" />
-            Pedidos de Compra ({orders.length})
+            Pedidos de Compra ({ordersReady&&!isLoading?orders.length:"—"})
           </button>
 
           <button
@@ -645,7 +652,7 @@ export default function ProcurementPage() {
               </div>
             </div>
 
-            {filteredOrders.length === 0 ? (
+            {!ordersReady||isLoading?<div className="p-12 text-center text-sm text-slate-500">{isLoading?"Consultando pedidos oficiais...":"Pedidos indisponíveis. Atualize a consulta."}</div>:filteredOrders.length === 0 ? (
               <div className="p-16 text-center">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 mb-3 border border-purple-100">
                   <ShoppingCart className="w-7 h-7" />
