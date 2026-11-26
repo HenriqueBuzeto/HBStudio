@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, connection } from "next/server";
 import crypto from "crypto";
 import {fleetSource} from "@/lib/fleet-source";
-export const dynamic="force-dynamic";
 import { authorizeFleet, guardOrigin, FleetError, uuid, string, optional, decimal, enumValue, type FleetSession } from "@/lib/fleet-session";
 
 const json=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{"Cache-Control":"no-store"}});
@@ -120,6 +119,7 @@ async function finishTrip(ctx:FleetSession,id:string,b:Record<string,unknown>,ci
 
 type RouteContext={params:Promise<{path:string[]}>};
 async function handle(request:NextRequest,ctx:RouteContext,method:"GET"|"POST"|"PATCH"){
+ await connection();
  const cid=request.headers.get("x-correlation-id")||crypto.randomUUID();
  try {
   const path=(await ctx.params).path;
