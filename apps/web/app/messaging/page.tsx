@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import Link from "next/link";
 import {formatPhoneBr,maskPhoneInput} from "@/lib/br-format";
 import {
   MessageSquare,
@@ -133,7 +134,7 @@ export default function MessagingPage() {
             Mensageria & WhatsApp Cloud API
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Mensageria aguardando integração com Neon e validação oficial da Meta. Nenhuma mensagem fictícia é exibida.
+            Envio automático aguarda integração com Neon e validação oficial da Meta. <Link href="/crm?tab=birthdays" className="font-bold text-violet-700 underline">Aniversários: contato manual pelo CRM.</Link>
           </p>
         </div>
 

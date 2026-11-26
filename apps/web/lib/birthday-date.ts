@@ -1,0 +1,3 @@
+export function localToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}
+export function validBirthDate(v:unknown,today=localToday()):v is string{if(typeof v!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<"1900-01-01"||v>today)return false;const d=new Date(v+"T00:00:00.000Z");return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v;}
+export function birthDateOrNull(v:unknown,type:number):string|null{if(v===null||v===undefined||v==="")return null;if(type!==1||!validBirthDate(v))throw Error("Informe uma data de nascimento válida, não futura, para pessoa física.");return v;}

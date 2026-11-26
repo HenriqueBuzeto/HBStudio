@@ -58,7 +58,9 @@ public class Party : TenantEntity
         DocumentNumber = NormalizeDocument(documentNumber);
         StateRegistration = string.IsNullOrWhiteSpace(stateRegistration) ? null : stateRegistration.Trim();
         MunicipalRegistration = string.IsNullOrWhiteSpace(municipalRegistration) ? null : municipalRegistration.Trim();
-        BirthDate = birthDate.HasValue ? DateTime.SpecifyKind(birthDate.Value, DateTimeKind.Utc) : null;
+        if (birthDate.HasValue && (type != PartyType.Individual || birthDate.Value.Date < new DateTime(1900, 1, 1) || birthDate.Value.Date > DateTime.UtcNow.Date))
+            throw new ArgumentException("Data de nascimento inválida para pessoa física.", nameof(birthDate));
+        BirthDate = birthDate.HasValue ? DateTime.SpecifyKind(birthDate.Value.Date, DateTimeKind.Utc) : null;
         Notes = notes?.Trim();
 
         ValidateDocument();

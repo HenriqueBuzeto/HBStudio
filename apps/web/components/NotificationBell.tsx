@@ -1,13 +1,13 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {Bell,BellOff,Check,CheckCheck,ChevronRight,Clock,RefreshCw,X,Wallet,Package,Wrench,ShoppingCart,Printer,Truck,CircleDollarSign,AlertCircle} from "lucide-react";
+import {Bell,BellOff,Check,CheckCheck,ChevronRight,Clock,RefreshCw,X,Wallet,Package,Wrench,ShoppingCart,Printer,Truck,CircleDollarSign,AlertCircle,MessageCircle} from "lucide-react";
 import {useAuth} from "@/lib/auth";
 import {useRouter} from "next/navigation";
 import {NOTIFICATION_PERMISSIONS,NOTIFICATION_CATEGORIES,type NotificationFeed,type ErpNotification} from "@/lib/notification-policy";
-const icons={finance:Wallet,inventory:Package,repairs:Wrench,purchases:ShoppingCart,cash:CircleDollarSign,manufacturing:Printer,fleet:Truck};
+const icons={finance:Wallet,inventory:Package,repairs:Wrench,purchases:ShoppingCart,cash:CircleDollarSign,manufacturing:Printer,fleet:Truck,crm:MessageCircle};
 const colors={urgent:"bg-rose-50 text-rose-700",warning:"bg-amber-50 text-amber-700",info:"bg-violet-50 text-violet-700"};
 const labels={urgent:"Urgente",warning:"Atenção",info:"Informativo"};
-const routes=new Set(["/financial","/inventory","/repairs","/procurement","/cash","/manufacturing","/fretes"]);
+const routes=new Set(["/financial","/inventory","/repairs","/procurement","/cash","/manufacturing","/fretes","/crm?tab=birthdays"]);
 const time=(s:string)=>new Date(s).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 export default function NotificationBell({mobile=false}:{mobile?:boolean}){
  const {user}=useAuth(),router=useRouter(),scope=[user?.tenantId,user?.branchId,user?.id].join(":"),allowed=!!user&&NOTIFICATION_PERMISSIONS.some(p=>user.permissions.includes(p));

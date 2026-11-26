@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import BirthdayPanel from "./BirthdayPanel";
+import {localToday,validBirthDate} from "@/lib/birthday-date";
 import LoyaltyPanel,{useLoyaltySummaries} from "./LoyaltyPanel";
 import {useAuth} from "@/lib/auth";
 import {formatCpfCnpj,formatPhoneBr,formatCep,formatDateBr,onlyDigits,normalizeDocument,normalizePhoneBr,normalizeCep,maskPhoneInput} from "@/lib/br-format";
@@ -322,6 +324,7 @@ export default function PartiesPage() {
       return;
     }
 
+    if(newType===1&&isCustomerCheck&&newBirthDate&&!validBirthDate(newBirthDate)){setErrorMsg("Informe uma data de nascimento válida.");setFormStep("general");return;}
     setIsSaving(true);
     setErrorMsg(null);
     const payload = {
@@ -331,7 +334,7 @@ export default function PartiesPage() {
       documentNumber: normalizeDocument(newDoc),
       stateRegistration: newType === 2 ? newStateReg.trim() : null,
       municipalRegistration: null,
-      birthDate: newBirthDate ? new Date(newBirthDate).toISOString() : null,
+      birthDate: newType===1&&isCustomerCheck&&newBirthDate ? newBirthDate : null,
       notes: newNotes.trim() || null,
       enableCustomer: isCustomerCheck,
       enableSupplier: isSupplierCheck,
@@ -988,6 +991,7 @@ export default function PartiesPage() {
                 {/* ========================================================= */}
                 {/* ABA 1: DADOS CADASTRAIS & ENDEREÇOS COMPLETO              */}
                 {/* ========================================================= */}
+                {(activeTab==="cadastral"||activeTab==="history")&&fullScreenParty.isCustomer&&fullScreenParty.type===1&&<BirthdayPanel key={fullScreenParty.id} partyId={fullScreenParty.id} onChanged={value=>{setFullScreenParty(p=>p?{...p,birthDate:value??undefined}:p);setParties(old=>old.map(p=>p.id===fullScreenParty.id?{...p,birthDate:value??undefined}:p));}}/>}
                 {activeTab === "cadastral" && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1427,7 +1431,7 @@ export default function PartiesPage() {
                           type="radio"
                           name="personType"
                           checked={newType === 2}
-                          onChange={() => {setNewType(2);setNewDoc(formatCpfCnpj(newDoc,2));}}
+                          onChange={() => {setNewType(2);setNewBirthDate("");setNewDoc(formatCpfCnpj(newDoc,2));}}
                           className="text-purple-600"
                         />
                         Pessoa Jurídica (PJ)
@@ -1517,6 +1521,7 @@ export default function PartiesPage() {
                       </div>
                     </div>
 
+                    {newType===1&&isCustomerCheck&&<label className="block text-xs font-bold text-slate-700">Data de nascimento (opcional)<input type="date" min="1900-01-01" max={localToday()} value={newBirthDate} onChange={e=>setNewBirthDate(e.target.value)} className="mt-1 w-full sm:max-w-xs text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20"/><span className="block mt-1 font-normal text-slate-500">Usada para lembretes de aniversário no CRM. Não autoriza mensagens automaticamente.</span></label>}
                     <div className="flex items-center gap-6 pt-2">
                       <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
                         <input

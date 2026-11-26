@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import RootShellLayout from "@/components/RootShellLayout";
+import BirthdayPanel from "../parties/BirthdayPanel";
 import {formatPhoneBr,maskPhoneInput,normalizePhoneBr} from "@/lib/br-format";
 import { useAuth } from "@/lib/auth";
 import {
@@ -81,6 +82,8 @@ export default function CrmPage(){
  const [filter,setFilter]=useState("open");
  const [priorityFilter,setPriorityFilter]=useState("all");
  const [tab,setTab]=useState<"board"|"leads"|"activities">("board");
+ const [birthdaysOpen,setBirthdaysOpen]=useState(false);
+ useEffect(()=>{if(new URLSearchParams(window.location.search).get("tab")==="birthdays")setBirthdaysOpen(true);},[]);
  const [openModal,setOpenModal]=useState<"pipeline"|"lead"|"opportunity"|"activity"|"loss"|"archive"|null>(null);
  const [selected,setSelected]=useState<Opportunity|null>(null);
  const [form,setForm]=useState(initialForm);
@@ -191,6 +194,7 @@ export default function CrmPage(){
   </div>}
   {!authLoading&&!canView&&<div className="rounded-xl bg-white p-10 text-center text-sm text-slate-500"><ShieldCheck className="mx-auto mb-3 h-8 w-8"/>Você não possui a permissão <strong>crm.view</strong>.</div>}
   {canView&&<>
+   {hasPermission("customers.view")&&<><button className={secondary} onClick={()=>setBirthdaysOpen(v=>!v)}>{birthdaysOpen?"Fechar aniversários":"Aniversários & pós-venda"}</button>{birthdaysOpen&&<BirthdayPanel/>}</>}
    <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
     {[
      {name:"Pipeline em aberto",value:loading?"—":money(pipelineTotal),icon:TrendingUp,color:"text-violet-700 bg-violet-50",sub:currentOpen.length+" oportunidades"},

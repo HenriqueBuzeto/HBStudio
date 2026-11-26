@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeFleet, guardOrigin, FleetError } from "@/lib/fleet-session";
 import crypto from "crypto";
+import {birthDateOrNull} from "@/lib/birthday-date";
 import {normalizePhoneBr,normalizeCep,normalizeDocument} from "@/lib/br-format";
 
 // GET /api/parties - Listar clientes e fornecedores do tenant com contatos, endereços e equipamentos
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
         p."DocumentNumber",
         p."StateRegistration",
         p."MunicipalRegistration",
-        p."BirthDate",
+        to_char(p."BirthDate" AT TIME ZONE 'UTC','YYYY-MM-DD') AS "BirthDate",
         p."IsActive",
         p."Notes",
         p."CreatedAtUtc",
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
       documentNumber: ctx.permissions.has("customers.sensitive.view") ? p.DocumentNumber : null,
       stateRegistration: p.StateRegistration,
       municipalRegistration: p.MunicipalRegistration,
-      birthDate: p.BirthDate,
+      birthDate: ctx.permissions.has("customers.sensitive.view") ? p.BirthDate : null,
       isActive: p.IsActive,
       notes: p.Notes,
       isCustomer: !!p.CustomerProfileId,
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
     if (!name) return NextResponse.json({ error: "O nome completo ou razão social é obrigatório." }, { status: 400 });
 
     const type = body.type === 2 ? 2 : 1;
+    let birthDate:string|null;try{birthDate=birthDateOrNull(body.birthDate,type);}catch(e){return NextResponse.json({error:(e as Error).message},{status:400});}
     const cleanDoc = typeof body.documentNumber === "string"
       ? normalizeDocument(body.documentNumber) : null;
     if (cleanDoc && cleanDoc.length !== (type === 2 ? 14 : 11)) {
@@ -230,7 +232,7 @@ export async function POST(request: NextRequest) {
         partyId, tenantId, type, name, type === 2 ? body.tradeName?.trim() || null : null,
         cleanDoc, type === 2 ? body.stateRegistration?.trim() || null : null,
         body.municipalRegistration?.trim() || null,
-        body.birthDate || null, body.notes?.trim() || null, now
+        birthDate?birthDate+"T00:00:00.000Z":null, body.notes?.trim() || null, now
       ])
     ];
     if (body.enableCustomer !== false) {
