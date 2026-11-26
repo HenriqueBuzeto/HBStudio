@@ -308,7 +308,7 @@ export default function RootShellLayout({
         </header>
 
         {/* Page Container com Scroll Vertical Próprio */}
-        <main className={"flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 max-w-7xl w-full mx-auto space-y-6 "+((pathname==="/reports"||pathname==="/partners")?"print:overflow-visible print:max-w-none print:p-0":"")}>
+        <main className={"flex-1 overflow-y-auto p-4 md:p-6 lg:p-7 w-full mx-auto space-y-6 "+(pathname==="/sales"?"max-w-[1600px] ":"max-w-7xl ")+((pathname==="/reports"||pathname==="/partners")?"print:overflow-visible print:max-w-none print:p-0":"")}>
           {children}
         </main>
       </div>
